@@ -45,6 +45,7 @@ Your goal is to help me write effective unit tests with XUnit, covering both sta
 
 ## Assertions
 
+- Use `AwesomeAssertions` nuget package for more expressive assertions
 - Use `Assert.Equal` for value equality
 - Use `Assert.Same` for reference equality
 - Use `Assert.True`/`Assert.False` for boolean conditions
