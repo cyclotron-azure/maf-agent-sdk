@@ -1,0 +1,51 @@
+<Project>
+
+  <!-- Enable Central Package Management -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Common Build Settings -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;NU5104</NoWarn>
+  </PropertyGroup>
+
+  <!-- Common NuGet Package Metadata -->
+  <PropertyGroup>
+    <Authors>Cyclotron</Authors>
+    <Company>Cyclotron</Company>
+    <Copyright>Copyright © Cyclotron $([System.DateTime]::Now.Year)</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/cyclotron-azure/maf-agent-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cyclotron-azure/maf-agent-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>logo.jpeg</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!-- Source Link Configuration -->
+  <PropertyGroup>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- Deterministic Builds for CI -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- Include logo in all packages -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)img/logo.jpeg" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>
