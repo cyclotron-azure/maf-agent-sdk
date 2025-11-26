@@ -81,8 +81,3 @@ agents:
       - Confidence: High/Medium/Low
       - Reason: Brief explanation
 
-# Telemetry Configuration (optional)
-Telemetry:
-  Enabled: false
-  SourceName: "SpamDetection"
-  EnableSensitiveData: false
