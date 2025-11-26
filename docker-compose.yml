@@ -1,0 +1,9 @@
+services:
+  grafana-otel:
+    image: grafana/otel-lgtm:latest
+    container_name: grafana-otel
+    ports:
+      - "3100:3000"   # Grafana UI (host:container)
+      - "4317:4317"   # OTLP gRPC endpoint
+      - "4318:4318"   # OTLP HTTP endpoint
+    restart: unless-stopped

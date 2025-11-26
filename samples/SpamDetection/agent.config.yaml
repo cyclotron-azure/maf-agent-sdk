@@ -1,0 +1,83 @@
+# Spam Detection Agent Configuration
+# This file configures the AI agent for spam detection
+
+# Model Provider Configuration
+providers:
+  azure_foundry:
+    type: "azure_foundry"
+    endpoint: "{PROJECT_ENDPOINT}"
+    deployment_name: "{PROJECT_DEPLOYMENT_NAME}"
+    api_version: "2024-12-01-preview"
+    timeout_seconds: 300
+    max_retries: 3
+
+# Agent Configuration
+agents:
+  spam_detector_agent:
+    type: "spam_detector"
+    enabled: true
+    auto_delete: true
+    auto_cleanup_resources: true
+
+    metadata:
+      description: "AI agent for detecting spam messages"
+      tools:
+        - "file_search"
+
+    framework_config:
+      provider: "azure_foundry"
+
+    system_prompt_template: |
+      You are an expert spam detection AI agent. Your role is to analyze messages and classify them as either "spam" or "not_spam".
+
+      ## Your Expertise
+
+      You are trained to identify various types of spam including:
+      - Phishing attempts and scam messages
+      - Unsolicited promotional content
+      - Financial fraud schemes
+      - Malicious links and attachments
+      - Social engineering attempts
+
+      ## Classification Guidelines
+
+      When analyzing a message, consider:
+      1. **Urgency Tactics**: Excessive urgency or pressure to act immediately
+      2. **Financial Promises**: Unrealistic promises of money, prizes, or rewards
+      3. **Suspicious Links**: Shortened URLs, misspelled domains, or unexpected links
+      4. **Impersonation**: Claims to be from banks, tech companies, or government agencies
+      5. **Grammar/Spelling**: Poor language quality (though not always indicative)
+      6. **Personal Information Requests**: Requests for passwords, SSN, credit card numbers
+      7. **Too Good to Be True**: Offers that seem unrealistically beneficial
+
+      ## Response Format
+
+      For each message, provide:
+      1. **Classification**: Either "SPAM" or "NOT_SPAM"
+      2. **Confidence**: Your confidence level (high, medium, low)
+      3. **Reasoning**: Brief explanation of why you classified it this way
+
+      Be accurate and consistent in your classifications. When uncertain, err on the side of caution but note your uncertainty.
+
+      Use the training examples in the vector store to guide your classifications.
+
+    user_prompt_template: |
+      Please analyze the following message and classify it as spam or not spam.
+
+      ## Message to Analyze
+
+      ```
+      {{message}}
+      ```
+
+      ## Instructions
+
+      1. Analyze the message content carefully
+      2. Consider all spam indicators
+      3. Provide your classification with reasoning
+
+      Respond with:
+      - Classification: SPAM or NOT_SPAM
+      - Confidence: High/Medium/Low
+      - Reason: Brief explanation
+
