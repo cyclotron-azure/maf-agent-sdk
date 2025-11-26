@@ -133,9 +133,6 @@ jobs:
       id-token: write
       contents: read
 
-    # Uncomment the following line after creating 'nuget' environment in GitHub repo settings
-    # environment: nuget
-
     steps:
       - name: Download NuGet packages
         uses: actions/download-artifact@v4
@@ -148,14 +145,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: NuGet Login (OIDC → Trusted Publishing)
-        uses: nuget/login@v1
-        with:
-          # NuGet.org username (profile name) - NOT email address
-          # Store this in a secret for security
-          user: ${{ secrets.NUGET_USER }}
-
-      - name: Publish to NuGet.org
+      - name: Publish to NuGet.org (Trusted Publishing)
         run: |
           echo "📦 Publishing version: ${{ needs.build.outputs.nuget_version }}"
           echo "📦 Is Pre-release: ${{ needs.build.outputs.is_prerelease }}"
