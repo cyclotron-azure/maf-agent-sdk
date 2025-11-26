@@ -2231,6 +2231,213 @@ public class AgentFactoryTests
 
     #endregion
 
+    #region Tool Configuration Tests
+
+    [Fact(DisplayName = "Constructor should accept agent with file_search tool configured")]
+    public void Constructor_FileSearchToolConfigured_CreatesFactory()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Metadata = new AgentMetadataOptions
+                {
+                    Description = "Test agent",
+                    Tools = ["file_search"]
+                }
+            }
+        };
+
+        // Act
+        var factory = new AgentFactory(
+            "classification",
+            _mockLogger.Object,
+            _mockPromptService.Object,
+            CreateProviderOptions(),
+            CreateAgentOptions(agents),
+            _mockClientFactory.Object,
+            _mockVectorStoreManager.Object,
+            CreateTelemetryOptions());
+
+        // Assert
+        factory.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().Contain("file_search");
+    }
+
+    [Fact(DisplayName = "Constructor should accept agent with code_interpreter tool configured")]
+    public void Constructor_CodeInterpreterToolConfigured_CreatesFactory()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Metadata = new AgentMetadataOptions
+                {
+                    Description = "Test agent",
+                    Tools = ["code_interpreter"]
+                }
+            }
+        };
+
+        // Act
+        var factory = new AgentFactory(
+            "classification",
+            _mockLogger.Object,
+            _mockPromptService.Object,
+            CreateProviderOptions(),
+            CreateAgentOptions(agents),
+            _mockClientFactory.Object,
+            _mockVectorStoreManager.Object,
+            CreateTelemetryOptions());
+
+        // Assert
+        factory.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().Contain("code_interpreter");
+    }
+
+    [Fact(DisplayName = "Constructor should accept agent with both tools configured")]
+    public void Constructor_BothToolsConfigured_CreatesFactory()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Metadata = new AgentMetadataOptions
+                {
+                    Description = "Test agent with multiple tools",
+                    Tools = ["file_search", "code_interpreter"]
+                }
+            }
+        };
+
+        // Act
+        var factory = new AgentFactory(
+            "classification",
+            _mockLogger.Object,
+            _mockPromptService.Object,
+            CreateProviderOptions(),
+            CreateAgentOptions(agents),
+            _mockClientFactory.Object,
+            _mockVectorStoreManager.Object,
+            CreateTelemetryOptions());
+
+        // Assert
+        factory.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().HaveCount(2);
+        factory.AgentDefinition.Metadata.Tools.Should().Contain("file_search");
+        factory.AgentDefinition.Metadata.Tools.Should().Contain("code_interpreter");
+    }
+
+    [Fact(DisplayName = "Constructor should accept agent with empty tools list")]
+    public void Constructor_EmptyToolsList_CreatesFactory()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Metadata = new AgentMetadataOptions
+                {
+                    Description = "Test agent",
+                    Tools = []
+                }
+            }
+        };
+
+        // Act
+        var factory = new AgentFactory(
+            "classification",
+            _mockLogger.Object,
+            _mockPromptService.Object,
+            CreateProviderOptions(),
+            CreateAgentOptions(agents),
+            _mockClientFactory.Object,
+            _mockVectorStoreManager.Object,
+            CreateTelemetryOptions());
+
+        // Assert
+        factory.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Constructor should accept agent with case-insensitive tool names")]
+    public void Constructor_MixedCaseToolNames_CreatesFactory()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Metadata = new AgentMetadataOptions
+                {
+                    Description = "Test agent",
+                    Tools = ["FILE_SEARCH", "Code_Interpreter"]
+                }
+            }
+        };
+
+        // Act
+        var factory = new AgentFactory(
+            "classification",
+            _mockLogger.Object,
+            _mockPromptService.Object,
+            CreateProviderOptions(),
+            CreateAgentOptions(agents),
+            _mockClientFactory.Object,
+            _mockVectorStoreManager.Object,
+            CreateTelemetryOptions());
+
+        // Assert
+        factory.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().HaveCount(2);
+    }
+
+    [Fact(DisplayName = "AgentDefinition Metadata should have default empty tools list")]
+    public void AgentDefinition_DefaultMetadata_HasEmptyToolsList()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                // No Metadata explicitly set - should use default
+            }
+        };
+
+        // Act
+        var factory = new AgentFactory(
+            "classification",
+            _mockLogger.Object,
+            _mockPromptService.Object,
+            CreateProviderOptions(),
+            CreateAgentOptions(agents),
+            _mockClientFactory.Object,
+            _mockVectorStoreManager.Object,
+            CreateTelemetryOptions());
+
+        // Assert
+        factory.AgentDefinition.Metadata.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().NotBeNull();
+        factory.AgentDefinition.Metadata.Tools.Should().BeEmpty();
+    }
+
+    #endregion
+
     #region Options Validation Tests
 
     [Fact(DisplayName = "Constructor should work with empty providers dictionary")]

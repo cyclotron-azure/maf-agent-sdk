@@ -246,13 +246,8 @@ public class AgentFactory : IAgentFactory
         // Get system prompt (instructions) from prompt rendering service
         var instructions = _promptService.RenderSystemPrompt(_agentKey);
 
-        // Configure tool resources with file search enabled
-        var toolResources = new ToolResources
-        {
-            FileSearch = new FileSearchToolResource()
-        };
-
-        toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
+        // Configure tool resources and definitions based on agent metadata configuration
+        var (toolResources, toolDefinitions) = BuildToolConfiguration(vectorStoreId);
 
         // Create ephemeral agent with unique name
         var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
@@ -261,11 +256,12 @@ public class AgentFactory : IAgentFactory
         try
         {
             _logger.LogDebug(
-                "Creating {AgentKey} agent with name: {AgentName}, provider: {ProviderName}, model: {Model}",
+                "Creating {AgentKey} agent with name: {AgentName}, provider: {ProviderName}, model: {Model}, tools: [{Tools}]",
                 _agentKey,
                 agentName,
                 providerName,
-                provider.GetEffectiveModel());
+                provider.GetEffectiveModel(),
+                string.Join(", ", _agentDefinition.Metadata.Tools));
 
             // Get provider-specific client
             var client = _clientFactory.GetClient(providerName);
@@ -274,7 +270,7 @@ public class AgentFactory : IAgentFactory
                 model: provider.GetEffectiveModel(),
                 name: agentName,
                 instructions: instructions,
-                tools: [new FileSearchToolDefinition()],
+                tools: toolDefinitions,
                 toolResources: toolResources,
                 cancellationToken: cancellationToken);
 
@@ -443,6 +439,67 @@ public class AgentFactory : IAgentFactory
                 "Skipping {AgentKey} vector store cleanup (AutoCleanupResources=false)",
                 _agentKey);
         }
+    }
+
+    /// <summary>
+    /// Builds the tool configuration based on the agent's metadata.tools configuration.
+    /// Supports "file_search" and "code_interpreter" tools.
+    /// </summary>
+    /// <param name="vectorStoreId">The vector store ID to associate with file search tool.</param>
+    /// <returns>A tuple containing the tool resources and tool definitions.</returns>
+    private (ToolResources toolResources, IEnumerable<ToolDefinition> toolDefinitions) BuildToolConfiguration(string vectorStoreId)
+    {
+        var toolResources = new ToolResources();
+        var toolDefinitions = new List<ToolDefinition>();
+        var configuredTools = _agentDefinition.Metadata.Tools;
+
+        // Default to file_search if no tools are configured
+        if (configuredTools.Count == 0)
+        {
+            _logger.LogDebug(
+                "No tools configured for {AgentKey}, defaulting to file_search",
+                _agentKey);
+            configuredTools = ["file_search"];
+        }
+
+        foreach (var tool in configuredTools)
+        {
+            switch (tool.ToLowerInvariant())
+            {
+                case "file_search":
+                    toolResources.FileSearch = new FileSearchToolResource();
+                    toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
+                    toolDefinitions.Add(new FileSearchToolDefinition());
+                    _logger.LogDebug("Configured file_search tool for {AgentKey}", _agentKey);
+                    break;
+
+                case "code_interpreter":
+                    toolResources.CodeInterpreter = new CodeInterpreterToolResource();
+                    toolDefinitions.Add(new CodeInterpreterToolDefinition());
+                    _logger.LogDebug("Configured code_interpreter tool for {AgentKey}", _agentKey);
+                    break;
+
+                default:
+                    _logger.LogWarning(
+                        "Unknown tool '{Tool}' configured for {AgentKey}. Supported tools: file_search, code_interpreter",
+                        tool,
+                        _agentKey);
+                    break;
+            }
+        }
+
+        // Ensure at least one tool is configured
+        if (toolDefinitions.Count == 0)
+        {
+            _logger.LogWarning(
+                "No valid tools configured for {AgentKey}, defaulting to file_search",
+                _agentKey);
+            toolResources.FileSearch = new FileSearchToolResource();
+            toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
+            toolDefinitions.Add(new FileSearchToolDefinition());
+        }
+
+        return (toolResources, toolDefinitions);
     }
 
     private void ValidateProviderReference()
