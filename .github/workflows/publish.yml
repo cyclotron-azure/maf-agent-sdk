@@ -84,26 +84,34 @@ jobs:
           
           FULL_VERSION=$(dotnet gitversion /showvariable FullSemVer)
           MAJOR_MINOR_PATCH=$(dotnet gitversion /showvariable MajorMinorPatch)
-          PRERELEASE_TAG=$(dotnet gitversion /showvariable PreReleaseTag)
           PRERELEASE_LABEL=$(dotnet gitversion /showvariable PreReleaseLabel)
           PRERELEASE_NUMBER=$(dotnet gitversion /showvariable PreReleaseNumber)
+          BRANCH_NAME="${GITHUB_REF##*/}"
           
-          # Build NuGet version: use MajorMinorPatch for stable, or add proper pre-release suffix
-          if [ -z "$PRERELEASE_TAG" ]; then
+          # Build NuGet version based on branch
+          # main branch: stable releases (MajorMinorPatch only)
+          # dev/feature branches: pre-release with label (e.g., 0.1.0-alpha.10)
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
+            # Main branch = stable release
             NUGET_VERSION="$MAJOR_MINOR_PATCH"
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
-          else
-            # Format: 0.0.1-alpha.10 (valid SemVer 2.0 for NuGet)
-            NUGET_VERSION="${MAJOR_MINOR_PATCH}-${PRERELEASE_TAG}"
+          elif [ -n "$PRERELEASE_LABEL" ]; then
+            # Has a proper pre-release label (alpha, beta, rc, etc.)
+            NUGET_VERSION="${MAJOR_MINOR_PATCH}-${PRERELEASE_LABEL}.${PRERELEASE_NUMBER}"
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            # Fallback: use MajorMinorPatch
+            NUGET_VERSION="$MAJOR_MINOR_PATCH"
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
           
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
           echo "nuget_version=$NUGET_VERSION" >> $GITHUB_OUTPUT
           
-          echo "📦 Version: $FULL_VERSION"
+          echo "📦 Branch: $BRANCH_NAME"
+          echo "📦 Full Version: $FULL_VERSION"
           echo "📦 NuGet Version: $NUGET_VERSION"
-          echo "📦 Pre-release Tag: $PRERELEASE_TAG"
+          echo "📦 Pre-release Label: $PRERELEASE_LABEL"
 
       - name: Restore dependencies
         run: dotnet restore
