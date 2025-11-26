@@ -515,5 +515,221 @@ public class PromptRenderingServiceTests
         service.HasUserPromptTemplate("agent2").Should().BeFalse();
     }
 
+    [Fact(DisplayName = "Constructor should handle invalid Handlebars template gracefully")]
+    public void Constructor_InvalidHandlebarsTemplate_HandlesGracefully()
+    {
+        // Arrange - Invalid Handlebars syntax (unclosed tag)
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["invalid_agent"] = new AgentDefinitionOptions
+            {
+                SystemPromptTemplate = "Hello {{name", // Invalid - unclosed tag
+                UserPromptTemplate = "Valid template"
+            }
+        };
+
+        // Act - should not throw during construction (logs error instead)
+        var service = CreateService(agents);
+
+        // Assert - Service created but template not available
+        service.Should().NotBeNull();
+        // The invalid template won't be compiled, so HasSystemPromptTemplate returns false
+        service.HasSystemPromptTemplate("invalid_agent").Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Constructor should handle empty agents dictionary")]
+    public void Constructor_EmptyAgentsDictionary_CreatesService()
+    {
+        // Act
+        var service = CreateService(new Dictionary<string, AgentDefinitionOptions>());
+
+        // Assert
+        service.Should().NotBeNull();
+    }
+
+    #endregion
+
+    #region RenderSystemPrompt Edge Case Tests
+
+    [Fact(DisplayName = "RenderSystemPrompt should throw when agent does not exist with context")]
+    public void RenderSystemPrompt_AgentDoesNotExist_WithContext_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var service = CreateService();
+        var context = new { name = "test" };
+
+        // Act
+        var act = () => service.RenderSystemPrompt("nonexistent", context);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*No system_prompt_template configured*");
+    }
+
+    [Fact(DisplayName = "RenderSystemPrompt should throw when template is whitespace only")]
+    public void RenderSystemPrompt_WhitespaceTemplate_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                SystemPromptTemplate = "   " // Whitespace only
+            }
+        };
+        var service = CreateService(agents);
+
+        // Act
+        var act = () => service.RenderSystemPrompt("classification");
+
+        // Assert - whitespace is considered null/empty
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    #endregion
+
+    #region RenderUserPrompt Edge Case Tests
+
+    [Fact(DisplayName = "RenderUserPrompt should throw when agent does not exist with context")]
+    public void RenderUserPrompt_AgentDoesNotExist_WithContext_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var service = CreateService();
+        var context = new { text = "test" };
+
+        // Act
+        var act = () => service.RenderUserPrompt("nonexistent", context);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*No user_prompt_template configured*");
+    }
+
+    [Fact(DisplayName = "RenderUserPrompt should handle complex Handlebars expressions")]
+    public void RenderUserPrompt_ComplexHandlebarsExpression_RendersCorrectly()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                UserPromptTemplate = "Document: {{document.name}} by {{document.author}}"
+            }
+        };
+        var service = CreateService(agents);
+        var context = new { document = new { name = "Test Doc", author = "John Doe" } };
+
+        // Act
+        var result = service.RenderUserPrompt("classification", context);
+
+        // Assert
+        result.Should().Be("Document: Test Doc by John Doe");
+    }
+
+    [Fact(DisplayName = "RenderUserPrompt should find agent with _agent suffix and render with context")]
+    public void RenderUserPrompt_AgentWithSuffix_RendersWithContext()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                UserPromptTemplate = "Process: {{item}}"
+            }
+        };
+        var service = CreateService(agents);
+        var context = new { item = "test item" };
+
+        // Act
+        var result = service.RenderUserPrompt("classification", context);
+
+        // Assert
+        result.Should().Be("Process: test item");
+    }
+
+    #endregion
+
+    #region HasUserPromptTemplate Edge Case Tests
+
+    [Fact(DisplayName = "HasUserPromptTemplate should return false for null key")]
+    public void HasUserPromptTemplate_NullKey_ReturnsFalse()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var result = service.HasUserPromptTemplate(null!);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "HasUserPromptTemplate should return false for whitespace key")]
+    public void HasUserPromptTemplate_WhitespaceKey_ReturnsFalse()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var result = service.HasUserPromptTemplate("   ");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region HasSystemPromptTemplate Edge Case Tests
+
+    [Fact(DisplayName = "HasSystemPromptTemplate should return false for null key")]
+    public void HasSystemPromptTemplate_NullKey_ReturnsFalse()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var result = service.HasSystemPromptTemplate(null!);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "HasSystemPromptTemplate should return false for whitespace key")]
+    public void HasSystemPromptTemplate_WhitespaceKey_ReturnsFalse()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var result = service.HasSystemPromptTemplate("   ");
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "HasSystemPromptTemplate should find template with _agent suffix")]
+    public void HasSystemPromptTemplate_AgentWithSuffix_ReturnsTrue()
+    {
+        // Arrange
+        var agents = new Dictionary<string, AgentDefinitionOptions>
+        {
+            ["classification_agent"] = new AgentDefinitionOptions
+            {
+                Type = "classification",
+                SystemPromptTemplate = "You are a helper."
+            }
+        };
+        var service = CreateService(agents);
+
+        // Act
+        var result = service.HasSystemPromptTemplate("classification");
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
     #endregion
 }

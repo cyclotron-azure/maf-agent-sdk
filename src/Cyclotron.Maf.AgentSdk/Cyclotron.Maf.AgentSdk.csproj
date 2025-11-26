@@ -8,6 +8,11 @@
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
+  <!-- Expose internals to test project -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cyclotron.Maf.AgentSdk.UnitTests" />
+  </ItemGroup>
+
   <!-- Azure SDK Packages -->
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" />

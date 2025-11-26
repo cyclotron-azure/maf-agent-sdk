@@ -1,1 +1,3 @@
 # Cyclotron.Maf.AgentSdk
+
+Cyclotron is an award-winning technology consultancy specializing in Microsoft solutions, AI innovation, and enterprise security. Founded in 2014 and headquartered in San Francisco, Cyclotron helps organizations accelerate digital transformation through services spanning Azure cloud, modern work, compliance, and custom AI platforms. As a multi-year Microsoft Partner of the Year and member of the Copilot Early Access Program, Cyclotron delivers integrated solutions that drive real business impact—empowering clients to work smarter, scale faster, and innovate securely. Learn more at cyclotron.com.
