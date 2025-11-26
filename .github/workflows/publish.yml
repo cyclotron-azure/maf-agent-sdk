@@ -192,12 +192,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Download NuGet packages
         uses: actions/download-artifact@v4
         with:
           name: nuget-packages
           path: ./artifacts
+
+      - name: Create and push tag
+        run: |
+          TAG_NAME="v${{ needs.build.outputs.nuget_version }}"
+          echo "Creating tag: $TAG_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME" || echo "Tag already exists, continuing..."
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
