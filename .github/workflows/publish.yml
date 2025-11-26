@@ -83,7 +83,7 @@ jobs:
           dotnet gitversion /output buildserver
           
           FULL_VERSION=$(dotnet gitversion /showvariable FullSemVer)
-          NUGET_VERSION=$(dotnet gitversion /showvariable NuGetVersionV2)
+          NUGET_VERSION=$(dotnet gitversion /showvariable SemVer)
           PRERELEASE_TAG=$(dotnet gitversion /showvariable PreReleaseTag)
           
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
