@@ -231,19 +231,26 @@ public class Main : IMain
         // Simple parsing - in production, you'd want structured output
         var lowerResponse = response.ToLowerInvariant();
 
-        var classification = lowerResponse.Contains("spam") && !lowerResponse.Contains("not spam")
-            ? "spam"
-            : "not_spam";
+        // Check for NOT_SPAM first (covers "not_spam", "not spam", "NOT_SPAM")
+        var isNotSpam = lowerResponse.Contains("not_spam") ||
+                        lowerResponse.Contains("not spam") ||
+                        lowerResponse.Contains("classification: not");
+
+        var classification = isNotSpam ? "not_spam" : "spam";
 
         // Try to extract confidence (default to 0.8 if not found)
         var confidence = 0.8;
-        if (lowerResponse.Contains("high confidence") || lowerResponse.Contains("confident"))
+        if (lowerResponse.Contains("high confidence") || lowerResponse.Contains("confidence: high"))
         {
             confidence = 0.95;
         }
-        else if (lowerResponse.Contains("low confidence") || lowerResponse.Contains("uncertain"))
+        else if (lowerResponse.Contains("low confidence") || lowerResponse.Contains("confidence: low") || lowerResponse.Contains("uncertain"))
         {
             confidence = 0.6;
+        }
+        else if (lowerResponse.Contains("medium confidence") || lowerResponse.Contains("confidence: medium"))
+        {
+            confidence = 0.8;
         }
 
         // Extract reason from response

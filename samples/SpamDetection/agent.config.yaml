@@ -5,8 +5,8 @@
 providers:
   azure_foundry:
     type: "azure_foundry"
-    endpoint: "${PROJECT_ENDPOINT}"
-    deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
+    endpoint: "{PROJECT_ENDPOINT}"
+    deployment_name: "{PROJECT_DEPLOYMENT_NAME}"
     api_version: "2024-12-01-preview"
     timeout_seconds: 300
     max_retries: 3
