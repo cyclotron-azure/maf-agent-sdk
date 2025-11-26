@@ -197,8 +197,23 @@ jobs:
           echo "📦 Version: ${{ needs.build.outputs.nuget_version }}"
           echo "📦 Is Pre-release: ${{ needs.build.outputs.is_prerelease }}"
 
+      - name: Check if release exists
+        id: check_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="v${{ needs.build.outputs.nuget_version }}"
+          if gh release view "$TAG_NAME" --repo ${{ github.repository }} >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "📦 Release $TAG_NAME already exists, skipping creation"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "📦 Release $TAG_NAME does not exist, will create"
+          fi
+
       - name: Create Tag and Release
         id: create_release
+        if: steps.check_release.outputs.exists == 'false'
         uses: actions/create-release@v1.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -208,12 +223,14 @@ jobs:
           prerelease: ${{ needs.build.outputs.is_prerelease == 'true' }}
 
       - name: Download NuGet packages
+        if: steps.check_release.outputs.exists == 'false'
         uses: actions/download-artifact@v4
         with:
           name: nuget-packages
           path: ./artifacts
 
       - name: Upload NuGet package to release
+        if: steps.check_release.outputs.exists == 'false'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
