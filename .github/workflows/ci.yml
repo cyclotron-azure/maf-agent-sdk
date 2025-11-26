@@ -62,13 +62,6 @@ jobs:
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
-        with:
-          directory: ./coverage
-          fail_ci_if_error: false
-        continue-on-error: true
-
       - name: Pack (validation only)
         run: dotnet pack --no-build --configuration Release /p:Version=${{ steps.gitversion.outputs.nuget_version }} --output ./artifacts
 
