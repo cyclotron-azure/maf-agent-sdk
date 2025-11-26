@@ -145,6 +145,12 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: NuGet login (OIDC → temp API key)
+        uses: nuget/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Publish to NuGet.org (Trusted Publishing)
         run: |
           echo "📦 Publishing version: ${{ needs.build.outputs.nuget_version }}"
@@ -153,6 +159,7 @@ jobs:
           for package in ./artifacts/*.nupkg; do
             echo "Publishing $package..."
             dotnet nuget push "$package" \
+              --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} \
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate
           done
