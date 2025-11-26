@@ -177,3 +177,40 @@ jobs:
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate
           done
+
+  create-tag:
+    name: Create Version Tag
+    needs: [build, publish-nuget]
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_nuget == 'true')
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.build.outputs.nuget_version }}"
+          TAG_NAME="v${VERSION}"
+          
+          echo "🏷️ Creating tag: $TAG_NAME"
+          
+          # Check if tag already exists
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG_NAME already exists, skipping..."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            
+            git tag -a "$TAG_NAME" -m "Release $VERSION"
+            git push origin "$TAG_NAME"
+            
+            echo "✅ Tag $TAG_NAME created and pushed successfully"
+          fi
