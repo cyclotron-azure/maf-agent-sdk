@@ -1,7 +1,7 @@
 # Publish Workflow - Build and Publish NuGet packages
 # Uses Trusted Publishing (OIDC) for NuGet.org authentication
 # No API keys required - uses short-lived tokens from GitHub Actions
-# 
+#
 # Triggers:
 # - Push to 'dev' branch: Publishes preview/alpha packages
 # - Push to 'main' branch: Publishes stable packages
@@ -81,13 +81,13 @@ jobs:
         id: gitversion
         run: |
           dotnet gitversion /output buildserver
-          
+
           FULL_VERSION=$(dotnet gitversion /showvariable FullSemVer)
           MAJOR_MINOR_PATCH=$(dotnet gitversion /showvariable MajorMinorPatch)
           PRERELEASE_LABEL=$(dotnet gitversion /showvariable PreReleaseLabel)
           PRERELEASE_NUMBER=$(dotnet gitversion /showvariable PreReleaseNumber)
           BRANCH_NAME="${GITHUB_REF##*/}"
-          
+
           # Build NuGet version based on branch
           # main branch: stable releases (MajorMinorPatch only)
           # dev/feature branches: pre-release with label (e.g., 0.1.0-alpha.10)
@@ -104,10 +104,10 @@ jobs:
             NUGET_VERSION="$MAJOR_MINOR_PATCH"
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
           echo "nuget_version=$NUGET_VERSION" >> $GITHUB_OUTPUT
-          
+
           echo "📦 Branch: $BRANCH_NAME"
           echo "📦 Full Version: $FULL_VERSION"
           echo "📦 NuGet Version: $NUGET_VERSION"
@@ -141,7 +141,7 @@ jobs:
     if: |
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_nuget == 'true')
-    
+
     # Required for Trusted Publishing (OIDC)
     permissions:
       id-token: write
@@ -169,7 +169,7 @@ jobs:
         run: |
           echo "📦 Publishing version: ${{ needs.build.outputs.nuget_version }}"
           echo "📦 Is Pre-release: ${{ needs.build.outputs.is_prerelease }}"
-          
+
           for package in ./artifacts/*.nupkg; do
             echo "Publishing $package..."
             dotnet nuget push "$package" \
@@ -185,7 +185,7 @@ jobs:
     if: |
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_nuget == 'true')
-    
+
     permissions:
       contents: write
 
@@ -199,18 +199,18 @@ jobs:
         run: |
           VERSION="${{ needs.build.outputs.nuget_version }}"
           TAG_NAME="v${VERSION}"
-          
+
           echo "🏷️ Creating tag: $TAG_NAME"
-          
+
           # Check if tag already exists
           if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
             echo "⚠️ Tag $TAG_NAME already exists, skipping..."
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            
+
             git tag -a "$TAG_NAME" -m "Release $VERSION"
             git push origin "$TAG_NAME"
-            
+
             echo "✅ Tag $TAG_NAME created and pushed successfully"
           fi
