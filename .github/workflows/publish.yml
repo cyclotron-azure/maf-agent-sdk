@@ -1,0 +1,179 @@
+# Publish Workflow - Build and Publish NuGet packages
+# Uses Trusted Publishing (OIDC) for NuGet.org authentication
+# No API keys required - uses short-lived tokens from GitHub Actions
+# 
+# Triggers:
+# - Push to 'dev' branch: Publishes preview/alpha packages
+# - Push to 'main' branch: Publishes stable packages
+# - Manual trigger: Can publish from any branch
+#
+# Setup required on nuget.org:
+# 1. Log into nuget.org
+# 2. Click your username → Trusted Publishing
+# 3. Add a new trusted publishing policy:
+#    - Repository Owner: cyclotron-azure
+#    - Repository: maf-agent-sdk
+#    - Workflow File: publish.yml
+#    - Environment: nuget (optional)
+
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/instructions/**'
+      - '.github/prompts/**'
+      - '.github/agents/**'
+
+  # Allow manual trigger with optional inputs
+  workflow_dispatch:
+    inputs:
+      publish_nuget:
+        description: 'Publish to NuGet.org'
+        required: true
+        type: boolean
+        default: true
+      create_release:
+        description: 'Create GitHub Release'
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # Don't cancel publish workflows
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Build & Pack
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.gitversion.outputs.version }}
+      nuget_version: ${{ steps.gitversion.outputs.nuget_version }}
+      is_prerelease: ${{ steps.gitversion.outputs.is_prerelease }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Full history for GitVersion
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Determine version with GitVersion
+        id: gitversion
+        run: |
+          dotnet gitversion /output buildserver
+          
+          FULL_VERSION=$(dotnet gitversion /showvariable FullSemVer)
+          MAJOR_MINOR_PATCH=$(dotnet gitversion /showvariable MajorMinorPatch)
+          PRERELEASE_LABEL=$(dotnet gitversion /showvariable PreReleaseLabel)
+          PRERELEASE_NUMBER=$(dotnet gitversion /showvariable PreReleaseNumber)
+          BRANCH_NAME="${GITHUB_REF##*/}"
+          
+          # Build NuGet version based on branch
+          # main branch: stable releases (MajorMinorPatch only)
+          # dev/feature branches: pre-release with label (e.g., 0.1.0-alpha.10)
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
+            # Main branch = stable release
+            NUGET_VERSION="$MAJOR_MINOR_PATCH"
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          elif [ -n "$PRERELEASE_LABEL" ]; then
+            # Has a proper pre-release label (alpha, beta, rc, etc.)
+            NUGET_VERSION="${MAJOR_MINOR_PATCH}-${PRERELEASE_LABEL}.${PRERELEASE_NUMBER}"
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            # Fallback: use MajorMinorPatch
+            NUGET_VERSION="$MAJOR_MINOR_PATCH"
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "nuget_version=$NUGET_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "📦 Branch: $BRANCH_NAME"
+          echo "📦 Full Version: $FULL_VERSION"
+          echo "📦 NuGet Version: $NUGET_VERSION"
+          echo "📦 Pre-release Label: $PRERELEASE_LABEL"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.version }}
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      - name: Pack
+        run: dotnet pack --no-build --configuration Release /p:Version=${{ steps.gitversion.outputs.nuget_version }} --output ./artifacts
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            ./artifacts/*.nupkg
+            ./artifacts/*.snupkg
+          retention-days: 30
+
+  publish-nuget:
+    name: Publish to NuGet.org
+    needs: build
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_nuget == 'true')
+    
+    # Required for Trusted Publishing (OIDC)
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: NuGet login (OIDC → temp API key)
+        uses: nuget/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish to NuGet.org (Trusted Publishing)
+        run: |
+          echo "📦 Publishing version: ${{ needs.build.outputs.nuget_version }}"
+          echo "📦 Is Pre-release: ${{ needs.build.outputs.is_prerelease }}"
+          
+          for package in ./artifacts/*.nupkg; do
+            echo "Publishing $package..."
+            dotnet nuget push "$package" \
+              --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
