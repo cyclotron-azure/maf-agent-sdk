@@ -227,9 +227,19 @@ jobs:
           fi
           
           echo "📦 Creating GitHub release..."
-          # Create release with artifacts
-          gh release create "$TAG_NAME" \
-            --title "Release $TAG_NAME" \
-            $RELEASE_FLAGS \
-            ./artifacts/*.nupkg ./artifacts/*.snupkg 2>/dev/null || \
-          gh release upload "$TAG_NAME" ./artifacts/*.nupkg ./artifacts/*.snupkg --clobber
+          
+          # List artifacts
+          echo "Artifacts to upload:"
+          ls -la ./artifacts/
+          
+          # Check if release already exists
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists, uploading artifacts..."
+            gh release upload "$TAG_NAME" ./artifacts/*.nupkg ./artifacts/*.snupkg --clobber
+          else
+            echo "Creating new release $TAG_NAME..."
+            gh release create "$TAG_NAME" \
+              --title "Release $TAG_NAME" \
+              $RELEASE_FLAGS \
+              ./artifacts/*.nupkg ./artifacts/*.snupkg
+          fi
