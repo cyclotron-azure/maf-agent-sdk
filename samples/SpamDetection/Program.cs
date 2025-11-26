@@ -30,11 +30,12 @@ Log.Logger = AppHost.CreateSerilogLogger(
 
 try
 {
-    Log.Information("Starting AppHost");
+    Log.Information("Starting Spam Detection Sample");
 
     using var host = AppHost
                     .CreateHostBuilder()
-                    .ConfigureServices(ConsoleServiceCollectionExtensions.ConfigureServices)
+                    .UseAgentSdk()
+                    .ConfigureServices(SpamDetectionServiceCollectionExtensions.ConfigureServices)
                     .Build();
 
     await host.StartAsync();
@@ -43,13 +44,13 @@ try
 
     await host.StopAsync();
 
-    Log.Information("AppHost Stopped");
+    Log.Information("Spam Detection Sample Stopped");
 
     return result;
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "AppHost terminated unexpectedly");
+    Log.Fatal(ex, "Spam Detection Sample terminated unexpectedly");
 
     return 1;
 }
