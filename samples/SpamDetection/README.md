@@ -17,7 +17,7 @@ The sample creates an AI agent that:
 2. **Azure AI Foundry** project with a deployed model (e.g., GPT-4o, GPT-4o-mini)
 3. **Azure CLI** authenticated (`az login`)
 
-## Setup
+## Quick Start
 
 ### 1. Configure Environment Variables
 
@@ -34,15 +34,10 @@ PROJECT_ENDPOINT=https://your-project.cognitiveservices.azure.com/
 PROJECT_DEPLOYMENT_NAME=gpt-4o-mini
 ```
 
-### 2. Build the Solution
+### 2. Build and Run
 
 ```bash
 dotnet build
-```
-
-### 3. Run the Sample
-
-```bash
 dotnet run
 ```
 
@@ -53,15 +48,27 @@ dotnet run
 The agent is configured in `agent.config.yaml`:
 
 ```yaml
+providers:
+  azure_foundry:
+    type: "azure_foundry"
+    endpoint: "{PROJECT_ENDPOINT}"        # Environment variable substitution
+    deployment_name: "{PROJECT_DEPLOYMENT_NAME}"
+    api_version: "2024-12-01-preview"
+
 agents:
   spam_detector_agent:
     type: "spam_detector"
     enabled: true
-    auto_delete: true
-    auto_cleanup_resources: true
+    auto_delete: true                     # Delete agent after use
+    auto_cleanup_resources: true          # Delete vector store after use
+
+    metadata:
+      description: "AI agent for detecting spam messages"
+      tools:
+        - "file_search"                   # Enables searching training documents
 
     framework_config:
-      provider: "azure_foundry"
+      provider: "azure_foundry"           # Reference to providers section
 
     system_prompt_template: |
       You are an expert spam detection AI agent...
@@ -70,6 +77,26 @@ agents:
       Please analyze the following message...
       {{message}}
 ```
+
+### Configuring Agent Tools
+
+The `tools` property in `metadata` controls which Azure AI Foundry tools the agent can use:
+
+| Tool | Description |
+|------|-------------|
+| `file_search` | Enables searching documents in the vector store |
+| `code_interpreter` | Enables Python code execution for data analysis |
+
+Example with multiple tools:
+
+```yaml
+metadata:
+  tools:
+    - "file_search"
+    - "code_interpreter"
+```
+
+> **Note:** If no tools are configured, `file_search` is enabled by default when creating an agent with a vector store.
 
 ### Keyed Dependency Injection
 
@@ -91,13 +118,13 @@ public Main(
 ### Agent Lifecycle
 
 1. **Create Vector Store**: Upload training examples for the agent to reference
-2. **Create Agent**: Initialize the ephemeral agent with file search capabilities
+2. **Create Agent**: Initialize the ephemeral agent with configured tools (e.g., file search)
 3. **Run Classification**: Send messages and receive classifications
-4. **Cleanup**: Delete agent, thread, and vector store (configurable via `auto_delete` and `auto_cleanup_resources`)
+4. **Cleanup**: Delete agent, thread, and vector store (based on `auto_delete` and `auto_cleanup_resources` settings)
 
 ## Sample Output
 
-```
+```text
 ================================================================================
 SPAM DETECTION RESULTS
 ================================================================================
@@ -127,6 +154,13 @@ ACCURACY: 10/10 (100%)
 | `enabled` | Whether the agent is active | `true` |
 | `auto_delete` | Delete agent/thread after use | `true` |
 | `auto_cleanup_resources` | Delete vector store after use | `true` |
+
+### Agent Metadata Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `description` | Human-readable agent description | `""` |
+| `tools` | List of tools: `file_search`, `code_interpreter` | `[]` (defaults to `file_search`) |
 
 ### Provider Options
 
@@ -173,15 +207,29 @@ system_prompt_template: |
   }
 ```
 
-### Enable Telemetry
+### Enable Code Interpreter
 
-Update the Telemetry section in `agent.config.yaml`:
+To enable Python code execution for more complex analysis:
 
 ```yaml
-Telemetry:
-  Enabled: true
-  SourceName: "SpamDetection"
-  EnableSensitiveData: false  # Set to true for debugging (logs message content)
+metadata:
+  tools:
+    - "file_search"
+    - "code_interpreter"
+```
+
+### Enable Telemetry
+
+Update the Telemetry section in `appsettings.json`:
+
+```json
+{
+  "Telemetry": {
+    "Enabled": true,
+    "SourceName": "SpamDetection",
+    "EnableSensitiveData": false
+  }
+}
 ```
 
 ## Troubleshooting
@@ -199,6 +247,10 @@ Telemetry:
    - Verify the model deployment is accessible
    - Check API rate limits
 
+4. **"Unknown tool" warning**
+   - Check that tools in `metadata.tools` are spelled correctly
+   - Supported tools: `file_search`, `code_interpreter`
+
 ### Logging
 
 Enable debug logging in `appsettings.Development.json`:
@@ -211,6 +263,21 @@ Enable debug logging in `appsettings.Development.json`:
     }
   }
 }
+```
+
+## Project Structure
+
+```text
+SpamDetection/
+├── agent.config.yaml          # Agent and provider configuration
+├── appsettings.json           # Application settings
+├── appsettings.Development.json
+├── .env                       # Environment variables (create from .env.example)
+├── Program.cs                 # Application entry point
+├── Main.cs                    # Spam detection logic
+├── SpamDetection.csproj       # Project file
+└── DependencyInjection/
+    └── SpamDetectionServiceCollectionExtensions.cs
 ```
 
 ## Related Documentation

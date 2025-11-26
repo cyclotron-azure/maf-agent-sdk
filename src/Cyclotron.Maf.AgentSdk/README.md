@@ -16,6 +16,7 @@ A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF)
 - **PDF Processing** - Convert PDF documents to markdown using PdfPig for better text extraction
 - **Prompt Rendering** - Handlebars-based template rendering for dynamic agent prompts
 - **OpenTelemetry** - Built-in tracing, metrics, and logging with OTLP exporter support
+- **Configurable Tools** - Enable `file_search` and/or `code_interpreter` via YAML configuration
 
 ## Installation
 
@@ -49,28 +50,51 @@ builder.AddAgentSdkTelemetry();
 Create `agent.config.yaml` in your project:
 
 ```yaml
+# Model Provider Configuration
+providers:
+  azure_foundry:
+    type: "azure_foundry"
+    endpoint: "${PROJECT_ENDPOINT}"      # Environment variable substitution
+    deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
+    api_version: "2024-12-01-preview"
+    timeout_seconds: 300
+    max_retries: 3
+
+# Agent Configuration
 agents:
   my_agent:
     type: "custom"
     enabled: true
-    auto_delete: true
-    auto_cleanup_resources: false
-    instructions: |
-      You are a document processing specialist.
-      Analyze documents and extract relevant information.
+    auto_delete: true              # Delete agent after workflow completes
+    auto_cleanup_resources: true   # Delete vector store after workflow completes
+
     metadata:
       description: "Document processing agent"
-      tools: ["file_search"]
+      tools:                       # Configure which tools the agent can use
+        - "file_search"            # Enable document search in vector stores
+        - "code_interpreter"       # Enable Python code execution (optional)
+
     framework_config:
-      provider: "azure_foundry"
-      model: "gpt-4o"
+      provider: "azure_foundry"    # Reference to providers section
+
     system_prompt_template: |
-      You are a helpful assistant.
+      You are a helpful assistant specialized in document analysis.
+
     user_prompt_template: |
       Process the document: {{fileName}}
+      Context: {{context}}
 ```
 
-### 3. Create Workflow Executors
+### 3. Set Environment Variables
+
+Create a `.env` file in your project root:
+
+```env
+PROJECT_ENDPOINT=https://your-project.api.azureml.ms
+PROJECT_DEPLOYMENT_NAME=gpt-4o
+```
+
+### 4. Create Workflow Executors
 
 ```csharp
 using Cyclotron.Maf.AgentSdk.Agents;
@@ -97,7 +121,7 @@ public class MyProcessingExecutor : Executor<InputType, OutputType>
 
         try
         {
-            // Run agent
+            // Run agent with automatic retry and polling
             var response = await _agentFactory.RunAgentWithPollingAsync(
                 messages: [_agentFactory.CreateUserMessage(promptContext)],
                 cancellationToken: cancellationToken);
@@ -107,13 +131,14 @@ public class MyProcessingExecutor : Executor<InputType, OutputType>
         }
         finally
         {
+            // Cleanup respects auto_delete and auto_cleanup_resources settings
             await _agentFactory.CleanupAsync(cancellationToken);
         }
     }
 }
 ```
 
-### 4. Build and Execute Workflow
+### 5. Build and Execute Workflow
 
 ```csharp
 using Microsoft.Agents.AI.Workflows;
@@ -127,45 +152,73 @@ var workflow = new WorkflowBuilder(executor1)
 var result = await workflow.ExecuteAsync<OutputType>(input, cancellationToken);
 ```
 
-## Configuration
+## Configuration Reference
+
+### Agent Configuration (`agent.config.yaml`)
+
+#### Provider Options
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `type` | string | Provider type (`azure_foundry`) | Required |
+| `endpoint` | string | Azure AI Foundry endpoint URL | Required |
+| `deployment_name` | string | Model deployment name | Required |
+| `model` | string | Alternative to deployment_name | - |
+| `api_version` | string | API version | `2024-12-01-preview` |
+| `timeout_seconds` | int | Request timeout | `300` |
+| `max_retries` | int | Maximum retry attempts | `3` |
+
+#### Agent Definition Options
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `type` | string | Agent type identifier | Required |
+| `enabled` | bool | Whether agent is active | `true` |
+| `auto_delete` | bool | Delete agent/thread after use | `true` |
+| `auto_cleanup_resources` | bool | Delete vector store after use | `false` |
+| `system_prompt_template` | string | Handlebars template for system prompt | - |
+| `user_prompt_template` | string | Handlebars template for user prompt | - |
+
+#### Agent Metadata Options
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `description` | string | Human-readable description | `""` |
+| `tools` | string[] | Tools to enable: `file_search`, `code_interpreter` | `[]` |
+
+> **Note:** If no tools are configured, `file_search` is enabled by default when creating an agent with a vector store.
+
+#### Framework Config Options
+
+| Property | Type | Description | Default |
+|----------|------|-------------|---------|
+| `provider` | string | Reference to a provider in the `providers` section | Required |
 
 ### Environment Variables
 
-```bash
-PROJECT_ENDPOINT=https://your-project.api.azureml.ms
-PROJECT_DEPLOYMENT_NAME=gpt-4o
+Values in `agent.config.yaml` support `${VAR_NAME}` syntax for environment variable substitution:
+
+```yaml
+endpoint: "${PROJECT_ENDPOINT}"        # Reads PROJECT_ENDPOINT from environment
+deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
 ```
 
-### Model Provider Options
+### Application Settings (`appsettings.json`)
 
-```json
-{
-  "ModelProviders": {
-    "DefaultProvider": "azure_foundry",
-    "Providers": {
-      "azure_foundry": {
-        "Endpoint": "https://your-project.api.azureml.ms",
-        "ApiKey": null,
-        "DeploymentName": "gpt-4o"
-      }
-    }
-  }
-}
-```
-
-### Telemetry Options
+#### Telemetry Options
 
 ```json
 {
   "Telemetry": {
     "Enabled": true,
-    "ServiceName": "MyAgentService",
+    "SourceName": "MyAgentService",
+    "EnableSensitiveData": false,
     "OtlpEndpoint": "http://localhost:4318"
   }
 }
 ```
 
-### Vector Store Indexing Options
+#### Vector Store Indexing Options
 
 ```json
 {
@@ -178,7 +231,7 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o
 }
 ```
 
-### PDF Conversion Options
+#### PDF Conversion Options
 
 ```json
 {
@@ -191,8 +244,6 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o
 ```
 
 ## Namespaces
-
-The SDK uses the following namespace structure:
 
 | Namespace | Description |
 |-----------|-------------|
@@ -263,6 +314,10 @@ var data = await context.ReadStateAsync<MyType>(
 - .NET 8.0 or later
 - Azure AI Foundry project endpoint
 - Azure credentials (DefaultAzureCredential or API key)
+
+## Samples
+
+See the [SpamDetection sample](../../samples/SpamDetection/README.md) for a complete working example.
 
 ## License
 
