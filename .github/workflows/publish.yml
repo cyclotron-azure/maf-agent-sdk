@@ -83,21 +83,27 @@ jobs:
           dotnet gitversion /output buildserver
           
           FULL_VERSION=$(dotnet gitversion /showvariable FullSemVer)
-          NUGET_VERSION=$(dotnet gitversion /showvariable SemVer)
+          MAJOR_MINOR_PATCH=$(dotnet gitversion /showvariable MajorMinorPatch)
           PRERELEASE_TAG=$(dotnet gitversion /showvariable PreReleaseTag)
+          PRERELEASE_LABEL=$(dotnet gitversion /showvariable PreReleaseLabel)
+          PRERELEASE_NUMBER=$(dotnet gitversion /showvariable PreReleaseNumber)
+          
+          # Build NuGet version: use MajorMinorPatch for stable, or add proper pre-release suffix
+          if [ -z "$PRERELEASE_TAG" ]; then
+            NUGET_VERSION="$MAJOR_MINOR_PATCH"
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          else
+            # Format: 0.0.1-alpha.10 (valid SemVer 2.0 for NuGet)
+            NUGET_VERSION="${MAJOR_MINOR_PATCH}-${PRERELEASE_TAG}"
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          fi
           
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
           echo "nuget_version=$NUGET_VERSION" >> $GITHUB_OUTPUT
           
-          if [ -z "$PRERELEASE_TAG" ]; then
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-          else
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-          fi
-          
           echo "📦 Version: $FULL_VERSION"
           echo "📦 NuGet Version: $NUGET_VERSION"
-          echo "📦 Pre-release: $PRERELEASE_TAG"
+          echo "📦 Pre-release Tag: $PRERELEASE_TAG"
 
       - name: Restore dependencies
         run: dotnet restore
