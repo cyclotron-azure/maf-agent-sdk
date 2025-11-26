@@ -201,25 +201,35 @@ jobs:
           name: nuget-packages
           path: ./artifacts
 
-      - name: Create and push tag
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME="v${{ needs.build.outputs.nuget_version }}"
-          echo "Creating tag: $TAG_NAME"
+          IS_PRERELEASE="${{ needs.build.outputs.is_prerelease }}"
+          
+          echo "📦 Creating tag: $TAG_NAME"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-          git push origin "$TAG_NAME" || echo "Tag already exists, continuing..."
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.build.outputs.nuget_version }}
-          name: Release v${{ needs.build.outputs.nuget_version }}
-          draft: false
-          prerelease: ${{ needs.build.outputs.is_prerelease == 'true' }}
-          generate_release_notes: true
-          files: |
-            ./artifacts/*.nupkg
-            ./artifacts/*.snupkg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Create and push tag if it doesn't exist
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+            git push origin "$TAG_NAME"
+          else
+            echo "Tag $TAG_NAME already exists"
+          fi
+          
+          # Build release flags
+          RELEASE_FLAGS="--generate-notes"
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            RELEASE_FLAGS="$RELEASE_FLAGS --prerelease"
+          fi
+          
+          echo "📦 Creating GitHub release..."
+          # Create release with artifacts
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            $RELEASE_FLAGS \
+            ./artifacts/*.nupkg ./artifacts/*.snupkg 2>/dev/null || \
+          gh release upload "$TAG_NAME" ./artifacts/*.nupkg ./artifacts/*.snupkg --clobber
