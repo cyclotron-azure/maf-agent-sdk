@@ -51,7 +51,7 @@ jobs:
           dotnet gitversion /output buildserver
           dotnet gitversion /showvariable FullSemVer
           echo "version=$(dotnet gitversion /showvariable FullSemVer)" >> $GITHUB_OUTPUT
-          echo "nuget_version=$(dotnet gitversion /showvariable NuGetVersionV2)" >> $GITHUB_OUTPUT
+          echo "nuget_version=$(dotnet gitversion /showvariable NuGetVersion)" >> $GITHUB_OUTPUT
 
       - name: Restore dependencies
         run: dotnet restore
