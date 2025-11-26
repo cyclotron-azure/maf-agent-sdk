@@ -188,12 +188,24 @@ jobs:
     
     permissions:
       contents: write
+      packages: write
+      actions: read
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Display version info
+        run: |
+          echo "📦 Version: ${{ needs.build.outputs.nuget_version }}"
+          echo "📦 Is Pre-release: ${{ needs.build.outputs.is_prerelease }}"
+
+      - name: Create Tag and Release
+        id: create_release
+        uses: actions/create-release@v1.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          fetch-depth: 0
+          tag_name: v${{ needs.build.outputs.nuget_version }}
+          release_name: Release v${{ needs.build.outputs.nuget_version }}
+          prerelease: ${{ needs.build.outputs.is_prerelease == 'true' }}
 
       - name: Download NuGet packages
         uses: actions/download-artifact@v4
@@ -201,45 +213,12 @@ jobs:
           name: nuget-packages
           path: ./artifacts
 
-      - name: Create tag and release
+      - name: Upload NuGet package to release
+        uses: actions/upload-release-asset@v1
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG_NAME="v${{ needs.build.outputs.nuget_version }}"
-          IS_PRERELEASE="${{ needs.build.outputs.is_prerelease }}"
-          
-          echo "📦 Creating tag: $TAG_NAME"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Create and push tag if it doesn't exist
-          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
-            git push origin "$TAG_NAME"
-          else
-            echo "Tag $TAG_NAME already exists"
-          fi
-          
-          # Build release flags
-          RELEASE_FLAGS="--generate-notes"
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            RELEASE_FLAGS="$RELEASE_FLAGS --prerelease"
-          fi
-          
-          echo "📦 Creating GitHub release..."
-          
-          # List artifacts
-          echo "Artifacts to upload:"
-          ls -la ./artifacts/
-          
-          # Check if release already exists
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Release $TAG_NAME already exists, uploading artifacts..."
-            gh release upload "$TAG_NAME" ./artifacts/*.nupkg ./artifacts/*.snupkg --clobber
-          else
-            echo "Creating new release $TAG_NAME..."
-            gh release create "$TAG_NAME" \
-              --title "Release $TAG_NAME" \
-              $RELEASE_FLAGS \
-              ./artifacts/*.nupkg ./artifacts/*.snupkg
-          fi
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/Cyclotron.Maf.AgentSdk.${{ needs.build.outputs.nuget_version }}.nupkg
+          asset_name: Cyclotron.Maf.AgentSdk.${{ needs.build.outputs.nuget_version }}.nupkg
+          asset_content_type: application/octet-stream

@@ -1,8 +1,8 @@
 # Cyclotron.Maf.AgentSdk
 
-[![NuGet Version](https://img.shields.io/nuget/v/Cyclotron.Maf.AgentSdk.svg)](https://www.nuget.org/packages/Cyclotron.Maf.AgentSdk/)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/Cyclotron.Maf.AgentSdk.svg)](https://www.nuget.org/packages/Cyclotron.Maf.AgentSdk/)
-[![Build Status](https://github.com/cyclotron-azure/maf-agent-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/cyclotron-azure/maf-agent-sdk/actions)
+[![NuGet Version](https://img.shields.io/nuget/v/AgentSdk.svg)](https://www.nuget.org/packages/Cyclotron.Maf.AgentSdk/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/AgentSdk.svg)](https://www.nuget.org/packages/Cyclotron.Maf.AgentSdk/)
+[![Build Status](https://github.com/cyclotron-azure/maf-agent-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/cyclotron-azure/maf-agent-sdk/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 
