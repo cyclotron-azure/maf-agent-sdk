@@ -24,13 +24,13 @@
 
   <!-- Microsoft.Extensions Packages -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.1.1" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.0.0-preview.1.25560.10" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
   </ItemGroup>
 
