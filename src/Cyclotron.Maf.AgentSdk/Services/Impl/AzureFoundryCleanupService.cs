@@ -1,4 +1,6 @@
 using Cyclotron.Maf.AgentSdk.Models;
+using Azure.AI.Projects;
+using Azure.AI.Agents.Persistent;
 using Microsoft.Extensions.Logging;
 
 namespace Cyclotron.Maf.AgentSdk.Services.Impl;
@@ -94,7 +96,8 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry files for provider '{ProviderName}'", providerName);
 
-        var client = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory.GetClient(providerName);
+        var client = projectClient.GetPersistentAgentsClient();
         int deleted = 0;
         int failed = 0;
 
@@ -142,7 +145,8 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
             fileIdList.Count,
             providerName);
 
-        var client = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory.GetClient(providerName);
+        var client = projectClient.GetPersistentAgentsClient();
         int deleted = 0;
         int failed = 0;
 
@@ -180,7 +184,8 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry vector stores for provider '{ProviderName}' (protected key: {ProtectedKey})", providerName, protectedMetadataKey ?? "none");
-        var client = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory.GetClient(providerName);
+        var client = projectClient.GetPersistentAgentsClient();
         int deleted = 0;
         int failed = 0;
 
@@ -230,7 +235,8 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
     public async Task<CleanupStatistics> CleanupThreadsAsync(string providerName, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry threads for provider '{ProviderName}'", providerName);
-        var client = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory.GetClient(providerName);
+        var client = projectClient.GetPersistentAgentsClient();
 
         int deleted = 0;
         int failed = 0;
@@ -271,7 +277,8 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry agents for provider '{ProviderName}'", providerName);
 
-        var client = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory.GetClient(providerName);
+        var client = projectClient.GetPersistentAgentsClient();
         int deleted = 0;
         int failed = 0;
 

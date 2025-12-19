@@ -298,7 +298,7 @@ var data = await context.ReadStateAsync<MyType>(
 
 | Package | Version |
 |---------|---------|
-| Azure.AI.Agents.Persistent | 1.2.0-beta.7 |
+| Azure.AI.Projects | 1.2.0-beta.1 |
 | Azure.AI.OpenAI | 2.5.0-beta.1 |
 | Azure.Identity | 1.17.0 |
 | Microsoft.Agents.AI.Workflows | 1.0.0-preview.251114.1 |

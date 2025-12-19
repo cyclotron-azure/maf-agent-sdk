@@ -1,5 +1,6 @@
 using Cyclotron.Maf.AgentSdk.Options;
 using Azure.AI.Agents.Persistent;
+using Azure.AI.Projects;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -29,6 +30,15 @@ public class VectorStoreManager(
     private readonly IPersistentAgentsClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     private readonly VectorStoreIndexingOptions _indexingOptions = providerOptions?.Value?.VectorStoreIndexing ?? new VectorStoreIndexingOptions();
 
+    /// <summary>
+    /// Gets a <see cref="PersistentAgentsClient"/> from the <see cref="AIProjectClient"/> for the specified provider.
+    /// </summary>
+    private PersistentAgentsClient GetPersistentAgentsClient(string providerName)
+    {
+        var projectClient = _clientFactory.GetClient(providerName);
+        return projectClient.GetPersistentAgentsClient();
+    }
+
     /// <inheritdoc/>
     public async Task<string> GetOrCreateSharedVectorStoreAsync(
         string providerName,
@@ -39,7 +49,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var client = GetPersistentAgentsClient(providerName);
 
             // Each workflow execution creates its own vector store
             // No need to search for existing ones since the key is unique per request
@@ -73,7 +83,7 @@ public class VectorStoreManager(
         string vectorStoreId,
         CancellationToken cancellationToken = default)
     {
-        var client = _clientFactory.GetClient(providerName);
+        var client = GetPersistentAgentsClient(providerName);
 
         _logger.LogInformation("Cleaning up vector store: {VectorStoreId}", vectorStoreId);
 
@@ -114,7 +124,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var client = GetPersistentAgentsClient(providerName);
 
             _logger.LogInformation("Uploading file {FileName} to vector store {VectorStoreId}", fileName, vectorStoreId);
 
@@ -156,7 +166,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var client = GetPersistentAgentsClient(providerName);
             var fileIds = new List<string>();
 
             _logger.LogInformation("Uploading multiple files to vector store {VectorStoreId}", vectorStoreId);
@@ -217,7 +227,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var client = GetPersistentAgentsClient(providerName);
             var maxAttempts = _indexingOptions.MaxWaitAttempts;
             var initialDelayMs = _indexingOptions.InitialWaitDelayMs;
             var useExponentialBackoff = _indexingOptions.UseExponentialBackoff;

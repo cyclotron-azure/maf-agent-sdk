@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Azure.AI.Agents.Persistent;
+using Azure.AI.Projects;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -264,7 +265,8 @@ public class AgentFactory : IAgentFactory
                 string.Join(", ", _agentDefinition.Metadata.Tools));
 
             // Get provider-specific client
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var client = projectClient.GetPersistentAgentsClient();
 
             var agentResponse = await client.Administration.CreateAgentAsync(
                 model: provider.GetEffectiveModel(),
@@ -333,7 +335,8 @@ public class AgentFactory : IAgentFactory
         try
         {
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var client = projectClient.GetPersistentAgentsClient();
             await client.Administration.DeleteAgentAsync(agentId, cancellationToken);
             _logger.LogDebug("Deleted {AgentKey} agent: {AgentId}", _agentKey, agentId);
         }
@@ -367,7 +370,8 @@ public class AgentFactory : IAgentFactory
             }
 
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var client = projectClient.GetPersistentAgentsClient();
             await client.Threads.DeleteThreadAsync(typedThread.ConversationId, cancellationToken);
 
             _logger.LogDebug("Deleted {AgentKey} thread: {ThreadId}", _agentKey, typedThread.ConversationId);
