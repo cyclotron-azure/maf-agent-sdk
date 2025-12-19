@@ -1,6 +1,6 @@
 <Project>
 
-  <!-- 
+  <!--
     Central Package Version Management
     All package versions are managed here. Individual projects reference packages without versions.
     See: https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management
