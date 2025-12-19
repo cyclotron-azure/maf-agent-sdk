@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Azure.AI.Projects;
+using Azure.AI.Projects.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -266,14 +267,25 @@ public class AgentFactory : IAgentFactory
             // Get provider-specific client
             var projectClient = _clientFactory.GetClient(providerName);
 
-            // Create agent using V2 API
-            AIAgent agent = await projectClient.CreateAIAgentAsync(
-                model: provider.GetEffectiveModel(),
-                name: agentName,
-                instructions: instructions,
-                tools: tools,
+            _logger.LogDebug(
+                "Creating {AgentKey} agent with configured version: {ConfiguredVersion}",
+                _agentKey,
+                _agentDefinition.Version ?? "(auto-generated)");
+
+            // Create agent using V2 versioned API with PromptAgentDefinition
+            var promptDefinition = new PromptAgentDefinition(model: provider.GetEffectiveModel())
+            {
+                Instructions = instructions
+            };
+
+            var versionOptions = new AgentVersionCreationOptions(promptDefinition);
+            AgentVersion createdAgentVersion = await projectClient.Agents.CreateAgentVersionAsync(
+                agentName: agentName,
+                options: versionOptions,
                 cancellationToken: cancellationToken);
 
+            // Get the AIAgent from the created version
+            AIAgent agent = projectClient.GetAIAgent(createdAgentVersion);
             var agentId = agent.Id;
 
             _logger.LogInformation(
@@ -330,14 +342,8 @@ public class AgentFactory : IAgentFactory
         {
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
-
-            // Agent IDs in V2 API are formatted as "name:version"
-            // Extract both parts for DeleteAgentVersionAsync
-            var parts = agentId.Split(':');
-            if (parts.Length == 2)
+            if (TryParseAgentId(agentId, out var agentName, out var agentVersion))
             {
-                var agentName = parts[0];
-                var agentVersion = parts[1];
                 await projectClient.Agents.DeleteAgentVersionAsync(agentName, agentVersion, cancellationToken);
                 _logger.LogDebug("Deleted {AgentKey} agent version {AgentVersion}: {AgentName}", _agentKey, agentVersion, agentName);
             }
@@ -516,6 +522,27 @@ public class AgentFactory : IAgentFactory
         }
 
         return tools;
+    }
+
+    private static bool TryParseAgentId(string agentId, out string agentName, out string agentVersion)
+    {
+        agentName = string.Empty;
+        agentVersion = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(agentId))
+        {
+            return false;
+        }
+
+        var parts = agentId.Split(':');
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        agentName = parts[0];
+        agentVersion = parts[1];
+        return !string.IsNullOrWhiteSpace(agentName) && !string.IsNullOrWhiteSpace(agentVersion);
     }
 
     private void ValidateProviderReference()

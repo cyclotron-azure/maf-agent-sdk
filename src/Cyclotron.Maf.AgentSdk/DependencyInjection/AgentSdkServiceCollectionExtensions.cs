@@ -61,6 +61,7 @@ public static class AgentSdkServiceCollectionExtensions
                             AutoDelete = agentSection.GetValue<bool>("auto_delete", true),
                             AutoCleanupResources = agentSection.GetValue<bool>("auto_cleanup_resources", true),
                             Enabled = agentSection.GetValue<bool>("enabled", true),
+                            Version = agentSection.GetValue<string?>("version"),
                             SystemPromptTemplate = agentSection.GetValue<string>("system_prompt_template"),
                             UserPromptTemplate = agentSection.GetValue<string>("user_prompt_template")
                         };

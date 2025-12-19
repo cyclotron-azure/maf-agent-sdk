@@ -18,6 +18,7 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: true
+    version: "1"
 
     metadata:
       description: "AI agent for detecting spam messages"

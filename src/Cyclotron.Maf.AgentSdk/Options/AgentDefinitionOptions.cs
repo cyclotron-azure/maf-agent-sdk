@@ -59,4 +59,9 @@ public class AgentDefinitionOptions
     /// References a model provider defined in the <c>providers:</c> section.
     /// </summary>
     public AIFrameworkOptions AIFrameworkOptions { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the desired agent version. Optional; if not set, the service version is used.
+    /// </summary>
+    public string? Version { get; set; }
 }
