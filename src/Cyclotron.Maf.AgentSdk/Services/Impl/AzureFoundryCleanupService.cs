@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using OpenAI.Files;
 using OpenAI.VectorStores;
 
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
+
 namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 
 /// <summary>
@@ -105,8 +107,8 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
 
         try
         {
-            var filesResponse = await fileClient.GetFilesAsync(purpose: null, cancellationToken: cancellationToken);
-            foreach (var file in filesResponse.Value)
+            var filesResult = await fileClient.GetFilesAsync(cancellationToken: cancellationToken);
+            foreach (var file in filesResult.Value)
             {
                 try
                 {
@@ -195,8 +197,7 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
 
         try
         {
-            var vectorStoresPage = await vectorStoreClient.GetVectorStoresAsync(cancellationToken: cancellationToken);
-            foreach (var vectorStore in vectorStoresPage.Value)
+            await foreach (var vectorStore in vectorStoreClient.GetVectorStoresAsync(cancellationToken: cancellationToken))
             {
                 // Skip shared knowledge base vector store if protected metadata key is provided
                 if (!string.IsNullOrEmpty(protectedMetadataKey) &&
@@ -272,9 +273,7 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
         {
             // Note: V2 API agents are managed through AIProjectClient.Agents
             // The Agents property provides access to agent operations
-            var agentsPage = await projectClient.Agents.GetAgentsAsync(cancellationToken: cancellationToken);
-            
-            foreach (var agent in agentsPage.Value.Data)
+            await foreach (var agent in projectClient.Agents.GetAgentsAsync(cancellationToken: cancellationToken))
             {
                 // Skip protected agents
                 if (_protectedAgentNames.Contains(agent.Name))

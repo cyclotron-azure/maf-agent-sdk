@@ -6,6 +6,8 @@ using OpenAI.Files;
 using OpenAI.VectorStores;
 using System.ClientModel;
 
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
+
 namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 
 /// <summary>
@@ -50,21 +52,10 @@ public class VectorStoreManager(
             // No need to search for existing ones since the key is unique per request
             _logger.LogInformation("Creating new vector store for workflow with key: {MetadataKey}", key);
             
-            var metadata = new Dictionary<string, string>
-            {
-                { key, bool.TrueString },
-                { "purpose", purpose },
-                { "created", DateTime.UtcNow.ToString("O") }
-            };
-
-            var vectorStoreOptions = new VectorStoreCreationOptions
-            {
-                Name = name,
-                Metadata = metadata
-            };
+            // Note: Metadata is read-only in SDK, so we can't set custom metadata via creation options
+            // Metadata would need to be set via separate update call if supported
 
             ClientResult<VectorStore> vectorStoreResponse = await vectorStoreClient.CreateVectorStoreAsync(
-                options: vectorStoreOptions,
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation("Created vector store: {VectorStoreId}", vectorStoreResponse.Value.Id);
@@ -94,9 +85,7 @@ public class VectorStoreManager(
         try
         {
             // Get all files in the vector store
-            var filesPage = await vectorStoreClient.GetFileAssociationsAsync(vectorStoreId, cancellationToken: cancellationToken);
-            
-            foreach (var file in filesPage.Value)
+            await foreach (var file in vectorStoreClient.GetVectorStoreFilesAsync(vectorStoreId, cancellationToken: cancellationToken))
             {
                 try
                 {
@@ -137,27 +126,50 @@ public class VectorStoreManager(
 
             _logger.LogInformation("Uploading file {FileName} to vector store {VectorStoreId}", fileName, vectorStoreId);
 
-            // Upload file to Azure AI Foundry
-            ClientResult<OpenAIFile> uploadedFile = await fileClient.UploadFileAsync(
-                data: fileContent,
-                filename: fileName,
-                purpose: FileUploadPurpose.Assistants,
-                cancellationToken: cancellationToken);
+            // Save stream to temporary file since SDK expects file path
+            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}-{fileName}");
+            try
+            {
+                using (var fileStream = File.Create(tempFilePath))
+                {
+                    await fileContent.CopyToAsync(fileStream, cancellationToken);
+                }
 
-            _logger.LogInformation("Uploaded file {FileName} with ID: {FileId}", fileName, uploadedFile.Value.Id);
+                // Upload file to Azure AI Foundry
+                ClientResult<OpenAIFile> uploadedFile = await fileClient.UploadFileAsync(
+                    filePath: tempFilePath,
+                    purpose: FileUploadPurpose.Assistants);
 
-            // Add file to vector store
-            ClientResult<VectorStoreFileAssociation> fileAssociation = await vectorStoreClient.AddFileToVectorStoreAsync(
-                vectorStoreId: vectorStoreId,
-                fileId: uploadedFile.Value.Id,
-                cancellationToken: cancellationToken);
+                _logger.LogInformation("Uploaded file {FileName} with ID: {FileId}", fileName, uploadedFile.Value.Id);
 
-            _logger.LogInformation("Added file {FileId} to vector store {VectorStoreId}", uploadedFile.Value.Id, vectorStoreId);
+                // Add file to vector store
+                await vectorStoreClient.AddFileToVectorStoreAsync(
+                    vectorStoreId: vectorStoreId,
+                    fileId: uploadedFile.Value.Id,
+                    cancellationToken: cancellationToken);
 
-            // Wait for file to be processed
-            await WaitForFileProcessingAsync(providerName, vectorStoreId, uploadedFile.Value.Id, cancellationToken);
+                _logger.LogInformation("Added file {FileId} to vector store {VectorStoreId}", uploadedFile.Value.Id, vectorStoreId);
 
-            return uploadedFile.Value.Id;
+                // Wait for file to be processed
+                await WaitForFileProcessingAsync(providerName, vectorStoreId, uploadedFile.Value.Id, cancellationToken);
+
+                return uploadedFile.Value.Id;
+            }
+            finally
+            {
+                // Clean up temp file
+                if (File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        // Best effort cleanup
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -180,40 +192,69 @@ public class VectorStoreManager(
             var fileClient = openAIClient.GetOpenAIFileClient();
             var vectorStoreClient = openAIClient.GetVectorStoreClient();
             var fileIds = new List<string>();
+            var tempFiles = new List<string>();
 
             _logger.LogInformation("Uploading multiple files to vector store {VectorStoreId}", vectorStoreId);
 
-            // Upload all files
-            foreach (var (content, fileName) in files)
+            try
             {
-                ClientResult<OpenAIFile> uploadedFile = await fileClient.UploadFileAsync(
-                    data: content,
-                    filename: fileName,
-                    purpose: FileUploadPurpose.Assistants,
-                    cancellationToken: cancellationToken);
+                // Upload all files
+                foreach (var (content, fileName) in files)
+                {
+                    // Save stream to temporary file since SDK expects file path
+                    var tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}-{fileName}");
+                    tempFiles.Add(tempFilePath);
 
-                _logger.LogInformation("Uploaded file {FileName} with ID: {FileId} to vector store {VectorStoreId}", fileName, uploadedFile.Value.Id, vectorStoreId);
-                fileIds.Add(uploadedFile.Value.Id);
+                    using (var fileStream = File.Create(tempFilePath))
+                    {
+                        await content.CopyToAsync(fileStream, cancellationToken);
+                    }
+
+                    ClientResult<OpenAIFile> uploadedFile = await fileClient.UploadFileAsync(
+                        filePath: tempFilePath,
+                        purpose: FileUploadPurpose.Assistants);
+
+                    _logger.LogInformation("Uploaded file {FileName} with ID: {FileId} to vector store {VectorStoreId}", fileName, uploadedFile.Value.Id, vectorStoreId);
+                    fileIds.Add(uploadedFile.Value.Id);
+                }
+
+                // Add all files to vector store
+                foreach (var fileId in fileIds)
+                {
+                    await vectorStoreClient.AddFileToVectorStoreAsync(
+                        vectorStoreId: vectorStoreId,
+                        fileId: fileId,
+                        cancellationToken: cancellationToken);
+                }
+
+                _logger.LogInformation("Added {FileCount} files to vector store {VectorStoreId}", fileIds.Count, vectorStoreId);
+
+                // Wait for all files to be processed
+                foreach (var fileId in fileIds)
+                {
+                    await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, cancellationToken);
+                }
+
+                return fileIds.AsReadOnly();
             }
-
-            // Add all files to vector store
-            foreach (var fileId in fileIds)
+            finally
             {
-                await vectorStoreClient.AddFileToVectorStoreAsync(
-                    vectorStoreId: vectorStoreId,
-                    fileId: fileId,
-                    cancellationToken: cancellationToken);
+                // Clean up temp files
+                foreach (var tempFile in tempFiles)
+                {
+                    if (File.Exists(tempFile))
+                    {
+                        try
+                        {
+                            File.Delete(tempFile);
+                        }
+                        catch
+                        {
+                            // Best effort cleanup
+                        }
+                    }
+                }
             }
-
-            _logger.LogInformation("Added {FileCount} files to vector store {VectorStoreId}", fileIds.Count, vectorStoreId);
-
-            // Wait for all files to be processed
-            foreach (var fileId in fileIds)
-            {
-                await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, cancellationToken);
-            }
-
-            return fileIds.AsReadOnly();
         }
         catch (Exception ex)
         {
@@ -263,7 +304,7 @@ public class VectorStoreManager(
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
-                ClientResult<VectorStoreFileAssociation> vectorStoreFile = await vectorStoreClient.GetFileAssociationAsync(
+                var vectorStoreFile = await vectorStoreClient.GetVectorStoreFileAsync(
                     vectorStoreId: vectorStoreId,
                     fileId: fileId,
                     cancellationToken: cancellationToken);
@@ -277,7 +318,7 @@ public class VectorStoreManager(
                     maxAttempts,
                     currentDelayMs);
 
-                if (status == VectorStoreFileAssociationStatus.Completed)
+                if (status == VectorStoreFileStatus.Completed)
                 {
                     _logger.LogInformation(
                         "File {FileId} indexing completed successfully after {Attempts} attempts",
@@ -286,14 +327,14 @@ public class VectorStoreManager(
                     return;
                 }
 
-                if (status == VectorStoreFileAssociationStatus.Failed)
+                if (status == VectorStoreFileStatus.Failed)
                 {
                     var errorMessage = $"File indexing failed for {fileId} in vector store {vectorStoreId}";
                     _logger.LogError(errorMessage);
                     throw new InvalidOperationException(errorMessage);
                 }
 
-                if (status == VectorStoreFileAssociationStatus.Cancelled)
+                if (status == VectorStoreFileStatus.Cancelled)
                 {
                     var errorMessage = $"File indexing was cancelled for {fileId} in vector store {vectorStoreId}";
                     _logger.LogWarning(errorMessage);

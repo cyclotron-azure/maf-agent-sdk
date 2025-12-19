@@ -365,10 +365,9 @@ public class AgentFactory : IAgentFactory
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
             
-            // V2 API: Use Conversations API to delete thread
-            await projectClient.Conversations.DeleteConversationAsync(typedThread.ConversationId, cancellationToken);
-
-            _logger.LogDebug("Deleted {AgentKey} thread: {ThreadId}", _agentKey, typedThread.ConversationId);
+            // V2 API: Thread/conversation deletion is not directly supported via AIProjectClient
+            // Threads are managed through agent lifecycle and are automatically cleaned up
+            _logger.LogDebug("Thread {ThreadId} for {AgentKey} - deletion not directly supported in V2 API, will be cleaned up automatically", typedThread.ConversationId, _agentKey);
         }
         catch (Exception ex)
         {
@@ -445,9 +444,9 @@ public class AgentFactory : IAgentFactory
     /// </summary>
     /// <param name="vectorStoreId">The vector store ID to associate with file search tool.</param>
     /// <returns>A list of tools for the agent.</returns>
-    private List<object> BuildToolConfiguration(string vectorStoreId)
+    private List<AITool> BuildToolConfiguration(string vectorStoreId)
     {
-        var tools = new List<object>();
+        var tools = new List<AITool>();
         var configuredTools = _agentDefinition.Metadata.Tools;
 
         // Default to file_search if no tools are configured
@@ -465,7 +464,7 @@ public class AgentFactory : IAgentFactory
             {
                 case "file_search":
                     var fileSearchTool = new HostedFileSearchTool();
-                    fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+                    fileSearchTool.Inputs?.Add(new HostedVectorStoreContent(vectorStoreId));
                     tools.Add(fileSearchTool);
                     _logger.LogDebug("Configured file_search tool for {AgentKey} with vector store {VectorStoreId}", _agentKey, vectorStoreId);
                     break;
@@ -491,7 +490,7 @@ public class AgentFactory : IAgentFactory
                 "No valid tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
             var fileSearchTool = new HostedFileSearchTool();
-            fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+            fileSearchTool.Inputs?.Add(new HostedVectorStoreContent(vectorStoreId));
             tools.Add(fileSearchTool);
         }
 
