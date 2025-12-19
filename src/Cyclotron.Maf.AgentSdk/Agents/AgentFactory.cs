@@ -330,8 +330,21 @@ public class AgentFactory : IAgentFactory
         {
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
-            await projectClient.Agents.DeleteAgentAsync(agentId, cancellationToken);
-            _logger.LogDebug("Deleted {AgentKey} agent: {AgentId}", _agentKey, agentId);
+
+            // Agent IDs in V2 API are formatted as "name:version"
+            // Extract both parts for DeleteAgentVersionAsync
+            var parts = agentId.Split(':');
+            if (parts.Length == 2)
+            {
+                var agentName = parts[0];
+                var agentVersion = parts[1];
+                await projectClient.Agents.DeleteAgentVersionAsync(agentName, agentVersion, cancellationToken);
+                _logger.LogDebug("Deleted {AgentKey} agent version {AgentVersion}: {AgentName}", _agentKey, agentVersion, agentName);
+            }
+            else
+            {
+                _logger.LogWarning("Agent ID format unexpected: {AgentId}. Expected 'name:version' format", agentId);
+            }
         }
         catch (Exception ex)
         {
@@ -364,7 +377,7 @@ public class AgentFactory : IAgentFactory
 
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
-            
+
             // V2 API: Thread/conversation deletion is not directly supported via AIProjectClient
             // Threads are managed through agent lifecycle and are automatically cleaned up
             _logger.LogDebug("Thread {ThreadId} for {AgentKey} - deletion not directly supported in V2 API, will be cleaned up automatically", typedThread.ConversationId, _agentKey);
@@ -464,7 +477,11 @@ public class AgentFactory : IAgentFactory
             {
                 case "file_search":
                     var fileSearchTool = new HostedFileSearchTool();
-                    fileSearchTool.Inputs?.Add(new HostedVectorStoreContent(vectorStoreId));
+                    if (fileSearchTool.Inputs == null)
+                    {
+                        fileSearchTool.Inputs = new List<AIContent>();
+                    }
+                    fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
                     tools.Add(fileSearchTool);
                     _logger.LogDebug("Configured file_search tool for {AgentKey} with vector store {VectorStoreId}", _agentKey, vectorStoreId);
                     break;
@@ -490,7 +507,11 @@ public class AgentFactory : IAgentFactory
                 "No valid tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
             var fileSearchTool = new HostedFileSearchTool();
-            fileSearchTool.Inputs?.Add(new HostedVectorStoreContent(vectorStoreId));
+            if (fileSearchTool.Inputs == null)
+            {
+                fileSearchTool.Inputs = new List<AIContent>();
+            }
+            fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
             tools.Add(fileSearchTool);
         }
 
