@@ -1,6 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
-using Azure.AI.Agents.Persistent;
 using Azure.AI.Projects;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -247,8 +246,8 @@ public class AgentFactory : IAgentFactory
         // Get system prompt (instructions) from prompt rendering service
         var instructions = _promptService.RenderSystemPrompt(_agentKey);
 
-        // Configure tool resources and definitions based on agent metadata configuration
-        var (toolResources, toolDefinitions) = BuildToolConfiguration(vectorStoreId);
+        // Configure tools based on agent metadata configuration
+        var tools = BuildToolConfiguration(vectorStoreId);
 
         // Create ephemeral agent with unique name
         var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
@@ -266,17 +265,16 @@ public class AgentFactory : IAgentFactory
 
             // Get provider-specific client
             var projectClient = _clientFactory.GetClient(providerName);
-            var client = projectClient.GetPersistentAgentsClient();
 
-            var agentResponse = await client.Administration.CreateAgentAsync(
+            // Create agent using V2 API
+            AIAgent agent = await projectClient.CreateAIAgentAsync(
                 model: provider.GetEffectiveModel(),
                 name: agentName,
                 instructions: instructions,
-                tools: toolDefinitions,
-                toolResources: toolResources,
+                tools: tools,
                 cancellationToken: cancellationToken);
 
-            var agentId = agentResponse.Value.Id;
+            var agentId = agent.Id;
 
             _logger.LogInformation(
                 "Created {AgentKey} agent: {AgentId} (Name: {AgentName}, Provider: {ProviderName})",
@@ -284,10 +282,6 @@ public class AgentFactory : IAgentFactory
                 agentId,
                 agentName,
                 providerName);
-
-
-            // Convert to MAF AIAgent for workflow compatibility
-            AIAgent agent = await client.GetAIAgentAsync(agentId, cancellationToken: cancellationToken);
 
             if (_telemetryOptions.Enabled && !string.IsNullOrWhiteSpace(_telemetryOptions.SourceName))
             {
@@ -336,8 +330,7 @@ public class AgentFactory : IAgentFactory
         {
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
-            var client = projectClient.GetPersistentAgentsClient();
-            await client.Administration.DeleteAgentAsync(agentId, cancellationToken);
+            await projectClient.Agents.DeleteAgentAsync(agentId, cancellationToken);
             _logger.LogDebug("Deleted {AgentKey} agent: {AgentId}", _agentKey, agentId);
         }
         catch (Exception ex)
@@ -371,8 +364,9 @@ public class AgentFactory : IAgentFactory
 
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
-            var client = projectClient.GetPersistentAgentsClient();
-            await client.Threads.DeleteThreadAsync(typedThread.ConversationId, cancellationToken);
+            
+            // V2 API: Use Conversations API to delete thread
+            await projectClient.Conversations.DeleteConversationAsync(typedThread.ConversationId, cancellationToken);
 
             _logger.LogDebug("Deleted {AgentKey} thread: {ThreadId}", _agentKey, typedThread.ConversationId);
         }
@@ -447,14 +441,13 @@ public class AgentFactory : IAgentFactory
 
     /// <summary>
     /// Builds the tool configuration based on the agent's metadata.tools configuration.
-    /// Supports "file_search" and "code_interpreter" tools.
+    /// Supports "file_search" and "code_interpreter" tools using V2 API patterns.
     /// </summary>
     /// <param name="vectorStoreId">The vector store ID to associate with file search tool.</param>
-    /// <returns>A tuple containing the tool resources and tool definitions.</returns>
-    private (ToolResources toolResources, IEnumerable<ToolDefinition> toolDefinitions) BuildToolConfiguration(string vectorStoreId)
+    /// <returns>A list of tools for the agent.</returns>
+    private List<object> BuildToolConfiguration(string vectorStoreId)
     {
-        var toolResources = new ToolResources();
-        var toolDefinitions = new List<ToolDefinition>();
+        var tools = new List<object>();
         var configuredTools = _agentDefinition.Metadata.Tools;
 
         // Default to file_search if no tools are configured
@@ -471,15 +464,14 @@ public class AgentFactory : IAgentFactory
             switch (tool.ToLowerInvariant())
             {
                 case "file_search":
-                    toolResources.FileSearch = new FileSearchToolResource();
-                    toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
-                    toolDefinitions.Add(new FileSearchToolDefinition());
-                    _logger.LogDebug("Configured file_search tool for {AgentKey}", _agentKey);
+                    var fileSearchTool = new HostedFileSearchTool();
+                    fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+                    tools.Add(fileSearchTool);
+                    _logger.LogDebug("Configured file_search tool for {AgentKey} with vector store {VectorStoreId}", _agentKey, vectorStoreId);
                     break;
 
                 case "code_interpreter":
-                    toolResources.CodeInterpreter = new CodeInterpreterToolResource();
-                    toolDefinitions.Add(new CodeInterpreterToolDefinition());
+                    tools.Add(new HostedCodeInterpreterTool());
                     _logger.LogDebug("Configured code_interpreter tool for {AgentKey}", _agentKey);
                     break;
 
@@ -493,17 +485,17 @@ public class AgentFactory : IAgentFactory
         }
 
         // Ensure at least one tool is configured
-        if (toolDefinitions.Count == 0)
+        if (tools.Count == 0)
         {
             _logger.LogWarning(
                 "No valid tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
-            toolResources.FileSearch = new FileSearchToolResource();
-            toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
-            toolDefinitions.Add(new FileSearchToolDefinition());
+            var fileSearchTool = new HostedFileSearchTool();
+            fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+            tools.Add(fileSearchTool);
         }
 
-        return (toolResources, toolDefinitions);
+        return tools;
     }
 
     private void ValidateProviderReference()
