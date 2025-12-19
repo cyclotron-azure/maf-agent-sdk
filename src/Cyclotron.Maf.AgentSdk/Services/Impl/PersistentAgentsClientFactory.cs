@@ -1,5 +1,4 @@
 using Cyclotron.Maf.AgentSdk.Options;
-using Azure.AI.Agents.Persistent;
 using Azure.AI.Projects;
 using Azure.Core;
 using Azure.Identity;
@@ -13,7 +12,7 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </summary>
 /// <remarks>
 /// This is a workaround since some Azure clients only accept <see cref="TokenCredential"/>.
-/// For production use with API keys, consider using DefaultAzureCredential or Azure.AI.OpenAI.OpenAIClient.
+/// For production use with API keys, consider using DefaultAzureCredential.
 /// </remarks>
 internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 {
@@ -47,9 +46,8 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 /// </list>
 /// </para>
 /// <para>
-/// The factory returns <see cref="AIProjectClient"/> instances from Azure.AI.Projects package (V2 API).
-/// To access agent operations, use <c>client.GetPersistentAgentsClient()</c> which returns a
-/// <see cref="PersistentAgentsClient"/> compatible with the V1 API structure.
+/// The factory returns <see cref="AIProjectClient"/> instances from Azure.AI.Projects V2 API.
+/// Use the native client methods for agent operations instead of legacy PersistentAgentsClient.
 /// </para>
 /// </remarks>
 public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory

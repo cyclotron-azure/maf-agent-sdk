@@ -1,4 +1,3 @@
-using Azure.AI.Agents.Persistent;
 using Azure.AI.Projects;
 
 namespace Cyclotron.Maf.AgentSdk.Services;
@@ -12,8 +11,7 @@ namespace Cyclotron.Maf.AgentSdk.Services;
 /// <para>
 /// This factory creates new client instances per request to avoid state sharing across parallel processing.
 /// Provider configurations are loaded from the <c>providers:</c> section in agent.config.yaml.
-/// The factory returns <see cref="AIProjectClient"/> instances which can provide access to
-/// <see cref="PersistentAgentsClient"/> via <c>GetPersistentAgentsClient()</c> method.
+/// Returns <see cref="AIProjectClient"/> instances from the Azure.AI.Projects V2 API.
 /// </para>
 /// <para>
 /// Supported authentication methods:
