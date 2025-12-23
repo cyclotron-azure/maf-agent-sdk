@@ -93,7 +93,7 @@ public class VectorStoreManagerTests
         // Arrange
         var options = new ModelProviderOptions
         {
-            Providers = new Dictionary<string, ModelProviderDefinitionOptions>(),
+            Providers = [],
             VectorStoreIndexing = null!
         };
 

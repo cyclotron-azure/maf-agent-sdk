@@ -6,6 +6,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenAI.Responses;
 using Polly;
 using Polly.Retry;
 
@@ -275,8 +276,22 @@ public class AgentFactory : IAgentFactory
             // Create agent using V2 versioned API with PromptAgentDefinition
             var promptDefinition = new PromptAgentDefinition(model: provider.GetEffectiveModel())
             {
-                Instructions = instructions
+                Instructions = instructions,
             };
+
+            if (tools.Count > 0)
+            {
+                var agentTools = tools
+                    .Select(t => t.AsOpenAIResponseTool())
+                    .Where(t => t is not null)
+                    .Select(t => t!.AsAgentTool())
+                    .ToList();
+
+                foreach (var tool in agentTools)
+                {
+                    promptDefinition.Tools.Add(tool);
+                }
+            }
 
             var versionOptions = new AgentVersionCreationOptions(promptDefinition);
             AgentVersion createdAgentVersion = await projectClient.Agents.CreateAgentVersionAsync(
@@ -483,10 +498,7 @@ public class AgentFactory : IAgentFactory
             {
                 case "file_search":
                     var fileSearchTool = new HostedFileSearchTool();
-                    if (fileSearchTool.Inputs == null)
-                    {
-                        fileSearchTool.Inputs = new List<AIContent>();
-                    }
+                    fileSearchTool.Inputs ??= [];
                     fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
                     tools.Add(fileSearchTool);
                     _logger.LogDebug("Configured file_search tool for {AgentKey} with vector store {VectorStoreId}", _agentKey, vectorStoreId);
@@ -515,7 +527,7 @@ public class AgentFactory : IAgentFactory
             var fileSearchTool = new HostedFileSearchTool();
             if (fileSearchTool.Inputs == null)
             {
-                fileSearchTool.Inputs = new List<AIContent>();
+                fileSearchTool.Inputs = [];
             }
             fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
             tools.Add(fileSearchTool);

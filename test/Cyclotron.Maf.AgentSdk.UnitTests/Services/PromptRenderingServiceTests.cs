@@ -541,7 +541,7 @@ public class PromptRenderingServiceTests
     public void Constructor_EmptyAgentsDictionary_CreatesService()
     {
         // Act
-        var service = CreateService(new Dictionary<string, AgentDefinitionOptions>());
+        var service = CreateService([]);
 
         // Assert
         service.Should().NotBeNull();

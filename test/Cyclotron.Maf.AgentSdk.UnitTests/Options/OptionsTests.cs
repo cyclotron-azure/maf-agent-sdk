@@ -264,7 +264,7 @@ public class ModelProviderOptionsTests
         // Arrange
         var options = new ModelProviderOptions
         {
-            Providers = new Dictionary<string, ModelProviderDefinitionOptions>()
+            Providers = []
         };
 
         // Act

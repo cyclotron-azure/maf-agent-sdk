@@ -71,7 +71,7 @@ public class PersistentAgentsClientFactoryTests
     public void Constructor_NoProvidersConfigured_ThrowsInvalidOperationException()
     {
         // Arrange - Empty providers dictionary
-        var providerOptions = CreateProviderOptions(new Dictionary<string, ModelProviderDefinitionOptions>());
+        var providerOptions = CreateProviderOptions([]);
 
         // Act
         var act = () => new PersistentAgentsClientFactory(_mockLogger.Object, providerOptions);
