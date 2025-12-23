@@ -23,21 +23,21 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// Any vector store with the protected metadata key will be excluded from deletion.
 /// </para>
 /// </remarks>
-public class AzureFoundryCleanupService : IAzureFoundryCleanupService
+public class AIFoundryCleanupService : IAIFoundryCleanupService
 {
-    private readonly IPersistentAgentsClientFactory _clientFactory;
-    private readonly ILogger<AzureFoundryCleanupService> _logger;
+    private readonly IAIProjectClientFactory _clientFactory;
+    private readonly ILogger<AIFoundryCleanupService> _logger;
     private readonly HashSet<string> _protectedAgentNames;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AzureFoundryCleanupService"/> class.
+    /// Initializes a new instance of the <see cref="AIFoundryCleanupService"/> class.
     /// </summary>
     /// <param name="clientFactory">The factory for creating Azure AI Foundry clients.</param>
     /// <param name="logger">The logger instance.</param>
     /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-    public AzureFoundryCleanupService(
-        IPersistentAgentsClientFactory clientFactory,
-        ILogger<AzureFoundryCleanupService> logger)
+    public AIFoundryCleanupService(
+        IAIProjectClientFactory clientFactory,
+        ILogger<AIFoundryCleanupService> logger)
     {
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -244,12 +244,12 @@ public class AzureFoundryCleanupService : IAzureFoundryCleanupService
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry threads for provider '{ProviderName}'", providerName);
         var projectClient = _clientFactory.GetClient(providerName);
-        
-        // Note: V2 API uses conversations, not threads. The AIProjectClient doesn't expose 
+
+        // Note: V2 API uses conversations, not threads. The AIProjectClient doesn't expose
         // a direct way to list and delete all threads/conversations via OpenAI client.
         // This would need to be done via the Agents API which is not exposed in the same way.
         // For now, log that this operation is not supported in V2 API.
-        
+
         _logger.LogWarning("Thread cleanup is not directly supported in V2 API. Threads are managed through agent conversations.");
 
         return new CleanupStatistics

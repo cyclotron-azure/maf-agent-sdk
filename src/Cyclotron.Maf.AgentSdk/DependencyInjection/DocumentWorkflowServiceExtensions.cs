@@ -23,13 +23,13 @@ public static class DocumentWorkflowServiceExtensions
     public static IServiceCollection AddDocumentWorkflowServices(this IServiceCollection services)
     {
         // Register PersistentAgentsClient factory as scoped service
-        services.AddScoped<IPersistentAgentsClientFactory, PersistentAgentsClientFactory>();
+        services.AddScoped<IAIProjectClientFactory, AIProjectClientFactory>();
 
         // Register vector store manager (now depends on IPersistentAgentsClientFactory)
         services.AddScoped<IVectorStoreManager, VectorStoreManager>();
 
         // Register Azure Foundry cleanup service
-        services.AddScoped<IAzureFoundryCleanupService, AzureFoundryCleanupService>();
+        services.AddScoped<IAIFoundryCleanupService, AIFoundryCleanupService>();
 
         // Register unified prompt rendering service
         services.AddSingleton<IPromptRenderingService, PromptRenderingService>();
@@ -71,7 +71,7 @@ public static class DocumentWorkflowServiceExtensions
                     sp.GetRequiredService<IPromptRenderingService>(),
                     sp.GetRequiredService<IOptions<ModelProviderOptions>>(),
                     sp.GetRequiredService<IOptions<AgentOptions>>(),
-                    sp.GetRequiredService<IPersistentAgentsClientFactory>(),
+                    sp.GetRequiredService<IAIProjectClientFactory>(),
                     sp.GetRequiredService<IVectorStoreManager>(),
                     sp.GetRequiredService<IOptions<TelemetryOptions>>()));
         }

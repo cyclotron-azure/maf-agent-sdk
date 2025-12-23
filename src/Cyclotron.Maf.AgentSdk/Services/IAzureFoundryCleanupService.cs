@@ -7,7 +7,7 @@ namespace Cyclotron.Maf.AgentSdk.Services;
 /// Provides methods to delete files, vector stores, threads, and agents
 /// to prevent resource accumulation and quota exhaustion.
 /// </summary>
-public interface IAzureFoundryCleanupService
+public interface IAIFoundryCleanupService
 {
     /// <summary>
     /// Performs comprehensive cleanup of all Azure AI Foundry resources.

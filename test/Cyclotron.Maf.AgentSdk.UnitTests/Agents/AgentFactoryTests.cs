@@ -20,14 +20,14 @@ public class AgentFactoryTests
 {
     private readonly Mock<ILogger<AgentFactory>> _mockLogger;
     private readonly Mock<IPromptRenderingService> _mockPromptService;
-    private readonly Mock<IPersistentAgentsClientFactory> _mockClientFactory;
+    private readonly Mock<IAIProjectClientFactory> _mockClientFactory;
     private readonly Mock<IVectorStoreManager> _mockVectorStoreManager;
 
     public AgentFactoryTests()
     {
         _mockLogger = new Mock<ILogger<AgentFactory>>();
         _mockPromptService = new Mock<IPromptRenderingService>();
-        _mockClientFactory = new Mock<IPersistentAgentsClientFactory>();
+        _mockClientFactory = new Mock<IAIProjectClientFactory>();
         _mockVectorStoreManager = new Mock<IVectorStoreManager>();
 
         // Default setup - HasConfiguration returns true

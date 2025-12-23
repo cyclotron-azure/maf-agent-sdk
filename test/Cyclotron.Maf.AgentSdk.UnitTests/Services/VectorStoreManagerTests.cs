@@ -18,12 +18,12 @@ namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 public class VectorStoreManagerTests
 {
     private readonly Mock<ILogger<VectorStoreManager>> _mockLogger;
-    private readonly Mock<IPersistentAgentsClientFactory> _mockClientFactory;
+    private readonly Mock<IAIProjectClientFactory> _mockClientFactory;
 
     public VectorStoreManagerTests()
     {
         _mockLogger = new Mock<ILogger<VectorStoreManager>>();
-        _mockClientFactory = new Mock<IPersistentAgentsClientFactory>();
+        _mockClientFactory = new Mock<IAIProjectClientFactory>();
     }
 
     private IOptions<ModelProviderOptions> CreateProviderOptions(VectorStoreIndexingOptions? indexingOptions = null)

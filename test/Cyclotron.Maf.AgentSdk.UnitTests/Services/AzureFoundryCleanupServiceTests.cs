@@ -9,19 +9,19 @@ using Xunit;
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 
 /// <summary>
-/// Unit tests for the <see cref="AzureFoundryCleanupService"/> class.
+/// Unit tests for the <see cref="AIFoundryCleanupService"/> class.
 /// Tests constructor validation and protected agent name handling.
 /// Note: Async cleanup methods require Azure client mocking which is complex for unit tests.
 /// </summary>
 public class AzureFoundryCleanupServiceTests
 {
-    private readonly Mock<IPersistentAgentsClientFactory> _mockClientFactory;
-    private readonly Mock<ILogger<AzureFoundryCleanupService>> _mockLogger;
+    private readonly Mock<IAIProjectClientFactory> _mockClientFactory;
+    private readonly Mock<ILogger<AIFoundryCleanupService>> _mockLogger;
 
     public AzureFoundryCleanupServiceTests()
     {
-        _mockClientFactory = new Mock<IPersistentAgentsClientFactory>();
-        _mockLogger = new Mock<ILogger<AzureFoundryCleanupService>>();
+        _mockClientFactory = new Mock<IAIProjectClientFactory>();
+        _mockLogger = new Mock<ILogger<AIFoundryCleanupService>>();
     }
 
     #region Constructor Tests
@@ -30,7 +30,7 @@ public class AzureFoundryCleanupServiceTests
     public void Constructor_NullClientFactory_ThrowsArgumentNullException()
     {
         // Act
-        var act = () => new AzureFoundryCleanupService(null!, _mockLogger.Object);
+        var act = () => new AIFoundryCleanupService(null!, _mockLogger.Object);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -41,7 +41,7 @@ public class AzureFoundryCleanupServiceTests
     public void Constructor_NullLogger_ThrowsArgumentNullException()
     {
         // Act
-        var act = () => new AzureFoundryCleanupService(_mockClientFactory.Object, null!);
+        var act = () => new AIFoundryCleanupService(_mockClientFactory.Object, null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -52,7 +52,7 @@ public class AzureFoundryCleanupServiceTests
     public void Constructor_ValidParameters_CreatesInstance()
     {
         // Act
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -64,7 +64,7 @@ public class AzureFoundryCleanupServiceTests
     public void Constructor_InitializesProtectedAgentNames()
     {
         // Act
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -184,7 +184,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAllResourcesAsync_ValidProvider_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -203,7 +203,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAllResourcesAsync_WithProtectedMetadataKey_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -223,7 +223,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAllResourcesAsync_NullProtectedMetadataKey_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -243,7 +243,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAllResourcesAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -270,7 +270,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupFilesAsync_ValidProvider_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -289,7 +289,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupFilesAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -312,7 +312,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupFilesAsync_VariousProviderNames_CallsCorrectProvider(string providerName)
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -335,7 +335,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task DeleteFilesAsync_ValidProvider_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -356,7 +356,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task DeleteFilesAsync_EmptyFileIds_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -376,7 +376,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task DeleteFilesAsync_MultipleFileIds_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -396,7 +396,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task DeleteFilesAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -422,7 +422,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupVectorStoresAsync_ValidProvider_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -441,7 +441,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupVectorStoresAsync_WithProtectedMetadataKey_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -461,7 +461,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupVectorStoresAsync_NullProtectedMetadataKey_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -481,7 +481,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupVectorStoresAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -508,7 +508,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupVectorStoresAsync_VariousProtectedKeys_CallsGetClient(string protectedKey)
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -532,7 +532,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupThreadsAsync_ValidProvider_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -551,7 +551,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupThreadsAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -575,7 +575,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupThreadsAsync_VariousProviderNames_CallsCorrectProvider(string providerName)
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -598,7 +598,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAgentsAsync_ValidProvider_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -617,7 +617,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAgentsAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -640,7 +640,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task CleanupAgentsAsync_VariousProviderNames_CallsCorrectProvider(string providerName)
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -663,11 +663,11 @@ public class AzureFoundryCleanupServiceTests
     public void MultipleInstances_IndependentProtectedAgentLists()
     {
         // Arrange & Act
-        var service1 = new AzureFoundryCleanupService(
+        var service1 = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
-        var service2 = new AzureFoundryCleanupService(
+        var service2 = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -683,7 +683,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task Service_ProviderNotFound_PropagatesException()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -702,7 +702,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task Service_AuthenticationError_PropagatesException()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -721,7 +721,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task Service_NetworkError_PropagatesException()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -744,7 +744,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task Service_ProviderNameWithSpecialChars_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 
@@ -765,7 +765,7 @@ public class AzureFoundryCleanupServiceTests
     public async Task Service_EmptyProviderName_CallsGetClient()
     {
         // Arrange
-        var service = new AzureFoundryCleanupService(
+        var service = new AIFoundryCleanupService(
             _mockClientFactory.Object,
             _mockLogger.Object);
 

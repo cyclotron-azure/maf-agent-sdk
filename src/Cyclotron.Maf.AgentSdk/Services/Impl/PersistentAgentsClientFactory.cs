@@ -50,20 +50,20 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 /// Use the native client methods for agent operations instead of legacy PersistentAgentsClient.
 /// </para>
 /// </remarks>
-public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
+public class AIProjectClientFactory : IAIProjectClientFactory
 {
-    private readonly ILogger<PersistentAgentsClientFactory> _logger;
+    private readonly ILogger<AIProjectClientFactory> _logger;
     private readonly ModelProviderOptions _providerOptions;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PersistentAgentsClientFactory"/> class.
+    /// Initializes a new instance of the <see cref="AIProjectClientFactory"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
     /// <param name="providerOptions">The model provider configuration options.</param>
     /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when no providers are configured.</exception>
-    public PersistentAgentsClientFactory(
-        ILogger<PersistentAgentsClientFactory> logger,
+    public AIProjectClientFactory(
+        ILogger<AIProjectClientFactory> logger,
         IOptions<ModelProviderOptions> providerOptions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

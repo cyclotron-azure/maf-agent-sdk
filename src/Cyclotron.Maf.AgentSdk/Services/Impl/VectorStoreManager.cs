@@ -27,11 +27,11 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class VectorStoreManager(
     ILogger<VectorStoreManager> logger,
-    IPersistentAgentsClientFactory clientFactory,
+    IAIProjectClientFactory clientFactory,
     IOptions<ModelProviderOptions> providerOptions) : IVectorStoreManager
 {
     private readonly ILogger<VectorStoreManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IPersistentAgentsClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+    private readonly IAIProjectClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     private readonly VectorStoreIndexingOptions _indexingOptions = providerOptions?.Value?.VectorStoreIndexing ?? new VectorStoreIndexingOptions();
 
     /// <inheritdoc/>
@@ -51,7 +51,7 @@ public class VectorStoreManager(
             // Each workflow execution creates its own vector store
             // No need to search for existing ones since the key is unique per request
             _logger.LogInformation("Creating new vector store for workflow with key: {MetadataKey}", key);
-            
+
             // Note: Metadata is read-only in SDK, so we can't set custom metadata via creation options
             // Metadata would need to be set via separate update call if supported
 

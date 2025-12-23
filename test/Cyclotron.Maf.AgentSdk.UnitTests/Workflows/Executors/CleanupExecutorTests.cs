@@ -19,7 +19,7 @@ namespace Cyclotron.Maf.AgentSdk.UnitTests.Workflows.Executors;
 public class CleanupExecutorTests
 {
     private readonly Mock<IVectorStoreManager> _mockVectorStoreManager;
-    private readonly Mock<IAzureFoundryCleanupService> _mockCleanupService;
+    private readonly Mock<IAIFoundryCleanupService> _mockCleanupService;
     private readonly Mock<ILogger<CleanupExecutor<TestCleanupableResult>>> _mockLogger;
     private readonly Mock<IWorkflowContext> _mockWorkflowContext;
     private readonly IOptions<ModelProviderOptions> _providerOptions;
@@ -27,7 +27,7 @@ public class CleanupExecutorTests
     public CleanupExecutorTests()
     {
         _mockVectorStoreManager = new Mock<IVectorStoreManager>();
-        _mockCleanupService = new Mock<IAzureFoundryCleanupService>();
+        _mockCleanupService = new Mock<IAIFoundryCleanupService>();
         _mockLogger = new Mock<ILogger<CleanupExecutor<TestCleanupableResult>>>();
         _mockWorkflowContext = new Mock<IWorkflowContext>();
         _providerOptions = MsOptions.Create(new ModelProviderOptions

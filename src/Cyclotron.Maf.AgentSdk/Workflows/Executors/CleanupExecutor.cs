@@ -16,13 +16,13 @@ namespace Cyclotron.Maf.AgentSdk.Workflows.Executors;
 /// <typeparam name="TResult">The workflow result type that implements <see cref="ICleanupableWorkflowResult"/>.</typeparam>
 public class CleanupExecutor<TResult>(
     IVectorStoreManager vectorStoreManager,
-    IAzureFoundryCleanupService cleanupService,
+    IAIFoundryCleanupService cleanupService,
     ILogger<CleanupExecutor<TResult>> logger,
     IOptions<ModelProviderOptions> providerOptions) : Executor<TResult, TResult>(nameof(CleanupExecutor<TResult>))
     where TResult : ICleanupableWorkflowResult
 {
     private readonly IVectorStoreManager _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
-    private readonly IAzureFoundryCleanupService _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
+    private readonly IAIFoundryCleanupService _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
     private readonly ILogger<CleanupExecutor<TResult>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ModelProviderOptions _providerOptions = providerOptions?.Value ?? throw new ArgumentNullException(nameof(providerOptions));
 

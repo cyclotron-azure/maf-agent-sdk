@@ -21,7 +21,7 @@ namespace Cyclotron.Maf.AgentSdk.Services;
 /// </list>
 /// </para>
 /// </remarks>
-public interface IPersistentAgentsClientFactory
+public interface IAIProjectClientFactory
 {
     /// <summary>
     /// Gets an <see cref="AIProjectClient"/> instance configured for the specified provider.

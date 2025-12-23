@@ -1,9 +1,6 @@
-using Cyclotron.Maf.AgentSdk.Agents;
-using Cyclotron.Maf.AgentSdk.Options;
-using Cyclotron.Maf.AgentSdk.Services;
-using Cyclotron.Maf.AgentSdk.Services.Impl;
-using Microsoft.Extensions.Options;
 using SpamDetection;
+using SpamDetection.Services;
+using SpamDetection.Services.Impl;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -22,36 +19,14 @@ public static class SpamDetectionServiceCollectionExtensions
         // Add core AgentSdk services
         services.AddAgentSdkServices();
 
-        // Register prompt rendering service
-        services.AddSingleton<IPromptRenderingService, PromptRenderingService>();
+        // Add document workflow services (includes vector store, prompt rendering, PDF services, etc.)
+        services.AddDocumentWorkflowServices();
 
-        // Register the persistent agents client factory
-        services.AddSingleton<IPersistentAgentsClientFactory, PersistentAgentsClientFactory>();
+        // Register keyed agent factory for spam_detector
+        services.AddKeyedAgentFactories("spam_detector");
 
-        // Register the vector store manager
-        services.AddSingleton<IVectorStoreManager, VectorStoreManager>();
-
-        // Register the spam detector agent factory as a keyed service
-        services.AddKeyedSingleton<IAgentFactory>("spam_detector", (sp, key) =>
-        {
-            var logger = sp.GetRequiredService<ILogger<AgentFactory>>();
-            var promptService = sp.GetRequiredService<IPromptRenderingService>();
-            var providerOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
-            var agentOptions = sp.GetRequiredService<IOptions<AgentOptions>>();
-            var clientFactory = sp.GetRequiredService<IPersistentAgentsClientFactory>();
-            var vectorStoreManager = sp.GetRequiredService<IVectorStoreManager>();
-            var telemetryOptions = sp.GetRequiredService<IOptions<TelemetryOptions>>();
-
-            return new AgentFactory(
-                key as string ?? "spam_detector",
-                logger,
-                promptService,
-                providerOptions,
-                agentOptions,
-                clientFactory,
-                vectorStoreManager,
-                telemetryOptions);
-        });
+        // Register the spam workflow service
+        services.AddScoped<ISpamWorkflow, SpamWorkflow>();
 
         // Register the main application entry point
         services.AddScoped<IMain, Main>();

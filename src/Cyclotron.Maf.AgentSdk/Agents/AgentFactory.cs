@@ -30,7 +30,7 @@ public class AgentFactory : IAgentFactory
 {
     private readonly ILogger<AgentFactory> _logger;
     private readonly IPromptRenderingService _promptService;
-    private readonly IPersistentAgentsClientFactory _clientFactory;
+    private readonly IAIProjectClientFactory _clientFactory;
     private readonly IVectorStoreManager _vectorStoreManager;
     private readonly ModelProviderOptions _providerOptions;
     private readonly string _agentKey;
@@ -55,7 +55,7 @@ public class AgentFactory : IAgentFactory
         IPromptRenderingService promptService,
         IOptions<ModelProviderOptions> providerOptions,
         IOptions<AgentOptions> agentOptions,
-        IPersistentAgentsClientFactory clientFactory,
+        IAIProjectClientFactory clientFactory,
         IVectorStoreManager vectorStoreManager,
         IOptions<TelemetryOptions> telemetryOptions)
     {
