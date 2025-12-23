@@ -49,6 +49,7 @@ public class AgentSdkServiceCollectionExtensionsTests
 
         // Act
         services.AddAgentSdkServices();
+        services.AddDocumentWorkflowServices();
         var serviceProvider = services.BuildServiceProvider();
 
         // Assert

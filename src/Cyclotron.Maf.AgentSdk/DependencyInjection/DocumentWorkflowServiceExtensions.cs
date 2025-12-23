@@ -15,7 +15,7 @@ public static class DocumentWorkflowServiceExtensions
 {
     /// <summary>
     /// Registers generic workflow-based document services with Azure AI Foundry.
-    /// This includes core services like vector store management, cleanup, and prompt rendering.
+    /// This includes core services like vector store management, cleanup, prompt rendering, and PDF content analysis.
     /// Domain-specific services should be registered via separate extension methods.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -33,6 +33,13 @@ public static class DocumentWorkflowServiceExtensions
 
         // Register unified prompt rendering service
         services.AddSingleton<IPromptRenderingService, PromptRenderingService>();
+
+        // Register PDF content analyzers as keyed services for pluggable implementation support
+        services.AddKeyedSingleton<IPdfContentAnalyzer>(
+            "pdfpig",
+            (sp, _) => new PdfPigContentAnalyzer(
+                sp.GetRequiredService<ILogger<PdfPigContentAnalyzer>>(),
+                sp.GetRequiredService<IOptions<PdfContentAnalysisOptions>>()));
 
         // Note: Domain-specific executors (FileRead, VectorStore, etc.) should be registered
         // by domain-specific packages (e.g., AgentSdk.HOA)

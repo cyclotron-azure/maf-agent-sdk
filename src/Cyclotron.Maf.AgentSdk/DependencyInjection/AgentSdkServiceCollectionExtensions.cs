@@ -29,6 +29,7 @@ public static class AgentSdkServiceCollectionExtensions
         services.AddAgentOptions();
         services.AddTelemetryOptions();
         services.AddPdfConversionOptions();
+        services.AddPdfContentAnalysisOptions();
 
         // Register PDF to Markdown converter
         services.AddSingleton<IPdfToMarkdownConverter, PdfPigMarkdownConverter>();
@@ -204,6 +205,35 @@ public static class AgentSdkServiceCollectionExtensions
                 if (pdfSection.Exists())
                 {
                     pdfSection.Bind(options);
+                }
+            })
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers and configures <see cref="PdfContentAnalysisOptions"/> from the <c>PdfContentAnalysis:</c> section in configuration.
+    /// Controls PDF content analysis behavior, analyzer selection, and failure handling strategies.
+    /// Supports named options for multiple configurations.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddPdfContentAnalysisOptions(
+        this IServiceCollection services,
+        string? name = null)
+    {
+        name ??= string.Empty;
+
+        services.AddOptions<PdfContentAnalysisOptions>(name)
+            .Configure<IConfiguration>((options, configuration) =>
+            {
+                var analysisSection = configuration.GetSection(PdfContentAnalysisOptions.SectionName);
+                if (analysisSection.Exists())
+                {
+                    analysisSection.Bind(options);
                 }
             })
             .ValidateDataAnnotations()

@@ -1,5 +1,7 @@
 using System.Text;
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Options;
+using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
 using Cyclotron.Maf.AgentSdk.UnitTests.TestFixtures;
 using AwesomeAssertions;
@@ -77,11 +79,27 @@ public class PdfPigMarkdownConverterTests : IDisposable
         return MsOptions.Create(options);
     }
 
-    private PdfPigMarkdownConverter CreateConverter(IOptions<PdfConversionOptions>? options = null)
+    private IOptions<PdfContentAnalysisOptions> CreateAnalysisOptions(bool enabled = false)
     {
+        var options = new PdfContentAnalysisOptions
+        {
+            Enabled = enabled
+        };
+        return MsOptions.Create(options);
+    }
+
+    private PdfPigMarkdownConverter CreateConverter(
+        IOptions<PdfConversionOptions>? options = null,
+        IOptions<PdfContentAnalysisOptions>? analysisOptions = null)
+    {
+        var mockAnalyzer = new Mock<IPdfContentAnalyzer>();
+        mockAnalyzer.Setup(a => a.GetAnalyzerName()).Returns("pdfpig");
+
         return new PdfPigMarkdownConverter(
             _mockLogger.Object,
-            options ?? CreateOptions());
+            options ?? CreateOptions(),
+            analysisOptions ?? CreateAnalysisOptions(),
+            mockAnalyzer.Object);
     }
 
     private string CreateTempPdf(byte[] pdfBytes)
@@ -491,18 +509,16 @@ public class PdfPigMarkdownConverterTests : IDisposable
 
     #region Constructor Tests
 
-    [Fact(DisplayName = "Constructor should accept null logger gracefully")]
-    public void Constructor_NullLogger_DoesNotThrow()
+    [Fact(DisplayName = "Constructor should validate logger")]
+    public void Constructor_NullLogger_ThrowsArgumentNullException()
     {
-        // Note: Primary constructor doesn't validate null, which is a design choice
-        // This test documents the current behavior
+        // Note: Primary constructor validates null logger
         var options = CreateOptions();
+        var analysisOptions = CreateAnalysisOptions();
 
-        // Act - should not throw
-        var converter = new PdfPigMarkdownConverter(null!, options);
-
-        // Assert
-        converter.Should().NotBeNull();
+        // Act & Assert - should throw
+        Assert.Throws<ArgumentNullException>(
+            () => new PdfPigMarkdownConverter(null!, options, analysisOptions, new Mock<IPdfContentAnalyzer>().Object));
     }
 
     [Fact(DisplayName = "Constructor should use default options values")]
@@ -515,7 +531,7 @@ public class PdfPigMarkdownConverterTests : IDisposable
             includeTimestamp: true);
 
         // Act
-        var converter = new PdfPigMarkdownConverter(_mockLogger.Object, options);
+        var converter = CreateConverter(options);
 
         // Assert
         converter.Should().NotBeNull();
