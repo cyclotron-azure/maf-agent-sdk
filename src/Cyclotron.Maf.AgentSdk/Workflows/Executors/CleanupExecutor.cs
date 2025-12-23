@@ -34,7 +34,7 @@ public class CleanupExecutor<TResult>(
     {
         _logger.LogInformation(
             "[{ExecutorName}] Starting execution - Input: Action={Action}, FileIds={FileIds}, VectorStoreIds={VectorStoreIds}, AgentIds={AgentIds}",
-            nameof(CleanupExecutor<TResult>),
+            nameof(CleanupExecutor<>),
             result.Action,
             string.Join(", ", result.FileIds),
             string.Join(", ", result.VectorStoreIds),

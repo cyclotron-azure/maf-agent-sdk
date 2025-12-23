@@ -25,7 +25,8 @@ public class ModelProviderOptions
     /// </summary>
     public string GetDefaultProviderName()
     {
-        if (!string.IsNullOrEmpty(DefaultProviderName) && Providers.ContainsKey(DefaultProviderName))
+        if (!string.IsNullOrEmpty(DefaultProviderName)
+            && Providers.ContainsKey(DefaultProviderName))
         {
             return DefaultProviderName;
         }
