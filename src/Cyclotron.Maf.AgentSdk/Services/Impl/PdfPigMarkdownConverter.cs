@@ -1,5 +1,7 @@
 using System.Text;
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UglyToad.PdfPig;
@@ -11,6 +13,7 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// <summary>
 /// Converts PDF files to Markdown format using the PdfPig library.
 /// Supports layout analysis for paragraph detection and reading order.
+/// Includes configurable content analysis to detect and handle image-only PDFs.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,12 +24,22 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// When layout analysis fails on a page, the converter falls back to simple
 /// text extraction without structure preservation.
 /// </para>
+/// <para>
+/// Before conversion, the PDF content can be analyzed to detect image-only content.
+/// Based on configuration, image-only PDFs can be skipped, cause an error, or fallback
+/// to conversion anyway.
+/// </para>
 /// </remarks>
 public class PdfPigMarkdownConverter(
     ILogger<PdfPigMarkdownConverter> logger,
-    IOptions<PdfConversionOptions> options) : IPdfToMarkdownConverter
+    IOptions<PdfConversionOptions> conversionOptions,
+    IOptions<PdfContentAnalysisOptions> analysisOptions,
+    [FromKeyedServices("pdfpig")] IPdfContentAnalyzer contentAnalyzer) : IPdfToMarkdownConverter
 {
-    private readonly PdfConversionOptions _options = options.Value;
+    private readonly ILogger<PdfPigMarkdownConverter> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly PdfConversionOptions _conversionOptions = conversionOptions.Value;
+    private readonly PdfContentAnalysisOptions _analysisOptions = analysisOptions.Value;
+    private readonly IPdfContentAnalyzer _contentAnalyzer = contentAnalyzer ?? throw new ArgumentNullException(nameof(contentAnalyzer));
 
     /// <inheritdoc />
     public async Task<string> ConvertToMarkdownAsync(
@@ -38,7 +51,17 @@ public class PdfPigMarkdownConverter(
             throw new FileNotFoundException($"PDF file not found: {pdfFilePath}");
         }
 
-        logger.LogInformation("Converting PDF to markdown: {FilePath}", pdfFilePath);
+        _logger.LogInformation("Converting PDF to markdown: {FilePath}", pdfFilePath);
+
+        // Analyze PDF content if enabled
+        if (_analysisOptions.Enabled)
+        {
+            var analysisResult = await AnalyzeAndHandleResultAsync(pdfFilePath, Path.GetFileName(pdfFilePath), cancellationToken);
+            if (analysisResult == null)
+            {
+                return string.Empty;
+            }
+        }
 
         // PdfPig operations are synchronous, wrap in Task.Run for async pattern
         return await Task.Run(() => ConvertToMarkdownInternal(pdfFilePath), cancellationToken);
@@ -50,7 +73,23 @@ public class PdfPigMarkdownConverter(
         string fileName,
         CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Converting PDF stream to markdown: {FileName}", fileName);
+        _logger.LogInformation("Converting PDF stream to markdown: {FileName}", fileName);
+
+        // Analyze PDF content if enabled
+        if (_analysisOptions.Enabled)
+        {
+            var analysisResult = await AnalyzeAndHandleResultAsync(pdfStream, fileName, cancellationToken);
+            if (analysisResult == null)
+            {
+                return string.Empty;
+            }
+
+            // Reset stream position after analysis
+            if (pdfStream.CanSeek)
+            {
+                pdfStream.Seek(0, SeekOrigin.Begin);
+            }
+        }
 
         // PdfPig can read from streams directly
         return await Task.Run(() => ConvertStreamToMarkdownInternal(pdfStream, fileName), cancellationToken);
@@ -65,7 +104,7 @@ public class PdfPigMarkdownConverter(
 
         string? savedFilePath = null;
 
-        if (_options.SaveMarkdownForDebug)
+        if (_conversionOptions.SaveMarkdownForDebug && !string.IsNullOrEmpty(markdownContent))
         {
             savedFilePath = await SaveMarkdownToFileAsync(
                 markdownContent,
@@ -87,7 +126,7 @@ public class PdfPigMarkdownConverter(
 
         string? savedFilePath = null;
 
-        if (_options.SaveMarkdownForDebug)
+        if (_conversionOptions.SaveMarkdownForDebug && !string.IsNullOrEmpty(markdownContent))
         {
             savedFilePath = await SaveMarkdownToFileAsync(
                 markdownContent,
@@ -96,6 +135,121 @@ public class PdfPigMarkdownConverter(
         }
 
         return (markdownContent, savedFilePath);
+    }
+
+    /// <summary>
+    /// Analyzes PDF content and handles the result based on configuration.
+    /// Returns null if content analysis indicates image-only PDF and failure strategy is Skip.
+    /// Throws exception if failure strategy is Throw.
+    /// Returns the analysis result if proceeding with conversion.
+    /// </summary>
+    private async Task<PdfContentAnalysisResult?> AnalyzeAndHandleResultAsync(
+        string pdfFilePath,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var analysisResult = await _contentAnalyzer.AnalyzeAsync(pdfFilePath, cancellationToken);
+
+            if (analysisResult.ContentType == PdfContentType.ImageOnly)
+            {
+                return HandleImageOnlyPdf(fileName, analysisResult);
+            }
+
+            return analysisResult;
+        }
+        catch (Exception ex)
+        {
+            return HandleAnalysisFailure(fileName, ex);
+        }
+    }
+
+    /// <summary>
+    /// Analyzes PDF content from stream and handles the result based on configuration.
+    /// Returns null if content analysis indicates image-only PDF and failure strategy is Skip.
+    /// Throws exception if failure strategy is Throw.
+    /// Returns the analysis result if proceeding with conversion.
+    /// </summary>
+    private async Task<PdfContentAnalysisResult?> AnalyzeAndHandleResultAsync(
+        Stream pdfStream,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var analysisResult = await _contentAnalyzer.AnalyzeAsync(pdfStream, fileName, cancellationToken);
+
+            if (analysisResult.ContentType == PdfContentType.ImageOnly)
+            {
+                return HandleImageOnlyPdf(fileName, analysisResult);
+            }
+
+            return analysisResult;
+        }
+        catch (Exception ex)
+        {
+            return HandleAnalysisFailure(fileName, ex);
+        }
+    }
+
+    /// <summary>
+    /// Handles image-only PDF detection based on configured failure strategy.
+    /// </summary>
+    private PdfContentAnalysisResult? HandleImageOnlyPdf(string fileName, PdfContentAnalysisResult analysisResult)
+    {
+        switch (_analysisOptions.FailureStrategy)
+        {
+            case PdfAnalysisFailureStrategy.Skip:
+                _logger.LogInformation(
+                    "Skipping image-only PDF: {FileName} (TextRatio: {TextRatio:P})",
+                    fileName,
+                    analysisResult.TextRatio);
+                return null;
+
+            case PdfAnalysisFailureStrategy.Throw:
+                var errorMsg = $"PDF is image-only and cannot be processed: {fileName} (TextRatio: {analysisResult.TextRatio:P})";
+                _logger.LogError(errorMsg);
+                throw new InvalidOperationException(errorMsg);
+
+            case PdfAnalysisFailureStrategy.Fallback:
+                _logger.LogWarning(
+                    "Image-only PDF will be processed with fallback conversion: {FileName} (TextRatio: {TextRatio:P})",
+                    fileName,
+                    analysisResult.TextRatio);
+                return analysisResult;
+
+            default:
+                _logger.LogWarning("Unknown failure strategy: {Strategy}, using Fallback", _analysisOptions.FailureStrategy);
+                return analysisResult;
+        }
+    }
+
+    /// <summary>
+    /// Handles analysis failures based on configured failure strategy.
+    /// </summary>
+    private PdfContentAnalysisResult? HandleAnalysisFailure(string fileName, Exception analysisException)
+    {
+        _logger.LogWarning(analysisException, "PDF content analysis failed for: {FileName}", fileName);
+
+        switch (_analysisOptions.FailureStrategy)
+        {
+            case PdfAnalysisFailureStrategy.Skip:
+                _logger.LogInformation("Skipping PDF due to analysis failure: {FileName}", fileName);
+                return null;
+
+            case PdfAnalysisFailureStrategy.Throw:
+                _logger.LogError("Throwing exception due to analysis failure for: {FileName}", fileName);
+                throw new InvalidOperationException($"PDF content analysis failed for {fileName}", analysisException);
+
+            case PdfAnalysisFailureStrategy.Fallback:
+                _logger.LogInformation("Proceeding with conversion despite analysis failure: {FileName}", fileName);
+                return new PdfContentAnalysisResult { ContentType = PdfContentType.Mixed, AnalyzerName = _contentAnalyzer.GetAnalyzerName() };
+
+            default:
+                _logger.LogWarning("Unknown failure strategy: {Strategy}, using Fallback", _analysisOptions.FailureStrategy);
+                return new PdfContentAnalysisResult { ContentType = PdfContentType.Mixed, AnalyzerName = _contentAnalyzer.GetAnalyzerName() };
+        }
     }
 
     /// <summary>
@@ -112,7 +266,7 @@ public class PdfPigMarkdownConverter(
         if (!Directory.Exists(outputDir))
         {
             Directory.CreateDirectory(outputDir);
-            logger.LogInformation("Created output directory: {OutputDir}", outputDir);
+            _logger.LogInformation("Created output directory: {OutputDir}", outputDir);
         }
 
         // Build filename
@@ -121,7 +275,7 @@ public class PdfPigMarkdownConverter(
 
         await File.WriteAllTextAsync(filePath, markdownContent, cancellationToken);
 
-        logger.LogInformation("Saved markdown file for debugging: {FilePath}", filePath);
+        _logger.LogInformation("Saved markdown file for debugging: {FilePath}", filePath);
 
         return filePath;
     }
@@ -134,13 +288,13 @@ public class PdfPigMarkdownConverter(
         var sb = new StringBuilder();
         sb.Append(baseFileName);
 
-        if (_options.IncludeTimestampInFilename)
+        if (_conversionOptions.IncludeTimestampInFilename)
         {
             sb.Append('_');
             sb.Append(DateTime.UtcNow.ToString("yyyyMMdd_HHmmss"));
         }
 
-        sb.Append(_options.MarkdownFileExtension);
+        sb.Append(_conversionOptions.MarkdownFileExtension);
 
         return sb.ToString();
     }
@@ -150,7 +304,7 @@ public class PdfPigMarkdownConverter(
     /// </summary>
     private string ResolveOutputDirectory()
     {
-        var outputPath = _options.OutputDirectory;
+        var outputPath = _conversionOptions.OutputDirectory;
 
         if (Path.IsPathRooted(outputPath))
         {
@@ -191,17 +345,17 @@ public class PdfPigMarkdownConverter(
         sb.AppendLine();
 
         var pageCount = document.NumberOfPages;
-        logger.LogDebug("Processing PDF with {PageCount} pages", pageCount);
+        _logger.LogDebug("Processing PDF with {PageCount} pages", pageCount);
 
         foreach (var page in document.GetPages())
         {
-            if (_options.IncludePageNumbers)
+            if (_conversionOptions.IncludePageNumbers)
             {
                 sb.AppendLine($"## Page {page.Number}");
                 sb.AppendLine();
             }
 
-            if (_options.PreserveParagraphStructure)
+            if (_conversionOptions.PreserveParagraphStructure)
             {
                 ExtractWithLayoutAnalysis(page, sb);
             }
@@ -212,7 +366,7 @@ public class PdfPigMarkdownConverter(
         }
 
         var result = sb.ToString();
-        logger.LogDebug("Extracted {CharCount} characters from PDF", result.Length);
+        _logger.LogDebug("Extracted {CharCount} characters from PDF", result.Length);
 
         return result;
     }
@@ -228,7 +382,7 @@ public class PdfPigMarkdownConverter(
 
             if (words.Count == 0)
             {
-                logger.LogDebug("No words found on page {PageNumber}", page.Number);
+                _logger.LogDebug("No words found on page {PageNumber}", page.Number);
                 return;
             }
 
@@ -251,7 +405,7 @@ public class PdfPigMarkdownConverter(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(
+            _logger.LogWarning(
                 ex,
                 "Layout analysis failed for page {PageNumber}, falling back to simple extraction",
                 page.Number);

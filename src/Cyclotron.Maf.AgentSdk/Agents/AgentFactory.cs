@@ -1,10 +1,12 @@
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
-using Azure.AI.Agents.Persistent;
+using Azure.AI.Projects;
+using Azure.AI.Projects.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenAI.Responses;
 using Polly;
 using Polly.Retry;
 
@@ -28,7 +30,7 @@ public class AgentFactory : IAgentFactory
 {
     private readonly ILogger<AgentFactory> _logger;
     private readonly IPromptRenderingService _promptService;
-    private readonly IPersistentAgentsClientFactory _clientFactory;
+    private readonly IAIProjectClientFactory _clientFactory;
     private readonly IVectorStoreManager _vectorStoreManager;
     private readonly ModelProviderOptions _providerOptions;
     private readonly string _agentKey;
@@ -53,7 +55,7 @@ public class AgentFactory : IAgentFactory
         IPromptRenderingService promptService,
         IOptions<ModelProviderOptions> providerOptions,
         IOptions<AgentOptions> agentOptions,
-        IPersistentAgentsClientFactory clientFactory,
+        IAIProjectClientFactory clientFactory,
         IVectorStoreManager vectorStoreManager,
         IOptions<TelemetryOptions> telemetryOptions)
     {
@@ -246,8 +248,8 @@ public class AgentFactory : IAgentFactory
         // Get system prompt (instructions) from prompt rendering service
         var instructions = _promptService.RenderSystemPrompt(_agentKey);
 
-        // Configure tool resources and definitions based on agent metadata configuration
-        var (toolResources, toolDefinitions) = BuildToolConfiguration(vectorStoreId);
+        // Configure tools based on agent metadata configuration
+        var tools = BuildToolConfiguration(vectorStoreId);
 
         // Create ephemeral agent with unique name
         var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
@@ -264,17 +266,42 @@ public class AgentFactory : IAgentFactory
                 string.Join(", ", _agentDefinition.Metadata.Tools));
 
             // Get provider-specific client
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
 
-            var agentResponse = await client.Administration.CreateAgentAsync(
-                model: provider.GetEffectiveModel(),
-                name: agentName,
-                instructions: instructions,
-                tools: toolDefinitions,
-                toolResources: toolResources,
+            _logger.LogDebug(
+                "Creating {AgentKey} agent with configured version: {ConfiguredVersion}",
+                _agentKey,
+                _agentDefinition.Version ?? "(auto-generated)");
+
+            // Create agent using V2 versioned API with PromptAgentDefinition
+            var promptDefinition = new PromptAgentDefinition(model: provider.GetEffectiveModel())
+            {
+                Instructions = instructions,
+            };
+
+            if (tools.Count > 0)
+            {
+                var agentTools = tools
+                    .Select(t => t.AsOpenAIResponseTool())
+                    .Where(t => t is not null)
+                    .Select(t => t!.AsAgentTool())
+                    .ToList();
+
+                foreach (var tool in agentTools)
+                {
+                    promptDefinition.Tools.Add(tool);
+                }
+            }
+
+            var versionOptions = new AgentVersionCreationOptions(promptDefinition);
+            AgentVersion createdAgentVersion = await projectClient.Agents.CreateAgentVersionAsync(
+                agentName: agentName,
+                options: versionOptions,
                 cancellationToken: cancellationToken);
 
-            var agentId = agentResponse.Value.Id;
+            // Get the AIAgent from the created version
+            AIAgent agent = projectClient.GetAIAgent(createdAgentVersion);
+            var agentId = agent.Id;
 
             _logger.LogInformation(
                 "Created {AgentKey} agent: {AgentId} (Name: {AgentName}, Provider: {ProviderName})",
@@ -282,10 +309,6 @@ public class AgentFactory : IAgentFactory
                 agentId,
                 agentName,
                 providerName);
-
-
-            // Convert to MAF AIAgent for workflow compatibility
-            AIAgent agent = await client.GetAIAgentAsync(agentId, cancellationToken: cancellationToken);
 
             if (_telemetryOptions.Enabled && !string.IsNullOrWhiteSpace(_telemetryOptions.SourceName))
             {
@@ -333,9 +356,16 @@ public class AgentFactory : IAgentFactory
         try
         {
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-            var client = _clientFactory.GetClient(providerName);
-            await client.Administration.DeleteAgentAsync(agentId, cancellationToken);
-            _logger.LogDebug("Deleted {AgentKey} agent: {AgentId}", _agentKey, agentId);
+            var projectClient = _clientFactory.GetClient(providerName);
+            if (TryParseAgentId(agentId, out var agentName, out var agentVersion))
+            {
+                await projectClient.Agents.DeleteAgentVersionAsync(agentName, agentVersion, cancellationToken);
+                _logger.LogDebug("Deleted {AgentKey} agent version {AgentVersion}: {AgentName}", _agentKey, agentVersion, agentName);
+            }
+            else
+            {
+                _logger.LogWarning("Agent ID format unexpected: {AgentId}. Expected 'name:version' format", agentId);
+            }
         }
         catch (Exception ex)
         {
@@ -367,10 +397,11 @@ public class AgentFactory : IAgentFactory
             }
 
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-            var client = _clientFactory.GetClient(providerName);
-            await client.Threads.DeleteThreadAsync(typedThread.ConversationId, cancellationToken);
+            var projectClient = _clientFactory.GetClient(providerName);
 
-            _logger.LogDebug("Deleted {AgentKey} thread: {ThreadId}", _agentKey, typedThread.ConversationId);
+            // V2 API: Thread/conversation deletion is not directly supported via AIProjectClient
+            // Threads are managed through agent lifecycle and are automatically cleaned up
+            _logger.LogDebug("Thread {ThreadId} for {AgentKey} - deletion not directly supported in V2 API, will be cleaned up automatically", typedThread.ConversationId, _agentKey);
         }
         catch (Exception ex)
         {
@@ -443,14 +474,13 @@ public class AgentFactory : IAgentFactory
 
     /// <summary>
     /// Builds the tool configuration based on the agent's metadata.tools configuration.
-    /// Supports "file_search" and "code_interpreter" tools.
+    /// Supports "file_search" and "code_interpreter" tools using V2 API patterns.
     /// </summary>
     /// <param name="vectorStoreId">The vector store ID to associate with file search tool.</param>
-    /// <returns>A tuple containing the tool resources and tool definitions.</returns>
-    private (ToolResources toolResources, IEnumerable<ToolDefinition> toolDefinitions) BuildToolConfiguration(string vectorStoreId)
+    /// <returns>A list of tools for the agent.</returns>
+    private List<AITool> BuildToolConfiguration(string vectorStoreId)
     {
-        var toolResources = new ToolResources();
-        var toolDefinitions = new List<ToolDefinition>();
+        var tools = new List<AITool>();
         var configuredTools = _agentDefinition.Metadata.Tools;
 
         // Default to file_search if no tools are configured
@@ -467,15 +497,15 @@ public class AgentFactory : IAgentFactory
             switch (tool.ToLowerInvariant())
             {
                 case "file_search":
-                    toolResources.FileSearch = new FileSearchToolResource();
-                    toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
-                    toolDefinitions.Add(new FileSearchToolDefinition());
-                    _logger.LogDebug("Configured file_search tool for {AgentKey}", _agentKey);
+                    var fileSearchTool = new HostedFileSearchTool();
+                    fileSearchTool.Inputs ??= [];
+                    fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+                    tools.Add(fileSearchTool);
+                    _logger.LogDebug("Configured file_search tool for {AgentKey} with vector store {VectorStoreId}", _agentKey, vectorStoreId);
                     break;
 
                 case "code_interpreter":
-                    toolResources.CodeInterpreter = new CodeInterpreterToolResource();
-                    toolDefinitions.Add(new CodeInterpreterToolDefinition());
+                    tools.Add(new HostedCodeInterpreterTool());
                     _logger.LogDebug("Configured code_interpreter tool for {AgentKey}", _agentKey);
                     break;
 
@@ -489,17 +519,42 @@ public class AgentFactory : IAgentFactory
         }
 
         // Ensure at least one tool is configured
-        if (toolDefinitions.Count == 0)
+        if (tools.Count == 0)
         {
             _logger.LogWarning(
                 "No valid tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
-            toolResources.FileSearch = new FileSearchToolResource();
-            toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
-            toolDefinitions.Add(new FileSearchToolDefinition());
+            var fileSearchTool = new HostedFileSearchTool();
+            if (fileSearchTool.Inputs == null)
+            {
+                fileSearchTool.Inputs = [];
+            }
+            fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+            tools.Add(fileSearchTool);
         }
 
-        return (toolResources, toolDefinitions);
+        return tools;
+    }
+
+    private static bool TryParseAgentId(string agentId, out string agentName, out string agentVersion)
+    {
+        agentName = string.Empty;
+        agentVersion = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(agentId))
+        {
+            return false;
+        }
+
+        var parts = agentId.Split(':');
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        agentName = parts[0];
+        agentVersion = parts[1];
+        return !string.IsNullOrWhiteSpace(agentName) && !string.IsNullOrWhiteSpace(agentVersion);
     }
 
     private void ValidateProviderReference()

@@ -1,5 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Options;
-using Azure.AI.Agents.Persistent;
+using Azure.AI.Projects;
 using Azure.Core;
 using Azure.Identity;
 using Microsoft.Extensions.Logging;
@@ -11,8 +11,8 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// Adapter to use Azure API Key with <see cref="TokenCredential"/> interface.
 /// </summary>
 /// <remarks>
-/// This is a workaround since <see cref="PersistentAgentsClient"/> only accepts <see cref="TokenCredential"/>.
-/// For production use with API keys, consider using Azure.AI.OpenAI.OpenAIClient instead.
+/// This is a workaround since some Azure clients only accept <see cref="TokenCredential"/>.
+/// For production use with API keys, consider using DefaultAzureCredential.
 /// </remarks>
 internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 {
@@ -33,7 +33,7 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 }
 
 /// <summary>
-/// Factory for creating <see cref="PersistentAgentsClient"/> instances with provider-specific authentication.
+/// Factory for creating <see cref="AIProjectClient"/> instances with provider-specific authentication.
 /// Supports multiple providers with different endpoints and authentication methods.
 /// Creates new client instances per scope to avoid state sharing in parallel processing.
 /// </summary>
@@ -45,21 +45,25 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 /// <item><description><c>azure_openai</c>: Uses API key authentication via <see cref="AzureKeyCredentialAdapter"/>.</description></item>
 /// </list>
 /// </para>
+/// <para>
+/// The factory returns <see cref="AIProjectClient"/> instances from Azure.AI.Projects V2 API.
+/// Use the native client methods for agent operations instead of legacy PersistentAgentsClient.
+/// </para>
 /// </remarks>
-public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
+public class AIProjectClientFactory : IAIProjectClientFactory
 {
-    private readonly ILogger<PersistentAgentsClientFactory> _logger;
+    private readonly ILogger<AIProjectClientFactory> _logger;
     private readonly ModelProviderOptions _providerOptions;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PersistentAgentsClientFactory"/> class.
+    /// Initializes a new instance of the <see cref="AIProjectClientFactory"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
     /// <param name="providerOptions">The model provider configuration options.</param>
     /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when no providers are configured.</exception>
-    public PersistentAgentsClientFactory(
-        ILogger<PersistentAgentsClientFactory> logger,
+    public AIProjectClientFactory(
+        ILogger<AIProjectClientFactory> logger,
         IOptions<ModelProviderOptions> providerOptions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -75,7 +79,7 @@ public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
     }
 
     /// <inheritdoc/>
-    public PersistentAgentsClient GetClient(string providerName)
+    public AIProjectClient GetClient(string providerName)
     {
         if (string.IsNullOrWhiteSpace(providerName))
         {
@@ -86,7 +90,7 @@ public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
         return CreateClient(providerName);
     }
 
-    private PersistentAgentsClient CreateClient(string providerName)
+    private AIProjectClient CreateClient(string providerName)
     {
         if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
         {
@@ -103,7 +107,7 @@ public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
         }
 
         _logger.LogInformation(
-            "Creating PersistentAgentsClient for provider '{ProviderName}' (Type: {ProviderType}, Endpoint: {Endpoint})",
+            "Creating AIProjectClient for provider '{ProviderName}' (Type: {ProviderType}, Endpoint: {Endpoint})",
             providerName,
             provider.Type,
             provider.Endpoint);
@@ -111,7 +115,7 @@ public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
         // Create credential based on provider type and configuration
         TokenCredential credential = CreateCredential(provider);
 
-        return new PersistentAgentsClient(provider.Endpoint, credential);
+        return new AIProjectClient(new Uri(provider.Endpoint), credential);
     }
 
     private TokenCredential CreateCredential(ModelProviderDefinitionOptions provider)
@@ -121,8 +125,8 @@ public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
         {
             _logger.LogDebug("Using API Key authentication for provider type: {ProviderType}", provider.Type);
             _logger.LogWarning(
-                "Using API Key with PersistentAgentsClient via adapter. " +
-                "For production Azure OpenAI usage, consider using Azure.AI.OpenAI.OpenAIClient or DefaultAzureCredential.");
+                "Using API Key with AIProjectClient via adapter. " +
+                "For production Azure OpenAI usage, consider using DefaultAzureCredential.");
 
             return new AzureKeyCredentialAdapter(provider.ApiKey!);
         }

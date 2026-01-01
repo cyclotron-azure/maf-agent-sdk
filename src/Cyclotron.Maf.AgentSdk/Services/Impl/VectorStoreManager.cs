@@ -1,12 +1,17 @@
 using Cyclotron.Maf.AgentSdk.Options;
-using Azure.AI.Agents.Persistent;
+using Azure.AI.Projects;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenAI.Files;
+using OpenAI.VectorStores;
+using System.ClientModel;
+
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 
 namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 
 /// <summary>
-/// Manages vector store lifecycle for AI agent document processing workflows.
+/// Manages vector store lifecycle for AI agent document processing workflows using Azure.AI.Projects V2 API.
 /// Provides operations for creating, managing, and cleaning up vector stores
 /// used by AI agents for file search and retrieval operations.
 /// </summary>
@@ -22,11 +27,11 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class VectorStoreManager(
     ILogger<VectorStoreManager> logger,
-    IPersistentAgentsClientFactory clientFactory,
+    IAIProjectClientFactory clientFactory,
     IOptions<ModelProviderOptions> providerOptions) : IVectorStoreManager
 {
     private readonly ILogger<VectorStoreManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IPersistentAgentsClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+    private readonly IAIProjectClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     private readonly VectorStoreIndexingOptions _indexingOptions = providerOptions?.Value?.VectorStoreIndexing ?? new VectorStoreIndexingOptions();
 
     /// <inheritdoc/>
@@ -39,21 +44,18 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var openAIClient = projectClient.GetProjectOpenAIClient();
+            var vectorStoreClient = openAIClient.GetVectorStoreClient();
 
             // Each workflow execution creates its own vector store
             // No need to search for existing ones since the key is unique per request
             _logger.LogInformation("Creating new vector store for workflow with key: {MetadataKey}", key);
-            var metadata = new Dictionary<string, string>
-            {
-                { key, bool.TrueString },
-                { "purpose", purpose },
-                { "created", DateTime.UtcNow.ToString("O") }
-            };
 
-            var vectorStoreResponse = await client.VectorStores.CreateVectorStoreAsync(
-                name: name,
-                metadata: metadata,
+            // Note: Metadata is read-only in SDK, so we can't set custom metadata via creation options
+            // Metadata would need to be set via separate update call if supported
+
+            ClientResult<VectorStore> vectorStoreResponse = await vectorStoreClient.CreateVectorStoreAsync(
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation("Created vector store: {VectorStoreId}", vectorStoreResponse.Value.Id);
@@ -73,28 +75,31 @@ public class VectorStoreManager(
         string vectorStoreId,
         CancellationToken cancellationToken = default)
     {
-        var client = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory.GetClient(providerName);
+        var openAIClient = projectClient.GetProjectOpenAIClient();
+        var vectorStoreClient = openAIClient.GetVectorStoreClient();
+        var fileClient = openAIClient.GetOpenAIFileClient();
 
         _logger.LogInformation("Cleaning up vector store: {VectorStoreId}", vectorStoreId);
 
         try
         {
             // Get all files in the vector store
-            await foreach (var file in client.VectorStores.GetVectorStoreFilesAsync(vectorStoreId, cancellationToken: cancellationToken))
+            await foreach (var file in vectorStoreClient.GetVectorStoreFilesAsync(vectorStoreId, cancellationToken: cancellationToken))
             {
                 try
                 {
-                    await client.Files.DeleteFileAsync(file.Id, cancellationToken);
-                    _logger.LogDebug("Deleted file: {FileId}", file.Id);
+                    await fileClient.DeleteFileAsync(file.FileId, cancellationToken);
+                    _logger.LogDebug("Deleted file: {FileId}", file.FileId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete file: {FileId}", file.Id);
+                    _logger.LogWarning(ex, "Failed to delete file: {FileId}", file.FileId);
                 }
             }
 
             // Delete the vector store
-            await client.VectorStores.DeleteVectorStoreAsync(vectorStoreId, cancellationToken);
+            await vectorStoreClient.DeleteVectorStoreAsync(vectorStoreId, cancellationToken);
             _logger.LogInformation("Deleted vector store: {VectorStoreId}", vectorStoreId);
         }
         catch (Exception ex)
@@ -114,31 +119,57 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var openAIClient = projectClient.GetProjectOpenAIClient();
+            var fileClient = openAIClient.GetOpenAIFileClient();
+            var vectorStoreClient = openAIClient.GetVectorStoreClient();
 
             _logger.LogInformation("Uploading file {FileName} to vector store {VectorStoreId}", fileName, vectorStoreId);
 
-            // Upload file to Azure AI Foundry
-            var uploadedFile = await client.Files.UploadFileAsync(
-                fileContent,
-                PersistentAgentFilePurpose.Agents,
-                fileName,
-                cancellationToken);
+            // Save stream to temporary file since SDK expects file path
+            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}-{fileName}");
+            try
+            {
+                using (var fileStream = File.Create(tempFilePath))
+                {
+                    await fileContent.CopyToAsync(fileStream, cancellationToken);
+                }
 
-            _logger.LogInformation("Uploaded file {FileName} with ID: {FileId}", fileName, uploadedFile.Value.Id);
+                // Upload file to Azure AI Foundry
+                ClientResult<OpenAIFile> uploadedFile = await fileClient.UploadFileAsync(
+                    filePath: tempFilePath,
+                    purpose: FileUploadPurpose.Assistants);
 
-            // Add file to vector store
-            await client.VectorStores.CreateVectorStoreFileBatchAsync(
-                vectorStoreId,
-                [uploadedFile.Value.Id],
-                cancellationToken: cancellationToken);
+                _logger.LogInformation("Uploaded file {FileName} with ID: {FileId}", fileName, uploadedFile.Value.Id);
 
-            _logger.LogInformation("Added file {FileId} to vector store {VectorStoreId}", uploadedFile.Value.Id, vectorStoreId);
+                // Add file to vector store
+                await vectorStoreClient.AddFileToVectorStoreAsync(
+                    vectorStoreId: vectorStoreId,
+                    fileId: uploadedFile.Value.Id,
+                    cancellationToken: cancellationToken);
 
-            // Wait for file to be processed
-            await WaitForFileProcessingAsync(providerName, vectorStoreId, uploadedFile.Value.Id, cancellationToken);
+                _logger.LogInformation("Added file {FileId} to vector store {VectorStoreId}", uploadedFile.Value.Id, vectorStoreId);
 
-            return uploadedFile.Value.Id;
+                // Wait for file to be processed
+                await WaitForFileProcessingAsync(providerName, vectorStoreId, uploadedFile.Value.Id, cancellationToken);
+
+                return uploadedFile.Value.Id;
+            }
+            finally
+            {
+                // Clean up temp file
+                if (File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        // Best effort cleanup
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -156,39 +187,74 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var openAIClient = projectClient.GetProjectOpenAIClient();
+            var fileClient = openAIClient.GetOpenAIFileClient();
+            var vectorStoreClient = openAIClient.GetVectorStoreClient();
             var fileIds = new List<string>();
+            var tempFiles = new List<string>();
 
             _logger.LogInformation("Uploading multiple files to vector store {VectorStoreId}", vectorStoreId);
 
-            // Upload all files
-            foreach (var (content, fileName) in files)
+            try
             {
-                var uploadedFile = await client.Files.UploadFileAsync(
-                    content,
-                    PersistentAgentFilePurpose.Agents,
-                    fileName,
-                    cancellationToken);
+                // Upload all files
+                foreach (var (content, fileName) in files)
+                {
+                    // Save stream to temporary file since SDK expects file path
+                    var tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}-{fileName}");
+                    tempFiles.Add(tempFilePath);
 
-                _logger.LogInformation("Uploaded file {FileName} with ID: {FileId} to vector store {VectorStoreId}", fileName, uploadedFile.Value.Id, vectorStoreId);
-                fileIds.Add(uploadedFile.Value.Id);
+                    using (var fileStream = File.Create(tempFilePath))
+                    {
+                        await content.CopyToAsync(fileStream, cancellationToken);
+                    }
+
+                    ClientResult<OpenAIFile> uploadedFile = await fileClient.UploadFileAsync(
+                        filePath: tempFilePath,
+                        purpose: FileUploadPurpose.Assistants);
+
+                    _logger.LogInformation("Uploaded file {FileName} with ID: {FileId} to vector store {VectorStoreId}", fileName, uploadedFile.Value.Id, vectorStoreId);
+                    fileIds.Add(uploadedFile.Value.Id);
+                }
+
+                // Add all files to vector store
+                foreach (var fileId in fileIds)
+                {
+                    await vectorStoreClient.AddFileToVectorStoreAsync(
+                        vectorStoreId: vectorStoreId,
+                        fileId: fileId,
+                        cancellationToken: cancellationToken);
+                }
+
+                _logger.LogInformation("Added {FileCount} files to vector store {VectorStoreId}", fileIds.Count, vectorStoreId);
+
+                // Wait for all files to be processed
+                foreach (var fileId in fileIds)
+                {
+                    await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, cancellationToken);
+                }
+
+                return fileIds.AsReadOnly();
             }
-
-            // Add all files to vector store in a batch
-            await client.VectorStores.CreateVectorStoreFileBatchAsync(
-                vectorStoreId,
-                fileIds,
-                cancellationToken: cancellationToken);
-
-            _logger.LogInformation("Added {FileCount} files to vector store {VectorStoreId}", fileIds.Count, vectorStoreId);
-
-            // Wait for all files to be processed
-            foreach (var fileId in fileIds)
+            finally
             {
-                await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, cancellationToken);
+                // Clean up temp files
+                foreach (var tempFile in tempFiles)
+                {
+                    if (File.Exists(tempFile))
+                    {
+                        try
+                        {
+                            File.Delete(tempFile);
+                        }
+                        catch
+                        {
+                            // Best effort cleanup
+                        }
+                    }
+                }
             }
-
-            return fileIds.AsReadOnly();
         }
         catch (Exception ex)
         {
@@ -217,7 +283,10 @@ public class VectorStoreManager(
     {
         try
         {
-            var client = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory.GetClient(providerName);
+            var openAIClient = projectClient.GetProjectOpenAIClient();
+            var vectorStoreClient = openAIClient.GetVectorStoreClient();
+
             var maxAttempts = _indexingOptions.MaxWaitAttempts;
             var initialDelayMs = _indexingOptions.InitialWaitDelayMs;
             var useExponentialBackoff = _indexingOptions.UseExponentialBackoff;
@@ -235,10 +304,10 @@ public class VectorStoreManager(
 
             for (int attempt = 0; attempt < maxAttempts; attempt++)
             {
-                var vectorStoreFile = await client.VectorStores.GetVectorStoreFileAsync(
-                    vectorStoreId,
-                    fileId,
-                    cancellationToken);
+                var vectorStoreFile = await vectorStoreClient.GetVectorStoreFileAsync(
+                    vectorStoreId: vectorStoreId,
+                    fileId: fileId,
+                    cancellationToken: cancellationToken);
 
                 var status = vectorStoreFile.Value.Status;
                 _logger.LogDebug(

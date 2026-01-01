@@ -33,9 +33,9 @@ public class DocumentWorkflowServiceExtensionsTests
 
         // Assert
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetService<IPersistentAgentsClientFactory>();
+        var service = scope.ServiceProvider.GetService<IAIProjectClientFactory>();
         service.Should().NotBeNull();
-        service.Should().BeOfType<PersistentAgentsClientFactory>();
+        service.Should().BeOfType<AIProjectClientFactory>();
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices should register IVectorStoreManager as scoped")]
@@ -73,9 +73,9 @@ public class DocumentWorkflowServiceExtensionsTests
 
         // Assert
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetService<IAzureFoundryCleanupService>();
+        var service = scope.ServiceProvider.GetService<IAIFoundryCleanupService>();
         service.Should().NotBeNull();
-        service.Should().BeOfType<AzureFoundryCleanupService>();
+        service.Should().BeOfType<AIFoundryCleanupService>();
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices should register IPromptRenderingService as singleton")]

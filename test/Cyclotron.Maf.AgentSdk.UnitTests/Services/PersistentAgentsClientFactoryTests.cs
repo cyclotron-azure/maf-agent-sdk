@@ -10,16 +10,16 @@ using MsOptions = Microsoft.Extensions.Options.Options;
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 
 /// <summary>
-/// Unit tests for the <see cref="PersistentAgentsClientFactory"/> class.
+/// Unit tests for the <see cref="AIProjectClientFactory"/> class.
 /// Tests constructor validation, provider lookup, and credential creation logic.
 /// </summary>
 public class PersistentAgentsClientFactoryTests
 {
-    private readonly Mock<ILogger<PersistentAgentsClientFactory>> _mockLogger;
+    private readonly Mock<ILogger<AIProjectClientFactory>> _mockLogger;
 
     public PersistentAgentsClientFactoryTests()
     {
-        _mockLogger = new Mock<ILogger<PersistentAgentsClientFactory>>();
+        _mockLogger = new Mock<ILogger<AIProjectClientFactory>>();
     }
 
     private IOptions<ModelProviderOptions> CreateProviderOptions(
@@ -49,7 +49,7 @@ public class PersistentAgentsClientFactoryTests
         var providerOptions = CreateProviderOptions();
 
         // Act
-        var act = () => new PersistentAgentsClientFactory(null!, providerOptions);
+        var act = () => new AIProjectClientFactory(null!, providerOptions);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -60,7 +60,7 @@ public class PersistentAgentsClientFactoryTests
     public void Constructor_NullProviderOptions_ThrowsArgumentNullException()
     {
         // Act
-        var act = () => new PersistentAgentsClientFactory(_mockLogger.Object, null!);
+        var act = () => new AIProjectClientFactory(_mockLogger.Object, null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -71,10 +71,10 @@ public class PersistentAgentsClientFactoryTests
     public void Constructor_NoProvidersConfigured_ThrowsInvalidOperationException()
     {
         // Arrange - Empty providers dictionary
-        var providerOptions = CreateProviderOptions(new Dictionary<string, ModelProviderDefinitionOptions>());
+        var providerOptions = CreateProviderOptions([]);
 
         // Act
-        var act = () => new PersistentAgentsClientFactory(_mockLogger.Object, providerOptions);
+        var act = () => new AIProjectClientFactory(_mockLogger.Object, providerOptions);
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -88,7 +88,7 @@ public class PersistentAgentsClientFactoryTests
         var providerOptions = CreateProviderOptions();
 
         // Act
-        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, providerOptions);
+        var factory = new AIProjectClientFactory(_mockLogger.Object, providerOptions);
 
         // Assert
         factory.Should().NotBeNull();
@@ -116,7 +116,7 @@ public class PersistentAgentsClientFactoryTests
         };
 
         // Act
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -135,7 +135,7 @@ public class PersistentAgentsClientFactoryTests
     public void GetClient_NullOrEmptyProviderName_ThrowsArgumentException(string? providerName)
     {
         // Arrange
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions());
 
@@ -151,7 +151,7 @@ public class PersistentAgentsClientFactoryTests
     public void GetClient_ProviderNotFound_ThrowsInvalidOperationException()
     {
         // Arrange
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions());
 
@@ -178,7 +178,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -205,7 +205,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -231,7 +231,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -257,7 +257,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -272,7 +272,7 @@ public class PersistentAgentsClientFactoryTests
     public void GetClient_MultipleCalls_ReturnsNewInstances()
     {
         // Arrange
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions());
 
@@ -300,7 +300,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new PersistentAgentsClientFactory(
+        var factory = new AIProjectClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 

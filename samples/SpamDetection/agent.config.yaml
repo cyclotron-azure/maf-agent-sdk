@@ -11,6 +11,28 @@ providers:
     timeout_seconds: 300
     max_retries: 3
 
+# PDF Content Analysis Configuration
+# Controls how PDF files are analyzed to detect content type (text-based, image-only, or mixed)
+pdf_content_analysis:
+  enabled: true
+  analyzer_key: "pdfpig"  # Key of registered analyzer: "pdfpig" (default), "vision" (future), or custom
+  failure_strategy: "fallback"  # Options: skip (skip image-only), throw (error on image-only), fallback (convert anyway)
+  text_ratio_threshold: 0.1  # Minimum ratio of pages with text to classify as TextBased (0.0-1.0)
+  max_pages_to_analyze: 0  # Maximum pages to analyze (0 = analyze all)
+  min_characters_per_page: 5  # Minimum characters to count page as having text
+  log_detailed_results: true  # Log text/image ratios and analysis metrics
+
+# PDF Conversion Configuration
+# Controls how PDF files are converted to markdown for processing
+pdf_conversion:
+  enabled: true
+  save_markdown_for_debug: false  # Save converted markdown to disk for debugging
+  output_directory: "./output"  # Directory for saved markdown files
+  include_page_numbers: true  # Add "## Page N" headers to markdown
+  preserve_paragraph_structure: true  # Use layout analysis for paragraph detection
+  include_timestamp_in_filename: true  # Add timestamp to saved markdown filenames
+  markdown_file_extension: ".md"  # File extension for saved markdown
+
 # Agent Configuration
 agents:
   spam_detector_agent:
@@ -18,6 +40,7 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: true
+    version: "1"
 
     metadata:
       description: "AI agent for detecting spam messages"

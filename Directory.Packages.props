@@ -10,13 +10,13 @@
   <ItemGroup>
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageVersion Include="Azure.Identity" Version="1.17.1" />
-    <PackageVersion Include="Azure.AI.Agents.Persistent" Version="1.2.0-beta.8" />
+    <PackageVersion Include="Azure.AI.Projects" Version="1.2.0-beta.5" />
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.5.0" />
+    <PackageVersion Include="OpenAI" Version="2.8.0" />
   </ItemGroup>
 
   <!-- Microsoft Agent Framework Packages -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Agents.AI.AzureAI.Persistent" Version="1.0.0-preview.251219.1" />
     <PackageVersion Include="Microsoft.Agents.AI.AzureAI" Version="1.0.0-preview.251219.1" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251219.1" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251219.1" />

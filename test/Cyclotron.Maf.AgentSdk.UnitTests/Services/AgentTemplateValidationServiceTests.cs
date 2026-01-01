@@ -247,7 +247,7 @@ public class AgentTemplateValidationServiceTests
         // Arrange - Empty agents dictionary
         var service = new AgentTemplateValidationService(
             _mockPromptService.Object,
-            CreateAgentOptions(new Dictionary<string, AgentDefinitionOptions>()),
+            CreateAgentOptions([]),
             _mockLogger.Object);
 
         // Act
