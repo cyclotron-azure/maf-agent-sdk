@@ -30,9 +30,13 @@ public static class AgentSdkServiceCollectionExtensions
         services.AddTelemetryOptions();
         services.AddPdfConversionOptions();
         services.AddPdfContentAnalysisOptions();
+        services.AddPdfImageExtractionOptions();
 
         // Register PDF to Markdown converter
         services.AddSingleton<IPdfToMarkdownConverter, PdfPigMarkdownConverter>();
+
+        // Register PDF image extractor
+        services.AddKeyedSingleton<IPdfImageExtractor, PdfPigImageExtractor>("pdfpig");
 
         return services;
     }
@@ -234,6 +238,35 @@ public static class AgentSdkServiceCollectionExtensions
                 if (analysisSection.Exists())
                 {
                     analysisSection.Bind(options);
+                }
+            })
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers and configures <see cref="PdfImageExtractionOptions"/> from the <c>PdfImageExtraction:</c> section in configuration.
+    /// Controls PDF image extraction behavior, format preferences, and performance characteristics.
+    /// Supports named options for multiple configurations.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddPdfImageExtractionOptions(
+        this IServiceCollection services,
+        string? name = null)
+    {
+        name ??= string.Empty;
+
+        services.AddOptions<PdfImageExtractionOptions>(name)
+            .Configure<IConfiguration>((options, configuration) =>
+            {
+                var extractionSection = configuration.GetSection(PdfImageExtractionOptions.SectionName);
+                if (extractionSection.Exists())
+                {
+                    extractionSection.Bind(options);
                 }
             })
             .ValidateDataAnnotations()
