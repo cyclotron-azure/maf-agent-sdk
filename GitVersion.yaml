@@ -22,18 +22,19 @@ branches:
     regex: ^master$|^main$
     mode: ContinuousDelivery
     label: ''
-    increment: Patch
+    increment: Inherit
     prevent-increment:
-      of-merged-branch: true
-    track-merge-target: false
+      of-merged-branch: false
+      when-current-commit-tagged: true
+    track-merge-target: true
     track-merge-message: true
     source-branches:
       - dev
       - release
       - hotfix
     is-source-branch-for: []
-    tracks-release-branches: false
-    is-release-branch: false
+    tracks-release-branches: true
+    is-release-branch: true
     is-main-branch: true
     pre-release-weight: 55000
 

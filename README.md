@@ -1,7 +1,7 @@
 # Cyclotron.Maf.AgentSdk
 
-[![NuGet Version](https://img.shields.io/nuget/v/AgentSdk.svg)](https://www.nuget.org/packages/Cyclotron.Maf.AgentSdk/)
-[![NuGet Downloads](https://img.shields.io/nuget/dt/AgentSdk.svg)](https://www.nuget.org/packages/Cyclotron.Maf.AgentSdk/)
+[![NuGet Version](https://img.shields.io/nuget/v/AgentSdk.svg)](https://www.nuget.org/packages/AgentSdk/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/AgentSdk.svg)](https://www.nuget.org/packages/AgentSdk/)
 [![Build Status](https://github.com/cyclotron-azure/maf-agent-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/cyclotron-azure/maf-agent-sdk/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
@@ -103,6 +103,31 @@ maf-agent-sdk/
 - **[Spam Detection Sample](samples/SpamDetection/README.md)** - Complete working example
 - **[Telemetry Guide](docs/TELEMETRY.md)** - OpenTelemetry setup and configuration
 - **[CI/CD Guide](docs/CICD.md)** - Build pipeline and versioning
+
+## 📌 Versioning
+
+This project uses **GitVersion** with semantic versioning following the GitFlow workflow. Versions are automatically bumped based on commit message keywords.
+
+### Version Bumping via Commit Messages
+
+Add `+semver:` to your commit messages to control version increments:
+
+| Keyword | Version Bump | Example |
+| --- | --- | --- |
+| `+semver: breaking` or `+semver: major` | Major (X.0.0) | `BREAKING CHANGE: +semver: major Refactor API` |
+| `+semver: feature` or `+semver: minor` | Minor (0.X.0) | `CHANGE: +semver: feature Add new endpoint` |
+| `+semver: fix` or `+semver: patch` | Patch (0.0.X) | `FIX: +semver: patch Resolve dependency issue` |
+| `+semver: skip` or `+semver: none` | No bump | `CHORE: +semver: skip Update docs` |
+
+### Branch Versioning Strategy
+
+- **main** - Stable releases (1.0.0, 1.0.1, 2.0.0, etc.)
+- **dev** - Alpha pre-releases (1.1.0-alpha.1, 1.1.0-alpha.2, etc.)
+- **release/*** - Release candidates (1.0.0-rc.1, 1.0.0-rc.2, etc.)
+- **feature/*** - Feature branches with pre-release labels
+- **hotfix/*** - Patch releases for critical fixes
+
+For more details, see [GitVersion.yaml](GitVersion.yaml)
 
 ## 🔧 Prerequisites
 
