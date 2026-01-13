@@ -16,10 +16,10 @@
 
   <!-- Microsoft Agent Framework Packages -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Agents.AI.AzureAI.Persistent" Version="1.0.0-preview.251219.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.AzureAI" Version="1.0.0-preview.251219.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.251219.1" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251219.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.AzureAI.Persistent" Version="1.0.0-preview.260108.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.AzureAI" Version="1.0.0-preview.260108.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.260108.1" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.260108.1" />
   </ItemGroup>
 
   <!-- Microsoft.Extensions Packages -->
