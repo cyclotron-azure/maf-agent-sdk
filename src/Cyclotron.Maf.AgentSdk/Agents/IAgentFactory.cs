@@ -17,10 +17,10 @@ public interface IAgentFactory
     AIAgent? Agent { get; }
 
     /// <summary>
-    /// Gets the currently created thread instance.
-    /// Null if no thread has been created or after disposal.
+    /// Gets the currently created session instance.
+    /// Null if no session has been created or after disposal.
     /// </summary>
-    AgentThread? Thread { get; }
+    AgentSession? Session { get; }
 
     /// <summary>
     /// Gets the vector store ID associated with the current agent.
@@ -57,8 +57,8 @@ public interface IAgentFactory
     /// <param name="maxRetries">Maximum number of retries for empty responses (default: 3)</param>
     /// <param name="retryDelaySeconds">Initial delay between retries in seconds (default: 5, uses exponential backoff)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The final agent response after all continuations are complete (type inferred from agent.RunAsync)</returns>
-    Task<AgentRunResponse> RunAgentWithPollingAsync(
+    /// <returns>The final agent response after all continuations are complete</returns>
+    Task<AgentResponse> RunAgentWithPollingAsync(
         IList<ChatMessage> messages,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
@@ -73,11 +73,11 @@ public interface IAgentFactory
     Task DeleteAgentAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Deletes the stored thread if it exists.
-    /// Clears the Thread property after deletion.
+    /// Deletes the stored session if it exists.
+    /// Clears the Session property after deletion.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
-    Task DeleteThreadAsync(CancellationToken cancellationToken = default);
+    Task DeleteSessionAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Performs cleanup of agent, thread, and vector store resources based on configuration.

@@ -308,7 +308,7 @@ public class AgentFactoryTests
         factory.AgentKey.Should().Be("classification");
         factory.AgentDefinition.Should().NotBeNull();
         factory.Agent.Should().BeNull();
-        factory.Thread.Should().BeNull();
+        factory.Session.Should().BeNull();
         factory.VectorStoreId.Should().BeNull();
     }
 
@@ -579,7 +579,7 @@ public class AgentFactoryTests
             CreateTelemetryOptions());
 
         // Assert
-        factory.Thread.Should().BeNull();
+        factory.Session.Should().BeNull();
     }
 
     [Fact(DisplayName = "Factory should have null VectorStoreId initially")]
@@ -754,10 +754,10 @@ public class AgentFactoryTests
 
     #endregion
 
-    #region DeleteThreadAsync Tests
+    #region DeleteSessionAsync Tests
 
-    [Fact(DisplayName = "DeleteThreadAsync should return gracefully when Thread is null")]
-    public async Task DeleteThreadAsync_NullThread_ReturnsGracefully()
+    [Fact(DisplayName = "DeleteSessionAsync should return gracefully when Session is null")]
+    public async Task DeleteSessionAsync_NullSession_ReturnsGracefully()
     {
         // Arrange
         var factory = new AgentFactory(
@@ -771,7 +771,7 @@ public class AgentFactoryTests
             CreateTelemetryOptions());
 
         // Act & Assert - Should not throw
-        await factory.DeleteThreadAsync();
+        await factory.DeleteSessionAsync();
 
         // Verify no client interaction
         _mockClientFactory.Verify(x => x.GetClient(It.IsAny<string>()), Times.Never);
@@ -884,7 +884,7 @@ public class AgentFactoryTests
             Times.Never);
     }
 
-    [Fact(DisplayName = "CleanupAsync should call DeleteThreadAsync and DeleteAgentAsync when AutoDelete is true")]
+    [Fact(DisplayName = "CleanupAsync should call DeleteSessionAsync and DeleteAgentAsync when AutoDelete is true")]
     public async Task CleanupAsync_AutoDeleteTrue_CallsDeleteMethods()
     {
         // Arrange
@@ -914,7 +914,7 @@ public class AgentFactoryTests
 
         // Assert - Factory should still be valid after cleanup
         factory.Agent.Should().BeNull();
-        factory.Thread.Should().BeNull();
+        factory.Session.Should().BeNull();
     }
 
     [Fact(DisplayName = "CleanupAsync should handle both AutoDelete and AutoCleanupResources together")]
@@ -947,7 +947,7 @@ public class AgentFactoryTests
 
         // Assert - No exceptions, cleanup methods called (but returned early due to null values)
         factory.Agent.Should().BeNull();
-        factory.Thread.Should().BeNull();
+        factory.Session.Should().BeNull();
         factory.VectorStoreId.Should().BeNull();
     }
 
@@ -1622,8 +1622,8 @@ public class AgentFactoryTests
         await factory.DeleteAgentAsync(cts.Token);
     }
 
-    [Fact(DisplayName = "DeleteThreadAsync should accept cancellation token")]
-    public async Task DeleteThreadAsync_CancellationToken_AcceptsToken()
+    [Fact(DisplayName = "DeleteSessionAsync should accept cancellation token")]
+    public async Task DeleteSessionAsync_CancellationToken_AcceptsToken()
     {
         // Arrange
         var factory = new AgentFactory(
@@ -1639,7 +1639,7 @@ public class AgentFactoryTests
         using var cts = new CancellationTokenSource();
 
         // Act & Assert - Should not throw (Thread is null)
-        await factory.DeleteThreadAsync(cts.Token);
+        await factory.DeleteSessionAsync(cts.Token);
     }
 
     [Fact(DisplayName = "CleanupAsync should accept cancellation token")]

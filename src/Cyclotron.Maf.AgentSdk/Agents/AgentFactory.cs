@@ -101,7 +101,7 @@ public class AgentFactory : IAgentFactory
     public AIAgent? Agent { get; private set; }
 
     /// <inheritdoc/>
-    public AgentThread? Thread { get; private set; }
+    public AgentSession? Session { get; private set; }
 
     /// <inheritdoc/>
     public string? VectorStoreId { get; private set; }
@@ -114,7 +114,7 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <inheritdoc/>
-    public async Task<AgentRunResponse> RunAgentWithPollingAsync(
+    public async Task<AgentResponse> RunAgentWithPollingAsync(
         IList<ChatMessage> messages,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
@@ -126,9 +126,9 @@ public class AgentFactory : IAgentFactory
             throw new InvalidOperationException("Agent must be created before running. Call CreateAgentAsync first.");
         }
 
-        if (Thread == null)
+        if (Session == null)
         {
-            throw new InvalidOperationException("Thread must be created before running. Call CreateAgentAsync first.");
+            throw new InvalidOperationException("Session must be created before running. Call CreateAgentAsync first.");
         }
 
         _logger.LogDebug(
@@ -139,10 +139,10 @@ public class AgentFactory : IAgentFactory
             maxRetries);
 
         // Configure Polly retry pipeline with exponential backoff
-        var retryPipeline = new ResiliencePipelineBuilder<AgentRunResponse>()
-            .AddRetry(new RetryStrategyOptions<AgentRunResponse>
+        var retryPipeline = new ResiliencePipelineBuilder<AgentResponse>()
+            .AddRetry(new RetryStrategyOptions<AgentResponse>()
             {
-                ShouldHandle = new PredicateBuilder<AgentRunResponse>()
+                ShouldHandle = new PredicateBuilder<AgentResponse>()
                     .HandleResult(response => IsEmptyResponse(response)),
                 MaxRetryAttempts = maxRetries,
                 Delay = TimeSpan.FromSeconds(retryDelaySeconds),
@@ -170,8 +170,8 @@ public class AgentFactory : IAgentFactory
             // Initial agent run
             var agentResponse = await Agent.RunAsync(
                 messages,
-                thread: Thread,
-                options: options,
+                Session,
+                options,
                 cancellationToken: ct);
 
             // Poll until the response is complete
@@ -187,7 +187,7 @@ public class AgentFactory : IAgentFactory
                     _agentKey,
                     token);
 
-                agentResponse = await Agent.RunAsync(Thread, options, cancellationToken: ct);
+                agentResponse = await Agent.RunAsync(Session, options, cancellationToken: ct);
             }
 
             return agentResponse;
@@ -205,7 +205,7 @@ public class AgentFactory : IAgentFactory
     /// Determines if an agent response is considered empty.
     /// A response is empty if no continuation occurred and all message texts are empty or whitespace.
     /// </summary>
-    private static bool IsEmptyResponse(AgentRunResponse response)
+    private static bool IsEmptyResponse(AgentResponse response)
     {
         // If there's a continuation token, the response is not considered empty (still processing)
         if (response.ContinuationToken != null)
@@ -300,7 +300,9 @@ public class AgentFactory : IAgentFactory
                 cancellationToken: cancellationToken);
 
             // Get the AIAgent from the created version
-            AIAgent agent = projectClient.GetAIAgent(createdAgentVersion);
+            var agentRecord = projectClient.Agents.GetAgent(agentName).Value;
+            var agentReference = new AgentReference(agentRecord.Id);
+            AIAgent agent = projectClient.AsAIAgent(agentReference);
             var agentId = agent.Id;
 
             _logger.LogInformation(
@@ -322,11 +324,11 @@ public class AgentFactory : IAgentFactory
                     .Build();
             }
 
-            // Store agent and create thread automatically
+            // Store agent and create session automatically
             Agent = agent;
-            Thread = agent.GetNewThread();
+            Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
             VectorStoreId = vectorStoreId;
-            _logger.LogDebug("Created thread for {AgentKey} agent: {AgentId}", _agentKey, agentId);
+            _logger.LogDebug("Created session for {AgentKey} agent: {AgentId}", _agentKey, agentId);
 
             return agent;
         }
@@ -378,50 +380,42 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <inheritdoc/>
-    public async Task DeleteThreadAsync(CancellationToken cancellationToken = default)
+    public async Task DeleteSessionAsync(CancellationToken cancellationToken = default)
     {
-        if (Thread == null)
+        if (Session == null)
         {
-            _logger.LogDebug("No thread to delete");
+            _logger.LogDebug("No session to delete");
             return;
         }
 
         try
         {
-            // Cast to ChatClientAgentThread to access ConversationId
-            var typedThread = Thread as ChatClientAgentThread;
-            if (typedThread?.ConversationId == null)
-            {
-                _logger.LogWarning("Thread does not have a ConversationId, cannot delete");
-                return;
-            }
-
             var providerName = _agentDefinition.AIFrameworkOptions.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
 
-            // V2 API: Thread/conversation deletion is not directly supported via AIProjectClient
-            // Threads are managed through agent lifecycle and are automatically cleaned up
-            _logger.LogDebug("Thread {ThreadId} for {AgentKey} - deletion not directly supported in V2 API, will be cleaned up automatically", typedThread.ConversationId, _agentKey);
+            // V2 API: Session/conversation deletion is not directly supported via AIProjectClient
+            // Sessions are managed through agent lifecycle and are automatically cleaned up
+            _logger.LogDebug("Session for {AgentKey} - deletion not directly supported in V2 API, will be cleaned up automatically", _agentKey);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete {AgentKey} thread", _agentKey);
+            _logger.LogWarning(ex, "Failed to delete {AgentKey} session", _agentKey);
         }
         finally
         {
-            Thread = null;
+            Session = null;
         }
     }
 
     /// <inheritdoc/>
     public async Task CleanupAsync(CancellationToken cancellationToken = default)
     {
-        // Cleanup agent and thread if AutoDelete is enabled
+        // Cleanup agent and session if AutoDelete is enabled
         if (_agentDefinition.AutoDelete)
         {
-            await DeleteThreadAsync(cancellationToken);
+            await DeleteSessionAsync(cancellationToken);
             await DeleteAgentAsync(cancellationToken);
-            _logger.LogInformation("Cleaned up {AgentKey} agent and thread", _agentKey);
+            _logger.LogInformation("Cleaned up {AgentKey} agent and session", _agentKey);
         }
         else
         {
