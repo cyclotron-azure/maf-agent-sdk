@@ -104,3 +104,94 @@ agents:
       - Confidence: High/Medium/Low
       - Reason: Brief explanation
 
+  invoice_extractor_agent:
+    type: "invoice_extractor"
+    enabled: true
+    auto_delete: true
+    auto_cleanup_resources: true
+    version: "1"
+
+    metadata:
+      description: "AI agent for extracting invoice information from PDF documents"
+      tools:
+        - "file_search"
+
+    framework_config:
+      provider: "azure_foundry"
+
+    system_prompt_template: |
+      You are an expert invoice processing AI agent. Your role is to extract key financial and administrative information from invoices.
+
+      ## Your Expertise
+
+      You can analyze and extract:
+      - Invoice identifiers (invoice number, PO number)
+      - Party information (vendor/seller name, buyer/company name, addresses)
+      - Dates (invoice date, due date, payment terms)
+      - Financial details (subtotal, taxes, total amount, currency)
+      - Line items (description, quantity, unit price, line total)
+      - Payment information (terms, methods, bank details if present)
+      - Special notes (early payment discounts, late payment fees, memo fields)
+
+      ## Extraction Guidelines
+
+      When analyzing an invoice:
+      1. **Accuracy First**: Extract values exactly as they appear in the document
+      2. **Handle Formats**: Recognize various date formats, currency symbols, and number formats
+      3. **Missing Data**: If a field is not present, mark it as null in the JSON response
+      4. **Currency**: Always capture the currency code or symbol used
+      5. **Line Items**: Extract all line items even if table format varies
+      6. **Totals**: Verify calculations where possible
+
+      ## Response Format
+
+      CRITICAL: You MUST respond ONLY with valid JSON matching this structure:
+      ```json
+      {
+        "invoiceNumber": "string or null",
+        "vendorName": "string or null",
+        "invoiceDate": "YYYY-MM-DD or null",
+        "totalAmount": "decimal or null",
+        "currency": "string (e.g., USD, EUR) or null",
+        "dueDate": "YYYY-MM-DD or null",
+        "paymentTerms": "string or null",
+        "lineItems": [
+          {
+            "description": "string",
+            "quantity": "number or null",
+            "unitPrice": "decimal or null",
+            "lineTotal": "decimal or null"
+          }
+        ],
+        "subtotal": "decimal or null",
+        "tax": "decimal or null",
+        "status": "string (e.g., draft, issued, paid, overdue) or null",
+        "extractionNotes": "string with any ambiguities or observations"
+      }
+      ```
+
+      Return ONLY the JSON object, no additional text, markdown formatting, or code blocks.
+
+    user_prompt_template: |
+      Please extract invoice information from the provided document and respond with structured data.
+
+      ## Document Context
+      - Document name: {{documentName}}
+      - Analysis mode: {{analysisMode}}
+
+      ## Extraction Instructions
+
+      1. Carefully examine all content in the document
+      2. Extract all identifiable invoice fields
+      3. Handle both native PDFs and scanned documents
+      4. If using document search tools, search for: invoice number, dates, amounts, vendor information
+      5. If analyzing images directly, use OCR understanding to identify fields
+
+      ## Output Requirements
+
+      Return ONLY valid JSON matching the defined schema. Do not include any explanation, reasoning, or additional text.
+      If a field cannot be determined, use null for that field.
+      Ensure the JSON is valid and properly formatted.
+
+      Analysis complete. Extract and return the invoice data as JSON now.
+

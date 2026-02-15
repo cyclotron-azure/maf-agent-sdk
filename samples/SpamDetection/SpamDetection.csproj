@@ -27,4 +27,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- copy pdfs folder to bin -->
+    <None Update="pdfs\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

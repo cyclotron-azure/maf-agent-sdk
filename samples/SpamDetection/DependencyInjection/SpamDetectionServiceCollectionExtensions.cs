@@ -28,6 +28,9 @@ public static class SpamDetectionServiceCollectionExtensions
         // Register the spam workflow service
         services.AddScoped<ISpamWorkflow, SpamWorkflow>();
 
+        // Register invoice extraction services
+        services.AddInvoiceExtractionServices();
+
         // Register the main application entry point
         services.AddScoped<IMain, Main>();
     }
