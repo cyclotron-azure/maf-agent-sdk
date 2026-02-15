@@ -3,7 +3,8 @@
     "SpamDetection": {
       "commandName": "Project",
       "environmentVariables": {
-        "DOTNET_ENVIRONMENT": "Development"
+        "DOTNET_ENVIRONMENT": "Development",
+        "DOTNET_SYSTEM_DRAWING_ENABLE_UNIX_SUPPORT": "1"
       }
     }
   }

@@ -277,4 +277,31 @@ public static class PdfTestFixtures
         Directory.CreateDirectory(tempDir);
         return tempDir;
     }
+
+    /// <summary>
+    /// Gets the path to the sample image-only invoice PDF used in samples.
+    /// </summary>
+    public static string GetSampleImageOnlyPdfPath()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-img.pdf");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current != null)
+        {
+            var solutionPath = Path.Combine(current.FullName, "Cyclotron.Maf.AgentSdk.sln");
+            if (File.Exists(solutionPath))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Repository root not found for test fixtures.");
+    }
 }

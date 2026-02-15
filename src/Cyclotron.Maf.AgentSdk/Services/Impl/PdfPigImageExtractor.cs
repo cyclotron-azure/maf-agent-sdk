@@ -3,8 +3,15 @@ using Cyclotron.Maf.AgentSdk.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Runtime.InteropServices;
+using System.Drawing;
+using System.Drawing.Imaging;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Images;
+using UglyToad.PdfPig.XObjects;
+
+using SystemDrawingImageFormat = System.Drawing.Imaging.ImageFormat;
+using ModelImageFormat = Cyclotron.Maf.AgentSdk.Models.ImageFormat;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 
@@ -41,6 +48,11 @@ public class PdfPigImageExtractor(
         string pdfFilePath,
         CancellationToken cancellationToken = default)
     {
+        if (!IsExtractionEnabled(Path.GetFileName(pdfFilePath)))
+        {
+            return Array.Empty<ExtractedPdfImage>();
+        }
+
         if (!File.Exists(pdfFilePath))
         {
             throw new FileNotFoundException($"PDF file not found: {pdfFilePath}");
@@ -66,6 +78,11 @@ public class PdfPigImageExtractor(
         string fileName,
         CancellationToken cancellationToken = default)
     {
+        if (!IsExtractionEnabled(fileName))
+        {
+            return Array.Empty<ExtractedPdfImage>();
+        }
+
         try
         {
             _logger.LogInformation("Extracting images from PDF stream: {FileName}", fileName);
@@ -101,6 +118,11 @@ public class PdfPigImageExtractor(
         string fileName,
         CancellationToken cancellationToken = default)
     {
+        if (!IsExtractionEnabled(fileName))
+        {
+            return Array.Empty<ExtractedPdfImage>();
+        }
+
         using var stream = new MemoryStream(pdfBytes);
         return await ExtractImagesAsync(stream, fileName, cancellationToken);
     }
@@ -111,6 +133,11 @@ public class PdfPigImageExtractor(
         IEnumerable<int> pageNumbers,
         CancellationToken cancellationToken = default)
     {
+        if (!IsExtractionEnabled(Path.GetFileName(pdfFilePath)))
+        {
+            return Array.Empty<ExtractedPdfImage>();
+        }
+
         if (!File.Exists(pdfFilePath))
         {
             throw new FileNotFoundException($"PDF file not found: {pdfFilePath}");
@@ -142,6 +169,11 @@ public class PdfPigImageExtractor(
         Func<ExtractedPdfImage, Task<bool>> onImageExtracted,
         CancellationToken cancellationToken = default)
     {
+        if (!IsExtractionEnabled(fileName))
+        {
+            return 0;
+        }
+
         try
         {
             _logger.LogInformation("Starting streaming image extraction from PDF: {FileName}", fileName);
@@ -190,6 +222,7 @@ public class PdfPigImageExtractor(
         HashSet<int>? pageNumbersToProcess)
     {
         var extractedImages = new List<ExtractedPdfImage>();
+        LogPreferredFormatFallback();
 
         try
         {
@@ -249,6 +282,7 @@ public class PdfPigImageExtractor(
         CancellationToken cancellationToken)
     {
         var totalImagesProcessed = 0;
+        LogPreferredFormatFallback();
 
         try
         {
@@ -304,13 +338,75 @@ public class PdfPigImageExtractor(
 
         try
         {
-            // PdfPig 0.1.12 - attempt to get images from page
-            // Note: Image extraction from PDFs can be complex as images may be embedded in content streams
-            // This is a placeholder for future implementation with proper XObject handling
             _logger.LogDebug("Processing page {PageNumber} for image extraction from {FileName}", pageNumber, fileName);
 
-            // TODO: Implement image extraction from page XObjects when PdfPig provides stable API
-            // For now, return empty list as this requires advanced PDF stream parsing
+            var images = page.GetImages().ToList();
+
+            _logger.LogDebug("Found {ImageCount} images on page {PageNumber}", images.Count, pageNumber);
+
+            if (_options.SkipTextOnlyPages && images.Count == 0 && !string.IsNullOrWhiteSpace(page.Text))
+            {
+                _logger.LogDebug("Skipping text-only page {PageNumber} during image extraction", pageNumber);
+                return pageImages;
+            }
+
+            for (var imageIndex = 0; imageIndex < images.Count; imageIndex++)
+            {
+                var image = images[imageIndex];
+
+                _logger.LogDebug(
+                    "Image {ImageIndex} details: {Width}x{Height}, BitsPerComponent={BitsPerComponent}, Inline={IsInline}, ImageMask={IsImageMask}",
+                    imageIndex + 1,
+                    image.WidthInSamples,
+                    image.HeightInSamples,
+                    image.BitsPerComponent,
+                    image.IsInlineImage,
+                    image.IsImageMask);
+
+                if (image is XObjectImage xObjectImage)
+                {
+                    _logger.LogDebug("Image {ImageIndex} XObject: IsJpxEncoded={IsJpxEncoded}", imageIndex + 1, xObjectImage.IsJpxEncoded);
+                }
+
+                if (image.WidthInSamples < _options.MinImageWidth || image.HeightInSamples < _options.MinImageHeight)
+                {
+                    _logger.LogDebug(
+                        "Skipping image on page {PageNumber} due to size {Width}x{Height}",
+                        pageNumber,
+                        image.WidthInSamples,
+                        image.HeightInSamples);
+                    continue;
+                }
+
+                if (!TryGetImageBytes(image, out var imageBytes, out var format, out var mimeType))
+                {
+                    _logger.LogDebug("Skipping image on page {PageNumber} due to extraction failure", pageNumber);
+                    continue;
+                }
+
+                if (_options.MaxImageSizeBytes > 0 && imageBytes.Length > _options.MaxImageSizeBytes)
+                {
+                    _logger.LogDebug(
+                        "Skipping image on page {PageNumber} due to size {Size} bytes",
+                        pageNumber,
+                        imageBytes.Length);
+                    continue;
+                }
+
+                var extractedImage = new ExtractedPdfImage
+                {
+                    ImageBytes = imageBytes,
+                    ImageBase64 = _options.EncodeAsBase64 ? Convert.ToBase64String(imageBytes) : string.Empty,
+                    MimeType = mimeType,
+                    Format = format,
+                    PageNumber = pageNumber,
+                    ImageIndexOnPage = imageIndex + 1,
+                    ImageName = BuildImageName(fileName, pageNumber, imageIndex + 1, format),
+                    Dimensions = (image.WidthInSamples, image.HeightInSamples)
+                };
+
+                pageImages.Add(extractedImage);
+            }
         }
         catch (Exception ex)
         {
@@ -337,4 +433,190 @@ public class PdfPigImageExtractor(
             }
         }
     }
+
+    private bool IsExtractionEnabled(string? fileName)
+    {
+        if (_options.Enabled)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            _logger.LogInformation("PDF image extraction disabled.");
+        }
+        else
+        {
+            _logger.LogInformation("PDF image extraction disabled. Skipping: {FileName}", fileName);
+        }
+
+        return false;
+    }
+
+    private void LogPreferredFormatFallback()
+    {
+        if (!string.Equals(_options.PreferredFormat, "png", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "PreferredFormat '{PreferredFormat}' is not supported by PdfPig extraction. Falling back to PNG.",
+                _options.PreferredFormat);
+        }
+    }
+
+    private static string BuildImageName(string fileName, int pageNumber, int imageIndex, ModelImageFormat format)
+    {
+        var extension = format switch
+        {
+            ModelImageFormat.Jpeg => ".jpg",
+            ModelImageFormat.Png => ".png",
+            ModelImageFormat.WebP => ".webp",
+            ModelImageFormat.Gif => ".gif",
+            _ => ".img"
+        };
+
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        return $"{baseName}_page_{pageNumber}_image_{imageIndex}{extension}";
+    }
+
+    private bool TryGetImageBytes(IPdfImage image, out byte[] imageBytes, out ModelImageFormat format, out string mimeType)
+    {
+        if (image.TryGetPng(out var pngBytes) && pngBytes.Length > 0)
+        {
+            imageBytes = pngBytes;
+            format = ModelImageFormat.Png;
+            mimeType = "image/png";
+            return true;
+        }
+
+        if (!IsSystemDrawingSupported())
+        {
+            _logger.LogWarning(
+                "System.Drawing is not supported on this platform. Set DOTNET_SYSTEM_DRAWING_ENABLE_UNIX_SUPPORT=1 and ensure libgdiplus is installed.");
+            return TryGetRawJpeg(image, out imageBytes, out format, out mimeType);
+        }
+
+        if (!image.TryGetBytesAsMemory(out var rawMemory))
+        {
+            return TryGetRawJpeg(image, out imageBytes, out format, out mimeType);
+        }
+
+        if (image.ColorSpaceDetails == null)
+        {
+            return TryGetRawJpeg(image, out imageBytes, out format, out mimeType);
+        }
+
+        var rawBytes = rawMemory.ToArray();
+        var pixelBytes = ColorSpaceDetailsByteConverter.Convert(
+            image.ColorSpaceDetails,
+            rawBytes,
+            image.BitsPerComponent,
+            image.WidthInSamples,
+            image.HeightInSamples);
+
+        if (pixelBytes.Length == 0)
+        {
+            return TryGetRawJpeg(image, out imageBytes, out format, out mimeType);
+        }
+
+        if (!TryEncodePng(pixelBytes, image.WidthInSamples, image.HeightInSamples, out var encodedPng))
+        {
+            return TryGetRawJpeg(image, out imageBytes, out format, out mimeType);
+        }
+
+        imageBytes = encodedPng;
+        format = ModelImageFormat.Png;
+        mimeType = "image/png";
+        return true;
+    }
+
+    private static bool TryGetRawJpeg(IPdfImage image, out byte[] imageBytes, out ModelImageFormat format, out string mimeType)
+    {
+        var rawBytes = image.RawBytes;
+
+        if (LooksLikeJpeg(rawBytes))
+        {
+            imageBytes = rawBytes.ToArray();
+            format = ModelImageFormat.Jpeg;
+            mimeType = "image/jpeg";
+            return true;
+        }
+
+        imageBytes = Array.Empty<byte>();
+        format = ModelImageFormat.Png;
+        mimeType = "image/png";
+        return false;
+    }
+
+    private static bool LooksLikeJpeg(ReadOnlySpan<byte> bytes)
+    {
+        return bytes.Length > 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
+    }
+
+    private static bool IsSystemDrawingSupported()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return true;
+        }
+
+        var enableUnixSupport = Environment.GetEnvironmentVariable("DOTNET_SYSTEM_DRAWING_ENABLE_UNIX_SUPPORT");
+        return string.Equals(enableUnixSupport, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(enableUnixSupport, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    #pragma warning disable CA1416 // System.Drawing is used when explicitly enabled for Unix.
+    private static bool TryEncodePng(ReadOnlySpan<byte> rgbBytes, int width, int height, out byte[] pngBytes)
+    {
+        pngBytes = Array.Empty<byte>();
+
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        const int bytesPerPixel = 3;
+        var expectedLength = width * height * bytesPerPixel;
+        if (rgbBytes.Length < expectedLength)
+        {
+            return false;
+        }
+
+        var rgbArray = rgbBytes.ToArray();
+
+        try
+        {
+            using var bitmap = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+            var rect = new Rectangle(0, 0, width, height);
+            var data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
+
+            try
+            {
+                var stride = data.Stride;
+                for (var y = 0; y < height; y++)
+                {
+                    var sourceIndex = y * width * bytesPerPixel;
+                    var destination = data.Scan0 + (y * stride);
+                    Marshal.Copy(rgbArray, sourceIndex, destination, width * bytesPerPixel);
+                }
+            }
+            finally
+            {
+                bitmap.UnlockBits(data);
+            }
+
+            using var output = new MemoryStream();
+            bitmap.Save(output, SystemDrawingImageFormat.Png);
+            pngBytes = output.ToArray();
+            return pngBytes.Length > 0;
+        }
+        catch (PlatformNotSupportedException)
+        {
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+    #pragma warning restore CA1416
 }

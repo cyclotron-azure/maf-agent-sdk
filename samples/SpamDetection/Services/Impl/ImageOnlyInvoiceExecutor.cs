@@ -22,6 +22,7 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
         string fileName,
         IAgentFactory agentFactory,
         IPdfImageExtractor pdfImageExtractor,
+        IVectorStoreManager vectorStoreManager,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Executing ImageOnlyInvoiceExecutor for file: {FileName}", fileName);
@@ -47,8 +48,17 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
                 return result;
             }
 
-            // Note: For image-only PDFs, we don't create an agent with vector store
-            // Instead, we'll create a message with the images as DataContent and send to agent
+            // Create a vector store to satisfy file_search tool configuration even for image-only PDFs
+            var providerName = agentFactory.AgentDefinition.AIFrameworkOptions.Provider;
+            _logger.LogInformation("Creating vector store for image-only invoice...");
+            var vectorStoreId = await vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
+                providerName,
+                key: $"invoice-image-{fileName}",
+                purpose: "Image-only invoice document for extraction",
+                name: $"Invoice_Image_{Path.GetFileNameWithoutExtension(fileName)}",
+                cancellationToken);
+
+            result.MutableVectorStoreIds.Add(vectorStoreId);
 
             // Step 2: Create ChatMessage with image content
             _logger.LogInformation("Creating chat message with {Count} image(s)...", extractedImages.Length);
@@ -73,9 +83,9 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
 
             var chatMessage = new ChatMessage(ChatRole.User, contentItems);
 
-            // Step 3: Create agent (but note: we're not binding it to a vector store)
+            // Step 3: Create agent with vector store (required for configured tools)
             _logger.LogInformation("Creating invoice extraction agent for image analysis...");
-            await agentFactory.CreateAgentAsync(vectorStoreId: string.Empty, cancellationToken);
+            await agentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
             result.MutableAgentIds.Add(agentFactory.Agent?.Id ?? "unknown");
 
             // Step 4: Run agent with image-containing message

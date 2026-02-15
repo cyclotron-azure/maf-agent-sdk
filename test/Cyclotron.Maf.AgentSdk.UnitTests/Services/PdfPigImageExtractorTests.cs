@@ -104,6 +104,43 @@ public class PdfPigImageExtractorTests : IDisposable
     }
 
     [Fact]
+    public async Task ExtractImagesAsync_WithImageOnlySamplePdf_ReturnsImages()
+    {
+        // Arrange
+        var options = CreateOptions(preferredFormat: "png", minImageWidth: 1, minImageHeight: 1);
+        var extractor = CreateExtractor(options);
+        var pdfPath = PdfTestFixtures.GetSampleImageOnlyPdfPath();
+
+        File.Exists(pdfPath).Should().BeTrue();
+
+        // Act
+        var result = await extractor.ExtractImagesAsync(pdfPath);
+
+        // Assert
+        result.Should().NotBeNull();
+        if (!IsSystemDrawingSupported())
+        {
+            return;
+        }
+
+        result.Length.Should().BeGreaterThan(0);
+        result[0].ImageBytes.Length.Should().BeGreaterThan(0);
+        result[0].MimeType.Should().NotBeNullOrWhiteSpace();
+    }
+
+    private static bool IsSystemDrawingSupported()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return true;
+        }
+
+        var enableUnixSupport = Environment.GetEnvironmentVariable("DOTNET_SYSTEM_DRAWING_ENABLE_UNIX_SUPPORT");
+        return string.Equals(enableUnixSupport, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(enableUnixSupport, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExtractImagesAsync_WithNonExistentFile_ThrowsFileNotFoundException()
     {
         // Arrange

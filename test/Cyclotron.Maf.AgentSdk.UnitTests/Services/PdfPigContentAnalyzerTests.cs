@@ -143,6 +143,23 @@ public class PdfPigContentAnalyzerTests : IDisposable
     }
 
     [Fact]
+    public async Task AnalyzeAsync_WithImageOnlySamplePdf_ReturnsImageOnlyContentType()
+    {
+        // Arrange
+        var analyzer = CreateAnalyzer();
+        var pdfPath = PdfTestFixtures.GetSampleImageOnlyPdfPath();
+
+        File.Exists(pdfPath).Should().BeTrue();
+
+        // Act
+        var result = await analyzer.AnalyzeAsync(pdfPath);
+
+        // Assert
+        result.ContentType.Should().Be(PdfContentType.ImageOnly);
+        result.PagesWithImages.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_WithNonExistentFile_ThrowsFileNotFoundException()
     {
         // Arrange
@@ -268,15 +285,13 @@ public class PdfPigContentAnalyzerTests : IDisposable
         var result = await analyzer.AnalyzeAsync(pdfPath);
 
         // Assert
-        // The minimal PDF has text, so classification depends on text ratio vs threshold
-        if (threshold > result.TextRatio)
-        {
-            result.ContentType.Should().Be(PdfContentType.ImageOnly);
-        }
-        else
-        {
-            result.ContentType.Should().Be(PdfContentType.TextBased);
-        }
+        var expected = result.TextRatio >= threshold
+            ? PdfContentType.TextBased
+            : result.ImageRatio > 0.5
+                ? PdfContentType.ImageOnly
+                : PdfContentType.Mixed;
+
+        result.ContentType.Should().Be(expected);
     }
 
     [Fact]

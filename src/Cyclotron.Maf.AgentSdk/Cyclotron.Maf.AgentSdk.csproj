@@ -51,6 +51,7 @@
 
   <!-- Utility Packages -->
   <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="PdfPig" />
     <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Handlebars.Net" />

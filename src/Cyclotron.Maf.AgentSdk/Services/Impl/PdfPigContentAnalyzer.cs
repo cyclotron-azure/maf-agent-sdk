@@ -220,22 +220,7 @@ public class PdfPigContentAnalyzer(
     {
         try
         {
-            // Heuristic 1: Check if page has GetImages method (PdfPig 0.1.12+)
-            var words = page.GetWords();
-
-            // Heuristic 2: If page has content but no words, it might be all images
-            var hasContent = !string.IsNullOrWhiteSpace(page.Text);
-            if (!hasContent)
-            {
-                // Empty pages might still have images
-                // For now, assume no content = possibly images
-                return true;
-            }
-
-            // For pages with content, we can't easily detect images in PdfPig 0.1.12
-            // So we'll return false for text-containing pages
-            // This is a safe default that avoids false positives
-            return false;
+            return page.NumberOfImages > 0;
         }
         catch
         {

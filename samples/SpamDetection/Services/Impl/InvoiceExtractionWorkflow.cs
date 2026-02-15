@@ -43,46 +43,69 @@ public sealed class InvoiceExtractionWorkflow(
 
         try
         {
-            // Analyze PDF content type
-            _logger.LogInformation("Analyzing PDF content type...");
-            var analysisResult = await _pdfContentAnalyzer.AnalyzeAsync(pdfContent, fileName, cancellationToken);
-            _logger.LogInformation("Detected PDF content type: {ContentType}", analysisResult.ContentType);
+            // Buffer the PDF once so non-seekable streams can be reused across steps
+            await using var bufferedStream = new MemoryStream();
+            await pdfContent.CopyToAsync(bufferedStream, cancellationToken);
+            var pdfBytes = bufferedStream.ToArray();
 
-            // Reset stream position for further processing
-            if (pdfContent.CanSeek)
+            if (pdfBytes.Length == 0)
             {
-                pdfContent.Seek(0, SeekOrigin.Begin);
+                throw new InvalidOperationException($"PDF content is empty for file: {fileName}");
             }
 
+            // Analyze PDF content type
+            _logger.LogInformation("Analyzing PDF content type...");
+            var analysisResult = await _pdfContentAnalyzer.AnalyzeFromBytesAsync(pdfBytes, fileName, cancellationToken);
+            _logger.LogInformation("Detected PDF content type: {ContentType}", analysisResult.ContentType);
+
+            InvoiceExtractionResult result;
+
             // Route to appropriate executor based on content type
-            InvoiceExtractionResult result = analysisResult.ContentType switch
+            switch (analysisResult.ContentType)
             {
-                PdfContentType.TextBased => await _textBasedExecutor.ExecuteAsync(
-                    pdfContent,
-                    fileName,
-                    _invoiceExtractorFactory,
-                    _pdfToMarkdownConverter,
-                    _vectorStoreManager,
-                    cancellationToken),
+                case PdfContentType.TextBased:
+                    using (var pdfStream = new MemoryStream(pdfBytes, writable: false))
+                    {
+                        result = await _textBasedExecutor.ExecuteAsync(
+                            pdfStream,
+                            fileName,
+                            _invoiceExtractorFactory,
+                            _pdfToMarkdownConverter,
+                            _vectorStoreManager,
+                            cancellationToken);
+                    }
+                    break;
 
-                PdfContentType.ImageOnly => await _imageOnlyExecutor.ExecuteAsync(
-                    pdfContent,
-                    fileName,
-                    _invoiceExtractorFactory,
-                    _pdfImageExtractor,
-                    cancellationToken),
+                case PdfContentType.ImageOnly:
+                    using (var pdfStream = new MemoryStream(pdfBytes, writable: false))
+                    {
+                        result = await _imageOnlyExecutor.ExecuteAsync(
+                            pdfStream,
+                            fileName,
+                            _invoiceExtractorFactory,
+                            _pdfImageExtractor,
+                               _vectorStoreManager,
+                            cancellationToken);
+                    }
+                    break;
 
-                PdfContentType.Mixed => await _mixedExecutor.ExecuteAsync(
-                    pdfContent,
-                    fileName,
-                    _invoiceExtractorFactory,
-                    _pdfToMarkdownConverter,
-                    _pdfImageExtractor,
-                    _vectorStoreManager,
-                    cancellationToken),
+                case PdfContentType.Mixed:
+                    using (var pdfStream = new MemoryStream(pdfBytes, writable: false))
+                    {
+                        result = await _mixedExecutor.ExecuteAsync(
+                            pdfStream,
+                            fileName,
+                            _invoiceExtractorFactory,
+                            _pdfToMarkdownConverter,
+                            _pdfImageExtractor,
+                            _vectorStoreManager,
+                            cancellationToken);
+                    }
+                    break;
 
-                _ => throw new InvalidOperationException($"Unknown PDF content type: {analysisResult.ContentType}")
-            };
+                default:
+                    throw new InvalidOperationException($"Unknown PDF content type: {analysisResult.ContentType}");
+            }
 
             result.ContentType = analysisResult.ContentType.ToString();
 
