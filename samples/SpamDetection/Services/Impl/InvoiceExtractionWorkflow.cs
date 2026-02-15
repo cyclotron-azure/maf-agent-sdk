@@ -12,9 +12,9 @@ namespace SpamDetection.Services.Impl;
 public sealed class InvoiceExtractionWorkflow(
     ILogger<InvoiceExtractionWorkflow> logger,
     [FromKeyedServices("invoice_extractor")] IAgentFactory invoiceExtractorFactory,
-    IPdfContentAnalyzer pdfContentAnalyzer,
+    [FromKeyedServices("pdfpig")] IPdfContentAnalyzer pdfContentAnalyzer,
     IPdfToMarkdownConverter pdfToMarkdownConverter,
-    IPdfImageExtractor pdfImageExtractor,
+    [FromKeyedServices("pdfpig")] IPdfImageExtractor pdfImageExtractor,
     IVectorStoreManager vectorStoreManager,
     TextBasedInvoiceExecutor textBasedExecutor,
     ImageOnlyInvoiceExecutor imageOnlyExecutor,

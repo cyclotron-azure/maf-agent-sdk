@@ -36,6 +36,8 @@ public class AgentFactory : IAgentFactory
     private readonly string _agentKey;
     private readonly AgentDefinitionOptions _agentDefinition;
     private readonly TelemetryOptions _telemetryOptions;
+    private string? _createdAgentName;
+    private string? _createdAgentVersion;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AgentFactory"/> class.
@@ -299,6 +301,9 @@ public class AgentFactory : IAgentFactory
                 options: versionOptions,
                 cancellationToken: cancellationToken);
 
+            _createdAgentName = agentName;
+            _createdAgentVersion = createdAgentVersion.Version;
+
             // Get the AIAgent from the created version
             var agentRecord = projectClient.Agents.GetAgent(agentName).Value;
             var agentReference = new AgentReference(agentRecord.Id);
@@ -364,6 +369,15 @@ public class AgentFactory : IAgentFactory
                 await projectClient.Agents.DeleteAgentVersionAsync(agentName, agentVersion, cancellationToken);
                 _logger.LogDebug("Deleted {AgentKey} agent version {AgentVersion}: {AgentName}", _agentKey, agentVersion, agentName);
             }
+            else if (!string.IsNullOrWhiteSpace(_createdAgentName) && !string.IsNullOrWhiteSpace(_createdAgentVersion))
+            {
+                await projectClient.Agents.DeleteAgentVersionAsync(_createdAgentName, _createdAgentVersion, cancellationToken);
+                _logger.LogDebug(
+                    "Deleted {AgentKey} agent version {AgentVersion}: {AgentName} (fallback)",
+                    _agentKey,
+                    _createdAgentVersion,
+                    _createdAgentName);
+            }
             else
             {
                 _logger.LogWarning("Agent ID format unexpected: {AgentId}. Expected 'name:version' format", agentId);
@@ -376,6 +390,8 @@ public class AgentFactory : IAgentFactory
         finally
         {
             Agent = null;
+            _createdAgentName = null;
+            _createdAgentVersion = null;
         }
     }
 

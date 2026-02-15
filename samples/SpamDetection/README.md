@@ -4,12 +4,13 @@ This sample demonstrates how to use the **Cyclotron.Maf.AgentSdk** to build an A
 
 ## Overview
 
-The sample creates an AI agent that:
+The sample creates AI agents that:
 
 - Analyzes messages to classify them as **SPAM** or **NOT_SPAM**
 - Uses a vector store with training examples for context
 - Provides confidence levels and reasoning for each classification
 - Demonstrates the full agent lifecycle (create, run, cleanup)
+- Includes an invoice extraction workflow for PDF processing
 
 ## Prerequisites
 
@@ -38,10 +39,35 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o-mini
 
 ```bash
 dotnet build
-dotnet run
+dotnet run --Workflow:Mode=both
+```
+
+To run a single workflow, set `Workflow:Mode`:
+
+```bash
+dotnet run --Workflow:Mode=spam
+dotnet run --Workflow:Mode=invoice
+```
+
+Place PDF files in the `pdfs/` folder next to the sample, or set a custom folder:
+
+```bash
+dotnet run --Workflow:Mode=invoice --Workflow:InvoicePdfDirectory=/path/to/pdfs
 ```
 
 ## How It Works
+
+### Workflow Selection
+
+`Workflow:Mode` controls which workflows run:
+
+- `spam` runs only the spam detection workflow
+- `invoice` runs only the invoice extraction workflow
+- `both` runs spam detection then invoice extraction
+- Aliases: `all`, `inv`, `invoices`, `spam-only`, `invoice-only`
+
+`Workflow:InvoicePdfDirectory` controls where the invoice workflow looks for PDFs
+(default: `pdfs`).
 
 ### Agent Configuration
 
