@@ -24,6 +24,14 @@ A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF)
 dotnet add package Cyclotron.Maf.AgentSdk
 ```
 
+## Session Management
+
+Sessions maintain conversation context and state across multiple agent invocations. Each session is created per agent and managed throughout the workflow:
+
+- **Session Creation**: Automatically created when `CreateAgentAsync()` is called
+- **Session Reuse**: Persists across multiple `RunAgentWithPollingAsync()` calls
+- **Session Cleanup**: Automatically deleted when `CleanupAsync()` is called (if `auto_delete` is true)
+
 ## Quick Start
 
 ### 1. Configure Services
@@ -132,6 +140,7 @@ public class MyProcessingExecutor : Executor<InputType, OutputType>
         finally
         {
             // Cleanup respects auto_delete and auto_cleanup_resources settings
+            // This deletes the agent, session, and optionally the vector store
             await _agentFactory.CleanupAsync(cancellationToken);
         }
     }
@@ -174,7 +183,7 @@ var result = await workflow.ExecuteAsync<OutputType>(input, cancellationToken);
 |----------|------|-------------|---------|
 | `type` | string | Agent type identifier | Required |
 | `enabled` | bool | Whether agent is active | `true` |
-| `auto_delete` | bool | Delete agent/thread after use | `true` |
+| `auto_delete` | bool | Delete agent and session after use | `true` |
 | `auto_cleanup_resources` | bool | Delete vector store after use | `false` |
 | `system_prompt_template` | string | Handlebars template for system prompt | - |
 | `user_prompt_template` | string | Handlebars template for user prompt | - |
@@ -266,6 +275,18 @@ deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
 | `IPromptRenderingService` | Renders Handlebars templates |
 | `IPersistentAgentsClientFactory` | Creates Azure AI Foundry clients |
 | `IAzureFoundryCleanupService` | Cleans up Azure AI Foundry resources |
+
+## Microsoft Learn Documentation
+
+For more information on Microsoft Agent Framework and session management, refer to these official resources:
+
+- **[Microsoft Agent Framework Overview](https://learn.microsoft.com/agent-framework/)** - Core framework concepts and architecture
+- **[Agent Framework Get Started](https://learn.microsoft.com/agent-framework/get-started/)** - Quick start guide
+- **[Agent Framework: Sessions & Conversations](https://learn.microsoft.com/agent-framework/agents/conversations/session)** - Managing agent sessions for maintaining conversation context
+- **[Agent Framework: Memory Management](https://learn.microsoft.com/agent-framework/get-started/memory/)** - How agents remember conversation history
+- **[Azure AI Foundry Agents](https://learn.microsoft.com/azure/ai-foundry/agents/)** - Creating and managing agents in Azure AI Foundry
+- **[Azure AI Foundry: Vector Stores](https://learn.microsoft.com/azure/ai-foundry/concepts/vector-stores)** - Vector store concepts and management
+- **[OpenTelemetry Integration](https://learn.microsoft.com/dotnet/core/runtime-config/other)** - Observability and telemetry for .NET applications
 
 ## Workflow State Management
 

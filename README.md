@@ -104,6 +104,14 @@ maf-agent-sdk/
 - **[Telemetry Guide](docs/TELEMETRY.md)** - OpenTelemetry setup and configuration
 - **[CI/CD Guide](docs/CICD.md)** - Build pipeline and versioning
 
+### Microsoft Learn Resources
+
+- **[Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/)** - Build AI agents using MAF
+- **[Agent Framework: Get Started](https://learn.microsoft.com/en-us/agent-framework/get-started/)** - Getting started guide
+- **[Agent Framework: Conversations & Sessions](https://learn.microsoft.com/en-us/agent-framework/agents/conversations/)** - Managing agent conversations with sessions
+- **[Azure AI Foundry: Agents](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/)** - Azure AI Foundry agents overview
+- **[Azure AI Foundry: Agent API Reference](https://learn.microsoft.com/en-us/azure/ai-studio/reference/python-sdk/latest/azure.ai.projects.operations.AgentsOperations)** - Agent operations API
+
 ## 📌 Versioning
 
 This project uses **GitVersion** with semantic versioning following the GitFlow workflow. Versions are automatically bumped based on commit message keywords.
@@ -166,7 +174,7 @@ dotnet run
 │         │    Microsoft Agent Framework (MAF)   │             │
 │         │    ┌─────────────────────────────┐  │             │
 │         │    │  Workflow Executors         │  │             │
-│         │    │  AIAgent / AgentThread      │  │             │
+│         │    │  AIAgent / AgentSession     │  │             │
 │         └────┴─────────────────────────────┴──┘             │
 ├─────────────────────────────────────────────────────────────┤
 │                   Azure AI Foundry                           │

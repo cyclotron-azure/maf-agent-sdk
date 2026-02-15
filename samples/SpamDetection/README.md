@@ -118,9 +118,9 @@ public Main(
 ### Agent Lifecycle
 
 1. **Create Vector Store**: Upload training examples for the agent to reference
-2. **Create Agent**: Initialize the ephemeral agent with configured tools (e.g., file search)
-3. **Run Classification**: Send messages and receive classifications
-4. **Cleanup**: Delete agent, thread, and vector store (based on `auto_delete` and `auto_cleanup_resources` settings)
+2. **Create Agent**: Initialize the ephemeral agent with configured tools (e.g., file search). A session is automatically created to maintain conversation context.
+3. **Run Classification**: Send messages through the session and receive classifications
+4. **Cleanup**: Delete agent, session, and vector store (based on `auto_delete` and `auto_cleanup_resources` settings)
 
 ## Sample Output
 
@@ -152,7 +152,7 @@ ACCURACY: 10/10 (100%)
 |--------|-------------|---------|
 | `type` | Agent type identifier | Required |
 | `enabled` | Whether the agent is active | `true` |
-| `auto_delete` | Delete agent/thread after use | `true` |
+| `auto_delete` | Delete agent and session after use | `true` |
 | `auto_cleanup_resources` | Delete vector store after use | `true` |
 
 ### Agent Metadata Options
@@ -171,6 +171,16 @@ ACCURACY: 10/10 (100%)
 | `api_version` | API version (default: 2024-12-01-preview) |
 | `timeout_seconds` | Request timeout (default: 300) |
 | `max_retries` | Maximum retry attempts (default: 3) |
+
+## Microsoft Learn Resources
+
+For more information on Agent Framework, sessions, and Azure AI Foundry:
+
+- **[Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/)** - Official framework documentation
+- **[Agent Sessions & Conversations](https://learn.microsoft.com/agent-framework/agents/conversations/session)** - Maintaining conversation context with sessions
+- **[Multi-turn Conversations](https://learn.microsoft.com/agent-framework/get-started/multi-turn/)** - Building multi-turn agent interactions
+- **[Azure AI Foundry Agents](https://learn.microsoft.com/azure/ai-foundry/agents/)** - Creating agents in Azure AI Foundry
+- **[Azure AI Foundry File Search](https://learn.microsoft.com/azure/ai-foundry/how-to/file-search)** - Using file search tool with agents
 
 ## Extending the Sample
 
