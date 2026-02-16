@@ -37,10 +37,24 @@ Create `agent.config.yaml` in your project root:
 
 ```yaml
 providers:
+  # Azure AI Foundry for production
   azure_foundry:
     type: "azure_foundry"
     endpoint: "${PROJECT_ENDPOINT}"
     deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
+
+  # Azure OpenAI for API-based access
+  azure_openai:
+    type: "azure_openai"
+    endpoint: "${AZURE_OPENAI_ENDPOINT}"
+    deployment_name: "gpt-4o"
+    api_key: "${AZURE_OPENAI_API_KEY}"
+
+  # Local Ollama for development
+  ollama_local:
+    type: "ollama"
+    endpoint: "http://localhost:11434"
+    deployment_name: "llama2"
 
 agents:
   my_agent:
@@ -54,12 +68,14 @@ agents:
         - "file_search"        # Enable document search
         - "code_interpreter"   # Enable code execution (optional)
     framework_config:
-      provider: "azure_foundry"
+      provider: "azure_foundry"  # Switch between providers here
     system_prompt_template: |
       You are a helpful assistant.
     user_prompt_template: |
       Process: {{input}}
 ```
+
+> 💡 **Tip:** Switch between providers by changing the `provider` value. Use `azure_foundry` for production, `azure_openai` for API access, or `ollama_local` for local development.
 
 ### Set Environment Variables
 
@@ -74,6 +90,7 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o
 
 | Feature | Description |
 |---------|-------------|
+| **Multi-Provider Support** | Support for Azure AI Foundry, Azure OpenAI, and local Ollama models |
 | **Workflow Orchestration** | Build sequential executor pipelines using MAF's `Executor<TInput, TOutput>` pattern |
 | **Agent Factory** | Create and manage ephemeral Azure AI Foundry agents with keyed DI support |
 | **Vector Store Management** | Lifecycle management with automatic indexing wait and exponential backoff |
@@ -100,6 +117,7 @@ maf-agent-sdk/
 ## 📖 Documentation
 
 - **[SDK Documentation](src/Cyclotron.Maf.AgentSdk/README.md)** - Detailed API reference and configuration options
+- **[Provider Guide](docs/PROVIDERS.md)** - Multi-provider setup and configuration
 - **[Spam Detection Sample](samples/SpamDetection/README.md)** - Complete working example
 - **[Telemetry Guide](docs/TELEMETRY.md)** - OpenTelemetry setup and configuration
 - **[CI/CD Guide](docs/CICD.md)** - Build pipeline and versioning
