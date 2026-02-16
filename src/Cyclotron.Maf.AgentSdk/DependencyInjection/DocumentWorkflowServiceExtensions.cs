@@ -22,6 +22,9 @@ public static class DocumentWorkflowServiceExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddDocumentWorkflowServices(this IServiceCollection services)
     {
+        // Register provider factory for creating provider instances (singleton for efficiency)
+        services.AddSingleton<IProviderClientFactory, ProviderClientFactory>();
+
         // Register PersistentAgentsClient factory as scoped service
         services.AddScoped<IPersistentAgentsClientFactory, PersistentAgentsClientFactory>();
 

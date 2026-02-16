@@ -1,43 +1,26 @@
-using Cyclotron.Maf.AgentSdk.Options;
+using Azure.AI.Agents.Persistent;
+using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
-using MsOptions = Microsoft.Extensions.Options.Options;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 
 /// <summary>
 /// Unit tests for the <see cref="PersistentAgentsClientFactory"/> class.
-/// Tests constructor validation, provider lookup, and credential creation logic.
+/// Tests constructor validation, provider lookup, and delegation to IProviderClientFactory.
 /// </summary>
 public class PersistentAgentsClientFactoryTests
 {
     private readonly Mock<ILogger<PersistentAgentsClientFactory>> _mockLogger;
+    private readonly Mock<IProviderClientFactory> _mockProviderFactory;
 
     public PersistentAgentsClientFactoryTests()
     {
         _mockLogger = new Mock<ILogger<PersistentAgentsClientFactory>>();
-    }
-
-    private IOptions<ModelProviderOptions> CreateProviderOptions(
-        Dictionary<string, ModelProviderDefinitionOptions>? providers = null)
-    {
-        var options = new ModelProviderOptions
-        {
-            Providers = providers ?? new Dictionary<string, ModelProviderDefinitionOptions>
-            {
-                ["azure_foundry"] = new ModelProviderDefinitionOptions
-                {
-                    Type = "azure_foundry",
-                    Endpoint = "https://test.azure.com",
-                    DeploymentName = "gpt-4"
-                }
-            }
-        };
-        return MsOptions.Create(options);
+        _mockProviderFactory = new Mock<IProviderClientFactory>();
     }
 
     #region Constructor Tests
@@ -45,80 +28,30 @@ public class PersistentAgentsClientFactoryTests
     [Fact(DisplayName = "Constructor should throw ArgumentNullException when logger is null")]
     public void Constructor_NullLogger_ThrowsArgumentNullException()
     {
-        // Arrange
-        var providerOptions = CreateProviderOptions();
-
         // Act
-        var act = () => new PersistentAgentsClientFactory(null!, providerOptions);
+        var act = () => new PersistentAgentsClientFactory(null!, _mockProviderFactory.Object);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("logger");
     }
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when providerOptions is null")]
-    public void Constructor_NullProviderOptions_ThrowsArgumentNullException()
+    [Fact(DisplayName = "Constructor should throw ArgumentNullException when providerFactory is null")]
+    public void Constructor_NullProviderFactory_ThrowsArgumentNullException()
     {
         // Act
         var act = () => new PersistentAgentsClientFactory(_mockLogger.Object, null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("providerOptions");
+            .WithParameterName("providerFactory");
     }
 
-    [Fact(DisplayName = "Constructor should throw InvalidOperationException when no providers configured")]
-    public void Constructor_NoProvidersConfigured_ThrowsInvalidOperationException()
+    [Fact(DisplayName = "Constructor should create instance with valid dependencies")]
+    public void Constructor_ValidDependencies_CreatesInstance()
     {
-        // Arrange - Empty providers dictionary
-        var providerOptions = CreateProviderOptions(new Dictionary<string, ModelProviderDefinitionOptions>());
-
         // Act
-        var act = () => new PersistentAgentsClientFactory(_mockLogger.Object, providerOptions);
-
-        // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*No providers configured*");
-    }
-
-    [Fact(DisplayName = "Constructor should create instance with valid configuration")]
-    public void Constructor_ValidConfiguration_CreatesInstance()
-    {
-        // Arrange
-        var providerOptions = CreateProviderOptions();
-
-        // Act
-        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, providerOptions);
-
-        // Assert
-        factory.Should().NotBeNull();
-    }
-
-    [Fact(DisplayName = "Constructor should accept multiple providers")]
-    public void Constructor_MultipleProviders_CreatesInstance()
-    {
-        // Arrange
-        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
-        {
-            ["azure_foundry"] = new ModelProviderDefinitionOptions
-            {
-                Type = "azure_foundry",
-                Endpoint = "https://foundry.azure.com",
-                DeploymentName = "gpt-4"
-            },
-            ["azure_openai"] = new ModelProviderDefinitionOptions
-            {
-                Type = "azure_openai",
-                Endpoint = "https://openai.azure.com",
-                DeploymentName = "gpt-35-turbo",
-                ApiKey = "test-key"
-            }
-        };
-
-        // Act
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions(providers));
+        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, _mockProviderFactory.Object);
 
         // Assert
         factory.Should().NotBeNull();
@@ -128,192 +61,99 @@ public class PersistentAgentsClientFactoryTests
 
     #region GetClient Tests
 
-    [Theory(DisplayName = "GetClient should throw ArgumentException when providerName is null or empty")]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void GetClient_NullOrEmptyProviderName_ThrowsArgumentException(string? providerName)
+    [Fact(DisplayName = "GetClient should throw ArgumentException when providerName is null")]
+    public void GetClient_NullProviderName_ThrowsArgumentException()
     {
         // Arrange
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions());
+        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, _mockProviderFactory.Object);
 
         // Act
-        var act = () => factory.GetClient(providerName!);
+        var act = () => factory.GetClient(null!);
 
         // Assert
         act.Should().Throw<ArgumentException>()
-            .WithMessage("*Provider name cannot be null or empty*");
+            .WithParameterName("providerName");
     }
 
-    [Fact(DisplayName = "GetClient should throw InvalidOperationException when provider not found")]
-    public void GetClient_ProviderNotFound_ThrowsInvalidOperationException()
+    [Fact(DisplayName = "GetClient should throw ArgumentException when providerName is empty")]
+    public void GetClient_EmptyProviderName_ThrowsArgumentException()
     {
         // Arrange
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions());
+        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, _mockProviderFactory.Object);
 
         // Act
-        var act = () => factory.GetClient("non_existent_provider");
+        var act = () => factory.GetClient(string.Empty);
+
+        // Assert
+        act.Should().Throw<ArgumentException>()
+            .WithParameterName("providerName");
+    }
+
+    [Fact(DisplayName = "GetClient should throw InvalidOperationException when provider is not Azure compatible")]
+    public void GetClient_NonAzureProvider_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var mockProvider = new Mock<IModelProvider>();
+        mockProvider.Setup(p => p.ProviderType).Returns("ollama");
+        
+        _mockProviderFactory
+            .Setup(f => f.GetProvider("test_ollama"))
+            .Returns(mockProvider.Object);
+
+        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, _mockProviderFactory.Object);
+
+        // Act
+        var act = () => factory.GetClient("test_ollama");
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*not found in configuration*")
-            .WithMessage("*Available providers*");
+            .WithMessage("*not compatible with Azure AI Agents API*");
     }
 
-    [Fact(DisplayName = "GetClient should throw InvalidOperationException when provider configuration is invalid")]
-    public void GetClient_InvalidProviderConfiguration_ThrowsInvalidOperationException()
+    [Fact(DisplayName = "GetClient should throw InvalidOperationException when provider returns non-PersistentAgentsClient")]
+    public void GetClient_ProviderReturnsWrongType_ThrowsInvalidOperationException()
     {
-        // Arrange - Provider with missing required fields
-        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
-        {
-            ["invalid_provider"] = new ModelProviderDefinitionOptions
-            {
-                Type = "", // Invalid - empty type
-                Endpoint = "https://test.azure.com",
-                DeploymentName = "gpt-4"
-            }
-        };
+        // Arrange
+        var mockProvider = new Mock<IModelProvider>();
+        mockProvider.Setup(p => p.ProviderType).Returns("azure_foundry");
+        mockProvider.Setup(p => p.CreateClient()).Returns(new object()); // Wrong type
 
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions(providers));
+        _mockProviderFactory
+            .Setup(f => f.GetProvider("test_provider"))
+            .Returns(mockProvider.Object);
+
+        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, _mockProviderFactory.Object);
 
         // Act
-        var act = () => factory.GetClient("invalid_provider");
+        var act = () => factory.GetClient("test_provider");
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*configuration is invalid*");
+            .WithMessage("*did not return a PersistentAgentsClient instance*");
     }
 
-    [Fact(DisplayName = "GetClient should throw InvalidOperationException when azure_openai has no API key")]
-    public void GetClient_AzureOpenAIWithoutApiKey_ThrowsInvalidOperationException()
-    {
-        // Arrange - azure_openai type requires API key
-        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
-        {
-            ["azure_openai_no_key"] = new ModelProviderDefinitionOptions
-            {
-                Type = "azure_openai",
-                Endpoint = "https://test.openai.azure.com",
-                DeploymentName = "gpt-35-turbo",
-                ApiKey = null // Missing API key
-            }
-        };
-
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions(providers));
-
-        // Act
-        var act = () => factory.GetClient("azure_openai_no_key");
-
-        // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*configuration is invalid*");
-    }
-
-    [Fact(DisplayName = "GetClient should create client for valid azure_foundry provider")]
-    public void GetClient_ValidAzureFoundryProvider_CreatesClient()
+    [Fact(DisplayName = "GetClient should delegate to IProviderClientFactory.GetProvider")]
+    public void GetClient_ValidProvider_DelegatesToProviderFactory()
     {
         // Arrange
-        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
-        {
-            ["azure_foundry"] = new ModelProviderDefinitionOptions
-            {
-                Type = "azure_foundry",
-                Endpoint = "https://test.azure.com",
-                DeploymentName = "gpt-4"
-            }
-        };
+        var mockProvider = new Mock<IModelProvider>();
+        mockProvider.Setup(p => p.ProviderType).Returns("azure_foundry");
+        
+        var mockClient = new Mock<PersistentAgentsClient>("https://test.com", new Mock<Azure.Core.TokenCredential>().Object);
+        mockProvider.Setup(p => p.CreateClient()).Returns(mockClient.Object);
 
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions(providers));
+        _mockProviderFactory
+            .Setup(f => f.GetProvider("test_provider"))
+            .Returns(mockProvider.Object);
+
+        var factory = new PersistentAgentsClientFactory(_mockLogger.Object, _mockProviderFactory.Object);
 
         // Act
-        var client = factory.GetClient("azure_foundry");
+        factory.GetClient("test_provider");
 
         // Assert
-        client.Should().NotBeNull();
-    }
-
-    [Fact(DisplayName = "GetClient should create client for valid azure_openai provider with API key")]
-    public void GetClient_ValidAzureOpenAIProvider_CreatesClient()
-    {
-        // Arrange
-        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
-        {
-            ["azure_openai"] = new ModelProviderDefinitionOptions
-            {
-                Type = "azure_openai",
-                Endpoint = "https://test.openai.azure.com",
-                DeploymentName = "gpt-35-turbo",
-                ApiKey = "test-api-key"
-            }
-        };
-
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions(providers));
-
-        // Act
-        var client = factory.GetClient("azure_openai");
-
-        // Assert
-        client.Should().NotBeNull();
-    }
-
-    [Fact(DisplayName = "GetClient should create new client instance per call")]
-    public void GetClient_MultipleCalls_ReturnsNewInstances()
-    {
-        // Arrange
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions());
-
-        // Act
-        var client1 = factory.GetClient("azure_foundry");
-        var client2 = factory.GetClient("azure_foundry");
-
-        // Assert - Should be different instances
-        client1.Should().NotBeNull();
-        client2.Should().NotBeNull();
-        client1.Should().NotBeSameAs(client2);
-    }
-
-    [Fact(DisplayName = "GetClient should support case-sensitive provider names")]
-    public void GetClient_CaseSensitiveProviderName_FindsCorrectProvider()
-    {
-        // Arrange
-        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
-        {
-            ["Azure_Foundry"] = new ModelProviderDefinitionOptions
-            {
-                Type = "azure_foundry",
-                Endpoint = "https://test.azure.com",
-                DeploymentName = "gpt-4"
-            }
-        };
-
-        var factory = new PersistentAgentsClientFactory(
-            _mockLogger.Object,
-            CreateProviderOptions(providers));
-
-        // Act - Try exact case
-        var client = factory.GetClient("Azure_Foundry");
-
-        // Assert
-        client.Should().NotBeNull();
-
-        // Act - Try different case (should fail since dictionary is case-sensitive by default)
-        var act = () => factory.GetClient("azure_foundry");
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*not found in configuration*");
+        _mockProviderFactory.Verify(f => f.GetProvider("test_provider"), Times.Once);
+        mockProvider.Verify(p => p.CreateClient(), Times.Once);
     }
 
     #endregion

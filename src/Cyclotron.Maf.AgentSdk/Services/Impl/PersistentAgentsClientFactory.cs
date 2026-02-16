@@ -1,77 +1,36 @@
-using Cyclotron.Maf.AgentSdk.Options;
 using Azure.AI.Agents.Persistent;
-using Azure.Core;
-using Azure.Identity;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 
 /// <summary>
-/// Adapter to use Azure API Key with <see cref="TokenCredential"/> interface.
-/// </summary>
-/// <remarks>
-/// This is a workaround since <see cref="PersistentAgentsClient"/> only accepts <see cref="TokenCredential"/>.
-/// For production use with API keys, consider using Azure.AI.OpenAI.OpenAIClient instead.
-/// </remarks>
-internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
-{
-    private readonly string _apiKey = apiKey ?? throw new ArgumentNullException(nameof(apiKey));
-
-    /// <inheritdoc/>
-    public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
-    {
-        // Return API key as bearer token (not standard OAuth flow)
-        return new AccessToken(_apiKey, DateTimeOffset.MaxValue);
-    }
-
-    /// <inheritdoc/>
-    public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
-    {
-        return new ValueTask<AccessToken>(GetToken(requestContext, cancellationToken));
-    }
-}
-
-/// <summary>
 /// Factory for creating <see cref="PersistentAgentsClient"/> instances with provider-specific authentication.
-/// Supports multiple providers with different endpoints and authentication methods.
+/// Uses <see cref="IProviderClientFactory"/> to support multiple provider types.
 /// Creates new client instances per scope to avoid state sharing in parallel processing.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Supported provider types:
-/// <list type="bullet">
-/// <item><description><c>azure_foundry</c>: Uses <see cref="DefaultAzureCredential"/> for authentication.</description></item>
-/// <item><description><c>azure_openai</c>: Uses API key authentication via <see cref="AzureKeyCredentialAdapter"/>.</description></item>
-/// </list>
+/// Delegates to <see cref="IProviderClientFactory"/> for provider instantiation.
+/// Only returns clients compatible with Azure AI Agents API (azure_foundry, azure_openai).
 /// </para>
 /// </remarks>
 public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
 {
     private readonly ILogger<PersistentAgentsClientFactory> _logger;
-    private readonly ModelProviderOptions _providerOptions;
+    private readonly IProviderClientFactory _providerFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PersistentAgentsClientFactory"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
-    /// <param name="providerOptions">The model provider configuration options.</param>
+    /// <param name="providerFactory">The provider factory for creating provider instances.</param>
     /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when no providers are configured.</exception>
     public PersistentAgentsClientFactory(
         ILogger<PersistentAgentsClientFactory> logger,
-        IOptions<ModelProviderOptions> providerOptions)
+        IProviderClientFactory providerFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        ArgumentNullException.ThrowIfNull(providerOptions, nameof(providerOptions));
-
-        _providerOptions = providerOptions.Value;
-
-        if (_providerOptions.Providers.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "No providers configured. Add a 'providers:' section to agent.config.yaml");
-        }
+        _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
     }
 
     /// <inheritdoc/>
@@ -82,56 +41,37 @@ public class PersistentAgentsClientFactory : IPersistentAgentsClientFactory
             throw new ArgumentException("Provider name cannot be null or empty", nameof(providerName));
         }
 
-        // Create new client instance per request to avoid state sharing across parallel processing
-        return CreateClient(providerName);
-    }
+        // Get provider instance from factory
+        var provider = _providerFactory.GetProvider(providerName);
 
-    private PersistentAgentsClient CreateClient(string providerName)
-    {
-        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
+        // Validate that provider supports Azure AI Agents API
+        if (!IsAzureCompatibleProvider(provider))
         {
             throw new InvalidOperationException(
-                $"Provider '{providerName}' not found in configuration. " +
-                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
-        }
-
-        if (!provider.IsValid())
-        {
-            throw new InvalidOperationException(
-                $"Provider '{providerName}' configuration is invalid. " +
-                $"Type: {provider.Type}, Endpoint: {provider.Endpoint}, DeploymentName: {provider.DeploymentName}");
+                $"Provider '{providerName}' (type: {provider.ProviderType}) is not compatible with Azure AI Agents API. " +
+                $"Supported types: azure_foundry, azure_openai");
         }
 
         _logger.LogInformation(
-            "Creating PersistentAgentsClient for provider '{ProviderName}' (Type: {ProviderType}, Endpoint: {Endpoint})",
+            "Creating PersistentAgentsClient for provider '{ProviderName}' (Type: {ProviderType})",
             providerName,
-            provider.Type,
-            provider.Endpoint);
+            provider.ProviderType);
 
-        // Create credential based on provider type and configuration
-        TokenCredential credential = CreateCredential(provider);
+        // Create client from provider
+        var client = provider.CreateClient();
 
-        return new PersistentAgentsClient(provider.Endpoint, credential);
-    }
-
-    private TokenCredential CreateCredential(ModelProviderDefinitionOptions provider)
-    {
-        // azure_openai with API key: Use AzureKeyCredentialAdapter
-        if (provider.Type.Equals("azure_openai", StringComparison.OrdinalIgnoreCase) && provider.UsesApiKey())
+        if (client is not PersistentAgentsClient agentsClient)
         {
-            _logger.LogDebug("Using API Key authentication for provider type: {ProviderType}", provider.Type);
-            _logger.LogWarning(
-                "Using API Key with PersistentAgentsClient via adapter. " +
-                "For production Azure OpenAI usage, consider using Azure.AI.OpenAI.OpenAIClient or DefaultAzureCredential.");
-
-            return new AzureKeyCredentialAdapter(provider.ApiKey!);
+            throw new InvalidOperationException(
+                $"Provider '{providerName}' did not return a PersistentAgentsClient instance");
         }
 
-        // azure_foundry or azure_openai without API key: Use DefaultAzureCredential
-        _logger.LogDebug(
-            "Using DefaultAzureCredential for provider type: {ProviderType}",
-            provider.Type);
+        return agentsClient;
+    }
 
-        return new DefaultAzureCredential();
+    private static bool IsAzureCompatibleProvider(IModelProvider provider)
+    {
+        return provider.ProviderType.Equals("azure_foundry", StringComparison.OrdinalIgnoreCase) ||
+               provider.ProviderType.Equals("azure_openai", StringComparison.OrdinalIgnoreCase);
     }
 }
