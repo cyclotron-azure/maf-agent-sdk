@@ -25,7 +25,7 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class AIFoundryCleanupService : IAIFoundryCleanupService
 {
-    private readonly IAIProjectClientFactory _clientFactory;
+    private readonly IProviderClientFactory _clientFactory;
     private readonly ILogger<AIFoundryCleanupService> _logger;
     private readonly HashSet<string> _protectedAgentNames;
 
@@ -36,7 +36,7 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
     /// <param name="logger">The logger instance.</param>
     /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
     public AIFoundryCleanupService(
-        IAIProjectClientFactory clientFactory,
+        IProviderClientFactory clientFactory,
         ILogger<AIFoundryCleanupService> logger)
     {
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));

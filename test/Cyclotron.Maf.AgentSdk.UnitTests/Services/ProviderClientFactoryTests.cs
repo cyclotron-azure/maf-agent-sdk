@@ -10,16 +10,16 @@ using MsOptions = Microsoft.Extensions.Options.Options;
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 
 /// <summary>
-/// Unit tests for the <see cref="AIProjectClientFactory"/> class.
+/// Unit tests for the <see cref="ProviderClientFactory"/> class.
 /// Tests constructor validation, provider lookup, and credential creation logic.
 /// </summary>
-public class PersistentAgentsClientFactoryTests
+public class ProviderClientFactoryTests
 {
-    private readonly Mock<ILogger<AIProjectClientFactory>> _mockLogger;
+    private readonly Mock<ILogger<ProviderClientFactory>> _mockLogger;
 
-    public PersistentAgentsClientFactoryTests()
+    public ProviderClientFactoryTests()
     {
-        _mockLogger = new Mock<ILogger<AIProjectClientFactory>>();
+        _mockLogger = new Mock<ILogger<ProviderClientFactory>>();
     }
 
     private IOptions<ModelProviderOptions> CreateProviderOptions(
@@ -49,7 +49,7 @@ public class PersistentAgentsClientFactoryTests
         var providerOptions = CreateProviderOptions();
 
         // Act
-        var act = () => new AIProjectClientFactory(null!, providerOptions);
+        var act = () => new ProviderClientFactory(null!, providerOptions);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -60,7 +60,7 @@ public class PersistentAgentsClientFactoryTests
     public void Constructor_NullProviderOptions_ThrowsArgumentNullException()
     {
         // Act
-        var act = () => new AIProjectClientFactory(_mockLogger.Object, null!);
+        var act = () => new ProviderClientFactory(_mockLogger.Object, null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -74,7 +74,7 @@ public class PersistentAgentsClientFactoryTests
         var providerOptions = CreateProviderOptions([]);
 
         // Act
-        var act = () => new AIProjectClientFactory(_mockLogger.Object, providerOptions);
+        var act = () => new ProviderClientFactory(_mockLogger.Object, providerOptions);
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -88,7 +88,7 @@ public class PersistentAgentsClientFactoryTests
         var providerOptions = CreateProviderOptions();
 
         // Act
-        var factory = new AIProjectClientFactory(_mockLogger.Object, providerOptions);
+        var factory = new ProviderClientFactory(_mockLogger.Object, providerOptions);
 
         // Assert
         factory.Should().NotBeNull();
@@ -116,7 +116,7 @@ public class PersistentAgentsClientFactoryTests
         };
 
         // Act
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -135,7 +135,7 @@ public class PersistentAgentsClientFactoryTests
     public void GetClient_NullOrEmptyProviderName_ThrowsArgumentException(string? providerName)
     {
         // Arrange
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions());
 
@@ -151,7 +151,7 @@ public class PersistentAgentsClientFactoryTests
     public void GetClient_ProviderNotFound_ThrowsInvalidOperationException()
     {
         // Arrange
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions());
 
@@ -178,7 +178,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -205,7 +205,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -231,7 +231,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -257,7 +257,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -272,7 +272,7 @@ public class PersistentAgentsClientFactoryTests
     public void GetClient_MultipleCalls_ReturnsNewInstances()
     {
         // Arrange
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions());
 
@@ -300,7 +300,7 @@ public class PersistentAgentsClientFactoryTests
             }
         };
 
-        var factory = new AIProjectClientFactory(
+        var factory = new ProviderClientFactory(
             _mockLogger.Object,
             CreateProviderOptions(providers));
 
@@ -314,6 +314,94 @@ public class PersistentAgentsClientFactoryTests
         var act = () => factory.GetClient("azure_foundry");
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*not found in configuration*");
+    }
+
+    #endregion
+
+    #region Ollama Provider Tests
+
+    [Fact(DisplayName = "GetClient should throw NotImplementedException for Ollama provider")]
+    public void GetClient_OllamaProvider_ThrowsNotImplementedException()
+    {
+        // Arrange
+        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
+        {
+            ["ollama_local"] = new ModelProviderDefinitionOptions
+            {
+                Type = "ollama",
+                Endpoint = "http://localhost:11434",
+                DeploymentName = "llama3"
+            }
+        };
+
+        var factory = new ProviderClientFactory(
+            _mockLogger.Object,
+            CreateProviderOptions(providers));
+
+        // Act
+        var act = () => factory.GetClient("ollama_local");
+
+        // Assert
+        act.Should().Throw<NotImplementedException>()
+            .WithMessage("*Local provider 'ollama' support is configured but not yet implemented*");
+    }
+
+    [Fact(DisplayName = "Ollama provider configuration should be valid")]
+    public void OllamaProvider_Configuration_IsValid()
+    {
+        // Arrange
+        var ollamaProvider = new ModelProviderDefinitionOptions
+        {
+            Type = "ollama",
+            Endpoint = "http://localhost:11434",
+            DeploymentName = "llama3",
+            Model = "llama3:latest"
+        };
+
+        // Act
+        var isValid = ollamaProvider.IsValid();
+        var isLocal = ollamaProvider.IsLocalProvider();
+
+        // Assert
+        isValid.Should().BeTrue();
+        isLocal.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Ollama provider should not require API key")]
+    public void OllamaProvider_NoApiKey_IsValid()
+    {
+        // Arrange
+        var ollamaProvider = new ModelProviderDefinitionOptions
+        {
+            Type = "ollama",
+            Endpoint = "http://localhost:11434",
+            DeploymentName = "codellama",
+            ApiKey = null // No API key required
+        };
+
+        // Act
+        var isValid = ollamaProvider.IsValid();
+
+        // Assert
+        isValid.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Ollama provider with missing endpoint should be invalid")]
+    public void OllamaProvider_MissingEndpoint_IsInvalid()
+    {
+        // Arrange
+        var ollamaProvider = new ModelProviderDefinitionOptions
+        {
+            Type = "ollama",
+            Endpoint = string.Empty,
+            DeploymentName = "llama3"
+        };
+
+        // Act
+        var isValid = ollamaProvider.IsValid();
+
+        // Assert
+        isValid.Should().BeFalse();
     }
 
     #endregion

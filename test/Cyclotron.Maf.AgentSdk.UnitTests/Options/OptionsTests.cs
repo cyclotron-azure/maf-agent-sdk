@@ -175,6 +175,48 @@ public class ModelProviderDefinitionOptionsTests
         // Assert
         result.Should().BeTrue();
     }
+
+    [Fact(DisplayName = "IsLocalProvider should return true for Ollama provider")]
+    public void IsLocalProvider_OllamaProvider_ReturnsTrue()
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Type = "ollama",
+            Endpoint = "http://localhost:11434",
+            DeploymentName = "llama3"
+        };
+
+        // Act
+        var result = options.IsLocalProvider();
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "IsLocalProvider should return false for Azure providers")]
+    public void IsLocalProvider_AzureProviders_ReturnsFalse()
+    {
+        // Arrange & Act
+        var azureFoundry = new ModelProviderDefinitionOptions { Type = "azure_foundry" };
+        var azureOpenAI = new ModelProviderDefinitionOptions { Type = "azure_openai" };
+
+        // Assert
+        azureFoundry.IsLocalProvider().Should().BeFalse();
+        azureOpenAI.IsLocalProvider().Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "IsLocalProvider should be case insensitive")]
+    public void IsLocalProvider_CaseInsensitive_ReturnsTrue()
+    {
+        // Arrange
+        var ollamaUpper = new ModelProviderDefinitionOptions { Type = "OLLAMA" };
+        var ollamaMixed = new ModelProviderDefinitionOptions { Type = "Ollama" };
+
+        // Act & Assert
+        ollamaUpper.IsLocalProvider().Should().BeTrue();
+        ollamaMixed.IsLocalProvider().Should().BeTrue();
+    }
 }
 
 /// <summary>
@@ -397,7 +439,7 @@ public class AgentDefinitionOptionsTests
         options.AutoCleanupResources.Should().BeFalse();
         options.SystemPromptTemplate.Should().BeNull();
         options.UserPromptTemplate.Should().BeNull();
-        options.AIFrameworkOptions.Should().NotBeNull();
+        options.Provider.Should().Be(string.Empty); // Provider is required and must be set via configuration
         options.Metadata.Should().NotBeNull();
     }
 

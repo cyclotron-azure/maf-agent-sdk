@@ -20,14 +20,14 @@ public class AgentFactoryTests
 {
     private readonly Mock<ILogger<AgentFactory>> _mockLogger;
     private readonly Mock<IPromptRenderingService> _mockPromptService;
-    private readonly Mock<IAIProjectClientFactory> _mockClientFactory;
+    private readonly Mock<IProviderClientFactory> _mockClientFactory;
     private readonly Mock<IVectorStoreManager> _mockVectorStoreManager;
 
     public AgentFactoryTests()
     {
         _mockLogger = new Mock<ILogger<AgentFactory>>();
         _mockPromptService = new Mock<IPromptRenderingService>();
-        _mockClientFactory = new Mock<IAIProjectClientFactory>();
+        _mockClientFactory = new Mock<IProviderClientFactory>();
         _mockVectorStoreManager = new Mock<IVectorStoreManager>();
 
         // Default setup - HasConfiguration returns true
@@ -64,7 +64,7 @@ public class AgentFactoryTests
                     Type = "classification",
                     Enabled = true,
                     AutoDelete = true,
-                    AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                    Provider = "azure_foundry"
                 }
             }
         };
@@ -239,7 +239,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "" }
+                Provider = ""
             }
         };
 
@@ -268,7 +268,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "non_existent_provider" }
+                Provider = "non_existent_provider"
             }
         };
 
@@ -326,7 +326,7 @@ public class AgentFactoryTests
             {
                 Type = "classification_type",
                 Enabled = true,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -355,7 +355,7 @@ public class AgentFactoryTests
             {
                 Type = "direct_classification",
                 Enabled = true,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -383,7 +383,7 @@ public class AgentFactoryTests
             ["other_agent"] = new AgentDefinitionOptions
             {
                 Type = "other",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -425,12 +425,12 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "from_suffix",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             },
             ["classification"] = new AgentDefinitionOptions
             {
                 Type = "from_exact",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -524,7 +524,7 @@ public class AgentFactoryTests
             [$"{agentKey}_agent"] = new AgentDefinitionOptions
             {
                 Type = "test",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -792,7 +792,7 @@ public class AgentFactoryTests
                 Type = "classification",
                 AutoDelete = false,
                 AutoCleanupResources = false,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -827,7 +827,7 @@ public class AgentFactoryTests
                 Type = "classification",
                 AutoDelete = true, // Will attempt agent cleanup
                 AutoCleanupResources = false,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -861,7 +861,7 @@ public class AgentFactoryTests
                 Type = "classification",
                 AutoDelete = true,
                 AutoCleanupResources = true, // Will attempt cleanup but VectorStoreId is null
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -895,7 +895,7 @@ public class AgentFactoryTests
                 Type = "classification",
                 AutoDelete = true,
                 AutoCleanupResources = false,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -928,7 +928,7 @@ public class AgentFactoryTests
                 Type = "classification",
                 AutoDelete = true,
                 AutoCleanupResources = true,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -975,7 +975,7 @@ public class AgentFactoryTests
             ["test_agent"] = new AgentDefinitionOptions
             {
                 Type = "test",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1018,7 +1018,7 @@ public class AgentFactoryTests
             {
                 Type = "classification",
                 AutoDelete = true,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1047,7 +1047,7 @@ public class AgentFactoryTests
             {
                 Type = "classification",
                 AutoDelete = false,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1076,7 +1076,7 @@ public class AgentFactoryTests
             {
                 Type = "classification",
                 AutoCleanupResources = true,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1105,7 +1105,7 @@ public class AgentFactoryTests
             {
                 Type = "classification",
                 Enabled = true,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1133,7 +1133,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "custom_classifier",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1161,7 +1161,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1177,8 +1177,8 @@ public class AgentFactoryTests
             CreateTelemetryOptions());
 
         // Assert
-        factory.AgentDefinition.AIFrameworkOptions.Should().NotBeNull();
-        factory.AgentDefinition.AIFrameworkOptions.Provider.Should().Be("azure_foundry");
+        factory.AgentDefinition.Provider.Should().NotBeNullOrWhiteSpace();
+        factory.AgentDefinition.Provider.Should().Be("azure_foundry");
     }
 
     #endregion
@@ -1210,7 +1210,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "openai" }
+                Provider = "openai"
             }
         };
 
@@ -1227,7 +1227,7 @@ public class AgentFactoryTests
 
         // Assert
         factory.Should().NotBeNull();
-        factory.AgentDefinition.AIFrameworkOptions.Provider.Should().Be("openai");
+        factory.AgentDefinition.Provider.Should().Be("openai");
     }
 
     [Fact(DisplayName = "Constructor should select correct provider from multiple options")]
@@ -1261,7 +1261,7 @@ public class AgentFactoryTests
             ["test_agent"] = new AgentDefinitionOptions
             {
                 Type = "test",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "provider_b" }
+                Provider = "provider_b"
             }
         };
 
@@ -1277,7 +1277,7 @@ public class AgentFactoryTests
             CreateTelemetryOptions());
 
         // Assert
-        factory.AgentDefinition.AIFrameworkOptions.Provider.Should().Be("provider_b");
+        factory.AgentDefinition.Provider.Should().Be("provider_b");
     }
 
     #endregion
@@ -1317,7 +1317,7 @@ public class AgentFactoryTests
             ["unknown_agent"] = new AgentDefinitionOptions
             {
                 Type = "unknown",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1526,7 +1526,7 @@ public class AgentFactoryTests
             ["different_agent"] = new AgentDefinitionOptions
             {
                 Type = "other",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1571,7 +1571,7 @@ public class AgentFactoryTests
             ["test_agent"] = new AgentDefinitionOptions
             {
                 Type = "test",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1653,7 +1653,7 @@ public class AgentFactoryTests
                 Type = "classification",
                 AutoDelete = false,
                 AutoCleanupResources = false,
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1835,12 +1835,12 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classifier",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             },
             ["extraction_agent"] = new AgentDefinitionOptions
             {
                 Type = "extractor",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1886,7 +1886,7 @@ public class AgentFactoryTests
             ["my_custom_agent_agent"] = new AgentDefinitionOptions
             {
                 Type = "custom",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1914,7 +1914,7 @@ public class AgentFactoryTests
             ["my-agent_agent"] = new AgentDefinitionOptions
             {
                 Type = "hyphenated",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1943,7 +1943,7 @@ public class AgentFactoryTests
             ["agent123_agent"] = new AgentDefinitionOptions
             {
                 Type = "numbered",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -1978,7 +1978,7 @@ public class AgentFactoryTests
             ["test_agent"] = new AgentDefinitionOptions
             {
                 Type = "test",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
             }
         };
 
@@ -2037,7 +2037,7 @@ public class AgentFactoryTests
             ["test_agent"] = new AgentDefinitionOptions
             {
                 Type = "test",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "missing_provider" }
+                Provider = "missing_provider"
             }
         };
 
@@ -2067,7 +2067,7 @@ public class AgentFactoryTests
             ["my_special_agent_agent"] = new AgentDefinitionOptions
             {
                 Type = "special",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "nonexistent" }
+                Provider = "nonexistent"
             }
         };
 
@@ -2100,7 +2100,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "   " }
+                Provider = "   "
             }
         };
 
@@ -2242,7 +2242,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Provider = "azure_foundry",
                 Metadata = new AgentMetadataOptions
                 {
                     Description = "Test agent",
@@ -2276,7 +2276,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Provider = "azure_foundry",
                 Metadata = new AgentMetadataOptions
                 {
                     Description = "Test agent",
@@ -2310,7 +2310,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Provider = "azure_foundry",
                 Metadata = new AgentMetadataOptions
                 {
                     Description = "Test agent with multiple tools",
@@ -2346,7 +2346,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Provider = "azure_foundry",
                 Metadata = new AgentMetadataOptions
                 {
                     Description = "Test agent",
@@ -2380,7 +2380,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" },
+                Provider = "azure_foundry",
                 Metadata = new AgentMetadataOptions
                 {
                     Description = "Test agent",
@@ -2414,7 +2414,7 @@ public class AgentFactoryTests
             ["classification_agent"] = new AgentDefinitionOptions
             {
                 Type = "classification",
-                AIFrameworkOptions = new AIFrameworkOptions { Provider = "azure_foundry" }
+                Provider = "azure_foundry"
                 // No Metadata explicitly set - should use default
             }
         };

@@ -40,6 +40,15 @@ public interface IAgentFactory
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates a specialized AI agent configured for a specific task without vector stores.
+    /// Use this overload for agents that don't require document search capabilities (e.g., local Ollama models).
+    /// Agent and thread are stored in properties for reuse.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>A configured AIAgent ready for task execution</returns>
+    Task<AIAgent> CreateAgentAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates a user message with the given context using Handlebars templates.
     /// Uses the agent key to retrieve the appropriate template and renders it as a ChatMessage.
     /// </summary>

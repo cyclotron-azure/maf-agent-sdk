@@ -13,7 +13,7 @@ This is a .NET 8.0 SDK for building AI agent workflows using Microsoft Agent Fra
 | `IAgentFactory` | `src/.../Agents/` | Creates ephemeral Azure AI Foundry agents with keyed DI |
 | `IVectorStoreManager` | `src/.../Services/` | Manages vector store lifecycle with indexing wait |
 | `IPromptRenderingService` | `src/.../Services/` | Handlebars template rendering for prompts |
-| `IPersistentAgentsClientFactory` | `src/.../Services/` | Creates Azure AI Foundry clients per provider |
+| `IProviderClientFactory` | `src/.../Services/` | Creates AI provider clients (Azure, Ollama) per provider |
 
 ### Data Flow
 
@@ -47,8 +47,7 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: false
-    framework_config:
-      provider: "azure_foundry"  # References providers: section
+    provider: "azure_foundry"  # References providers: section (flattened in v2.0.0)
     system_prompt_template: |
       Your instructions here with {{variables}}
     user_prompt_template: |

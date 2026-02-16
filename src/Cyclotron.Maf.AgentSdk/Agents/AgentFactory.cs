@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Middleware;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Azure.AI.Projects;
@@ -30,7 +31,7 @@ public class AgentFactory : IAgentFactory
 {
     private readonly ILogger<AgentFactory> _logger;
     private readonly IPromptRenderingService _promptService;
-    private readonly IAIProjectClientFactory _clientFactory;
+    private readonly IProviderClientFactory _clientFactory;
     private readonly IVectorStoreManager _vectorStoreManager;
     private readonly ModelProviderOptions _providerOptions;
     private readonly string _agentKey;
@@ -57,7 +58,7 @@ public class AgentFactory : IAgentFactory
         IPromptRenderingService promptService,
         IOptions<ModelProviderOptions> providerOptions,
         IOptions<AgentOptions> agentOptions,
-        IAIProjectClientFactory clientFactory,
+        IProviderClientFactory clientFactory,
         IVectorStoreManager vectorStoreManager,
         IOptions<TelemetryOptions> telemetryOptions)
     {
@@ -231,8 +232,8 @@ public class AgentFactory : IAgentFactory
             throw new ArgumentException("Vector store ID cannot be null or empty", nameof(vectorStoreId));
         }
 
-        // Get provider configuration from agent's framework_config
-        var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+        // Get provider configuration from agent's provider property
+        var providerName = _agentDefinition.Provider;
         if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
         {
             throw new InvalidOperationException(
@@ -317,17 +318,8 @@ public class AgentFactory : IAgentFactory
                 agentName,
                 providerName);
 
-            if (_telemetryOptions.Enabled && !string.IsNullOrWhiteSpace(_telemetryOptions.SourceName))
-            {
-                agent = agent.AsBuilder()
-                    .UseOpenTelemetry(
-                        _telemetryOptions.SourceName,
-                        configure =>
-                        {
-                            configure.EnableSensitiveData = _telemetryOptions.EnableSensitiveData;
-                        })
-                    .Build();
-            }
+            // Apply middleware using centralized helper
+            agent = ApplyMiddleware(agent);
 
             // Store agent and create session automatically
             Agent = agent;
@@ -350,6 +342,114 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <inheritdoc/>
+    public async Task<AIAgent> CreateAgentAsync(CancellationToken cancellationToken = default)
+    {
+        // Get provider configuration from agent's provider property
+        var providerName = _agentDefinition.Provider;
+        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
+        {
+            throw new InvalidOperationException(
+                $"Provider '{providerName}' referenced by agent '{_agentKey}' not found in configuration. " +
+                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
+        }
+
+        // Check if using local provider - not yet fully implemented
+        if (provider.IsLocalProvider())
+        {
+            throw new NotImplementedException(
+                $"Local provider '{provider.Type}' (Ollama) support is configured but not yet fully implemented in v2.0.0.\n" +
+                $"Agent: {_agentKey}\n" +
+                $"Provider configuration is valid. Ollama and other local providers will be fully supported in a future release.\n" +
+                $"For now, use Azure AI Foundry providers (azure_foundry or azure_openai) for full agent support.\n" +
+                $"To disable this agent, set enabled: false in agent.config.yaml under agents.{_agentKey}");
+        }
+
+        _logger.LogInformation(
+            "Creating {AgentKey} agent WITHOUT vector store with provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model})",
+            _agentKey,
+            providerName,
+            provider.Endpoint,
+            provider.GetEffectiveModel());
+
+        // Get system prompt (instructions) from prompt rendering service
+        var instructions = _promptService.RenderSystemPrompt(_agentKey);
+
+        // No tools configuration for agents without vector stores (e.g., Ollama)
+        // (BuildToolConfiguration returns List<AITool>, but we don't call it here)
+
+        // Create ephemeral agent with unique name
+        var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
+        var agentName = $"{namePrefix}-{Guid.NewGuid().ToString("N")[..8]}";
+
+        try
+        {
+            _logger.LogDebug(
+                "Creating {AgentKey} agent with name: {AgentName}, provider: {ProviderName}, model: {Model} (no tools configured)",
+                _agentKey,
+                agentName,
+                providerName,
+                provider.GetEffectiveModel());
+
+            // Get provider-specific client
+            var projectClient = _clientFactory.GetClient(providerName);
+
+            _logger.LogDebug(
+                "Creating {AgentKey} agent with configured version: {ConfiguredVersion}",
+                _agentKey,
+                _agentDefinition.Version ?? "(auto-generated)");
+
+            // Create agent using V2 versioned API with PromptAgentDefinition
+            var promptDefinition = new PromptAgentDefinition(model: provider.GetEffectiveModel())
+            {
+                Instructions = instructions,
+            };
+
+            var versionOptions = new AgentVersionCreationOptions(promptDefinition);
+            AgentVersion createdAgentVersion = await projectClient.Agents.CreateAgentVersionAsync(
+                agentName: agentName,
+                options: versionOptions,
+                cancellationToken: cancellationToken);
+
+            _createdAgentName = agentName;
+            _createdAgentVersion = createdAgentVersion.Version;
+
+            // Get the AIAgent from the created version
+            var agentRecord = projectClient.Agents.GetAgent(agentName).Value;
+            var agentReference = new AgentReference(agentRecord.Id);
+            AIAgent agent = projectClient.AsAIAgent(agentReference);
+            var agentId = agent.Id;
+
+            _logger.LogInformation(
+                "Created {AgentKey} agent WITHOUT vector store: {AgentId} (Name: {AgentName}, Provider: {ProviderName})",
+                _agentKey,
+                agentId,
+                agentName,
+                providerName);
+
+            // Apply middleware using centralized helper
+            agent = ApplyMiddleware(agent);
+
+            // Store agent and create session automatically
+            Agent = agent;
+            Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
+            VectorStoreId = null; // No vector store for this agent
+            _logger.LogDebug("Created session for {AgentKey} agent: {AgentId} (no vector store)", _agentKey, agentId);
+
+            return agent;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to create {AgentKey} agent WITHOUT vector store with provider '{ProviderName}'",
+                _agentKey,
+                providerName);
+
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteAgentAsync(CancellationToken cancellationToken = default)
     {
         if (Agent == null)
@@ -362,7 +462,7 @@ public class AgentFactory : IAgentFactory
 
         try
         {
-            var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+            var providerName = _agentDefinition.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
             if (TryParseAgentId(agentId, out var agentName, out var agentVersion))
             {
@@ -406,7 +506,7 @@ public class AgentFactory : IAgentFactory
 
         try
         {
-            var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+            var providerName = _agentDefinition.Provider;
             var projectClient = _clientFactory.GetClient(providerName);
 
             // V2 API: Session/conversation deletion is not directly supported via AIProjectClient
@@ -441,7 +541,7 @@ public class AgentFactory : IAgentFactory
         // Cleanup vector store if AutoCleanupResources is enabled
         if (_agentDefinition.AutoCleanupResources && !string.IsNullOrWhiteSpace(VectorStoreId))
         {
-            var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+            var providerName = _agentDefinition.Provider;
             _logger.LogInformation(
                 "Cleaning up vector store for {AgentKey}: {VectorStoreId}",
                 _agentKey,
@@ -569,13 +669,13 @@ public class AgentFactory : IAgentFactory
 
     private void ValidateProviderReference()
     {
-        var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+        var providerName = _agentDefinition.Provider;
 
         if (string.IsNullOrWhiteSpace(providerName))
         {
             throw new InvalidOperationException(
-                $"Agent '{_agentKey}' does not have a provider configured in framework_config.provider. " +
-                $"Please specify a provider reference in agent.config.yaml.");
+                $"Agent '{_agentKey}' does not have a provider configured. " +
+                $"Please specify a provider reference in agent.config.yaml (v2.0: use 'provider' property, not 'framework_config.provider').");
         }
 
         if (!_providerOptions.Providers.ContainsKey(providerName))
@@ -585,6 +685,27 @@ public class AgentFactory : IAgentFactory
                 $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}. " +
                 $"Please add '{providerName}' to the providers: section in agent.config.yaml.");
         }
+    }
+
+    /// <summary>
+    /// Applies middleware to the agent using centralized middleware helper.
+    /// Combines legacy TelemetryOptions with new MiddlewareConfiguration.
+    /// </summary>
+    private AIAgent ApplyMiddleware(AIAgent agent)
+    {
+        // Build middleware configuration from agent definition and telemetry options
+        var middlewareConfig = _agentDefinition.Middleware ?? new MiddlewareConfiguration();
+
+        // If TelemetryOptions are enabled, add/override OpenTelemetry configuration
+        if (_telemetryOptions.Enabled && !string.IsNullOrWhiteSpace(_telemetryOptions.SourceName))
+        {
+            middlewareConfig.OpenTelemetryOptions = new AgentOpenTelemetryOptions(
+                _telemetryOptions.SourceName,
+                configure => configure.EnableSensitiveData = _telemetryOptions.EnableSensitiveData);
+        }
+
+        // Apply middleware using centralized helper
+        return AgentMiddlewareHelper.ApplyMiddleware(agent, middlewareConfig, services: null);
     }
 
     private AgentDefinitionOptions GetAgentDefinition(AgentOptions agentOptions, string agentKey)

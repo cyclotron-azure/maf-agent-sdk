@@ -273,7 +273,7 @@ deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
 | `IVectorStoreManager` | Manages vector store lifecycle |
 | `IPdfToMarkdownConverter` | Converts PDF documents to markdown |
 | `IPromptRenderingService` | Renders Handlebars templates |
-| `IPersistentAgentsClientFactory` | Creates Azure AI Foundry clients |
+| `IProviderClientFactory` | Creates AI provider clients (Azure, Ollama) |
 | `IAzureFoundryCleanupService` | Cleans up Azure AI Foundry resources |
 
 ## Microsoft Learn Documentation

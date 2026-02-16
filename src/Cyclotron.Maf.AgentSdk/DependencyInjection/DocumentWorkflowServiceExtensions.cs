@@ -22,10 +22,10 @@ public static class DocumentWorkflowServiceExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddDocumentWorkflowServices(this IServiceCollection services)
     {
-        // Register PersistentAgentsClient factory as scoped service
-        services.AddScoped<IAIProjectClientFactory, AIProjectClientFactory>();
+        // Register provider client factory as scoped service (supports Azure and Ollama)
+        services.AddScoped<IProviderClientFactory, ProviderClientFactory>();
 
-        // Register vector store manager (now depends on IPersistentAgentsClientFactory)
+        // Register vector store manager (depends on IProviderClientFactory)
         services.AddScoped<IVectorStoreManager, VectorStoreManager>();
 
         // Register Azure Foundry cleanup service
@@ -71,7 +71,7 @@ public static class DocumentWorkflowServiceExtensions
                     sp.GetRequiredService<IPromptRenderingService>(),
                     sp.GetRequiredService<IOptions<ModelProviderOptions>>(),
                     sp.GetRequiredService<IOptions<AgentOptions>>(),
-                    sp.GetRequiredService<IAIProjectClientFactory>(),
+                    sp.GetRequiredService<IProviderClientFactory>(),
                     sp.GetRequiredService<IVectorStoreManager>(),
                     sp.GetRequiredService<IOptions<TelemetryOptions>>()));
         }

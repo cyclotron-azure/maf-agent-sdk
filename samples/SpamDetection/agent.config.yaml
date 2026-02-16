@@ -11,6 +11,15 @@ providers:
     timeout_seconds: 300
     max_retries: 3
 
+  # Ollama local provider example
+  # Demonstrates using open-source models running locally
+  ollama_local:
+    type: "ollama"
+    endpoint: "{OLLAMA_ENDPOINT}"
+    deployment_name: "{OLLAMA_MODEL}"
+    timeout_seconds: 120
+    max_retries: 2
+
 # PDF Content Analysis Configuration
 # Controls how PDF files are analyzed to detect content type (text-based, image-only, or mixed)
 pdf_content_analysis:
@@ -103,6 +112,51 @@ agents:
       - Classification: SPAM or NOT_SPAM
       - Confidence: High/Medium/Low
       - Reason: Brief explanation
+
+  # Ollama-based spam detector example
+  # Uses local open-source models for privacy-first spam detection
+  # NOTE: Ollama agents do NOT support Azure AI Foundry vector stores or tools
+  spam_detector_ollama:
+    type: "spam_detector_local"
+    enabled: false  # Set to true to use Ollama instead of Azure
+    auto_delete: true
+    auto_cleanup_resources: false  # No Azure resources to cleanup for local models
+    version: "1"
+
+    metadata:
+      description: "Local AI agent for spam detection using Ollama"
+      # NOTE: No tools configured - Ollama doesn't support Azure AI Foundry tools
+      # Vector stores (file_search) and code_interpreter are Azure-only features
+      # Ollama agents rely on the model's pre-trained knowledge only
+
+    framework_config:
+      provider: "ollama_local"  # References the Ollama provider
+
+    system_prompt_template: |
+      You are a spam detection assistant. Analyze messages and classify them as SPAM or NOT_SPAM.
+
+      When analyzing, consider:
+      - Phishing attempts and scams
+      - Unsolicited promotions
+      - Suspicious links or requests
+      - Urgency tactics and pressure
+      - Requests for personal information
+      - Poor grammar or spelling (though not always indicative)
+      - Unrealistic promises or offers
+
+      Respond with:
+      - Classification: SPAM or NOT_SPAM
+      - Confidence: High/Medium/Low
+      - Reason: Brief explanation (1-2 sentences)
+
+      Use your training knowledge to make accurate classifications. Keep responses concise.
+
+    user_prompt_template: |
+      Analyze this message and classify it as spam or not spam:
+
+      Message: {{message}}
+
+      Provide your classification, confidence level, and brief reason.
 
   invoice_extractor_agent:
     type: "invoice_extractor"

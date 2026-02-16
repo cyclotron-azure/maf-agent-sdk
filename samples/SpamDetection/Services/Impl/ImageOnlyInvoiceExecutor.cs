@@ -49,7 +49,7 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
             }
 
             // Create a vector store to satisfy file_search tool configuration even for image-only PDFs
-            var providerName = agentFactory.AgentDefinition.AIFrameworkOptions.Provider;
+            var providerName = agentFactory.AgentDefinition.Provider;
             _logger.LogInformation("Creating vector store for image-only invoice...");
             var vectorStoreId = await vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
                 providerName,

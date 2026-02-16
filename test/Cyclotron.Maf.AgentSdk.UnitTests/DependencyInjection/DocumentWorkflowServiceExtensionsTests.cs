@@ -18,8 +18,8 @@ public class DocumentWorkflowServiceExtensionsTests
 {
     #region AddDocumentWorkflowServices Tests
 
-    [Fact(DisplayName = "AddDocumentWorkflowServices should register IPersistentAgentsClientFactory as scoped")]
-    public void AddDocumentWorkflowServices_RegistersPersistentAgentsClientFactory()
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register IProviderClientFactory as scoped")]
+    public void AddDocumentWorkflowServices_RegistersProviderClientFactory()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -33,9 +33,9 @@ public class DocumentWorkflowServiceExtensionsTests
 
         // Assert
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetService<IAIProjectClientFactory>();
+        var service = scope.ServiceProvider.GetService<IProviderClientFactory>();
         service.Should().NotBeNull();
-        service.Should().BeOfType<AIProjectClientFactory>();
+        service.Should().BeOfType<ProviderClientFactory>();
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices should register IVectorStoreManager as scoped")]

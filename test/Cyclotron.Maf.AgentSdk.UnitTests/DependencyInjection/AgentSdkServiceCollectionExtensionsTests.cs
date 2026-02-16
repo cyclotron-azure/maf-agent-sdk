@@ -186,8 +186,8 @@ public class AgentSdkServiceCollectionExtensionsTests
         var options = serviceProvider.GetRequiredService<IOptions<AgentOptions>>();
         var agentDef = options.Value.Agents["test_agent"];
 
-        agentDef.AIFrameworkOptions.Should().NotBeNull();
-        agentDef.AIFrameworkOptions!.Provider.Should().Be("azure_foundry");
+        agentDef.Provider.Should().NotBeNullOrWhiteSpace();
+        agentDef.Provider.Should().Be("azure_foundry");
     }
 
     [Fact(DisplayName = "AddAgentOptions should use default values when not specified")]

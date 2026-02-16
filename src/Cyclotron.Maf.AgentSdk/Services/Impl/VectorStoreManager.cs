@@ -27,11 +27,11 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class VectorStoreManager(
     ILogger<VectorStoreManager> logger,
-    IAIProjectClientFactory clientFactory,
+    IProviderClientFactory clientFactory,
     IOptions<ModelProviderOptions> providerOptions) : IVectorStoreManager
 {
     private readonly ILogger<VectorStoreManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IAIProjectClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+    private readonly IProviderClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     private readonly VectorStoreIndexingOptions _indexingOptions = providerOptions?.Value?.VectorStoreIndexing ?? new VectorStoreIndexingOptions();
 
     /// <inheritdoc/>

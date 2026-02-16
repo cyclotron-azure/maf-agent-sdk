@@ -22,11 +22,27 @@ public static class SpamDetectionServiceCollectionExtensions
         // Add document workflow services (includes vector store, prompt rendering, PDF services, etc.)
         services.AddDocumentWorkflowServices();
 
-        // Register keyed agent factory for spam_detector
-        services.AddKeyedAgentFactories("spam_detector");
+        // Register keyed agent factories for both Azure and Ollama spam detectors
+        services.AddKeyedAgentFactories("spam_detector");          // Azure AI Foundry
+        services.AddKeyedAgentFactories("spam_detector_ollama");   // Ollama local
 
-        // Register the spam workflow service
-        services.AddScoped<ISpamWorkflow, SpamWorkflow>();
+        // Register both spam workflow services
+        services.AddScoped<SpamWorkflow>();         // Azure workflow (with vector stores)
+        services.AddScoped<OllamaSpamWorkflow>();   // Ollama workflow (no vector stores)
+
+        // Register a factory to choose the right spam workflow based on configuration
+        services.AddScoped<ISpamWorkflow>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            var provider = config["Workflow:SpamProvider"]?.ToLowerInvariant() ?? "azure";
+
+            return provider switch
+            {
+                "ollama" => sp.GetRequiredService<OllamaSpamWorkflow>(),
+                "azure" => sp.GetRequiredService<SpamWorkflow>(),
+                _ => sp.GetRequiredService<SpamWorkflow>() // Default to Azure
+            };
+        });
 
         // Register invoice extraction services
         services.AddInvoiceExtractionServices();

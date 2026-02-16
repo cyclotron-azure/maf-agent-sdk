@@ -65,6 +65,7 @@ public class ModelProviderDefinitionOptions
 
     /// <summary>
     /// Validates that the provider configuration is complete based on type.
+    /// Supported provider types: azure_foundry, azure_openai, ollama.
     /// </summary>
     public bool IsValid()
     {
@@ -79,6 +80,18 @@ public class ModelProviderDefinitionOptions
             return false;
         }
 
+        // ollama is a local provider - minimal validation required
+        if (Type.Equals("ollama", StringComparison.OrdinalIgnoreCase))
+        {
+            // Ollama requires endpoint and model name, no authentication
+            return !string.IsNullOrEmpty(Endpoint) && !string.IsNullOrEmpty(DeploymentName);
+        }
+
         return true;
     }
+
+    /// <summary>
+    /// Determines if this is a local provider (Ollama, etc.) that doesn't use cloud authentication.
+    /// </summary>
+    public bool IsLocalProvider() => Type.Equals("ollama", StringComparison.OrdinalIgnoreCase);
 }

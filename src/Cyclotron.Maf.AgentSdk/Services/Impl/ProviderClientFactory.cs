@@ -34,7 +34,7 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 
 /// <summary>
 /// Factory for creating <see cref="AIProjectClient"/> instances with provider-specific authentication.
-/// Supports multiple providers with different endpoints and authentication methods.
+/// Supports multiple providers (Azure AI Foundry, Azure OpenAI, Ollama) with different endpoints and authentication methods.
 /// Creates new client instances per scope to avoid state sharing in parallel processing.
 /// </summary>
 /// <remarks>
@@ -43,27 +43,28 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 /// <list type="bullet">
 /// <item><description><c>azure_foundry</c>: Uses <see cref="DefaultAzureCredential"/> for authentication.</description></item>
 /// <item><description><c>azure_openai</c>: Uses API key authentication via <see cref="AzureKeyCredentialAdapter"/>.</description></item>
+/// <item><description><c>ollama</c>: Local provider, no authentication required.</description></item>
 /// </list>
 /// </para>
 /// <para>
-/// The factory returns <see cref="AIProjectClient"/> instances from Azure.AI.Projects V2 API.
-/// Use the native client methods for agent operations instead of legacy PersistentAgentsClient.
+/// The factory returns <see cref="AIProjectClient"/> instances from Azure.AI.Projects V2 API for Azure providers
+/// and compatible clients for local providers.
 /// </para>
 /// </remarks>
-public class AIProjectClientFactory : IAIProjectClientFactory
+public class ProviderClientFactory : IProviderClientFactory
 {
-    private readonly ILogger<AIProjectClientFactory> _logger;
+    private readonly ILogger<ProviderClientFactory> _logger;
     private readonly ModelProviderOptions _providerOptions;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AIProjectClientFactory"/> class.
+    /// Initializes a new instance of the <see cref="ProviderClientFactory"/> class.
     /// </summary>
     /// <param name="logger">The logger instance.</param>
     /// <param name="providerOptions">The model provider configuration options.</param>
     /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when no providers are configured.</exception>
-    public AIProjectClientFactory(
-        ILogger<AIProjectClientFactory> logger,
+    public ProviderClientFactory(
+        ILogger<ProviderClientFactory> logger,
         IOptions<ModelProviderOptions> providerOptions)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -104,6 +105,14 @@ public class AIProjectClientFactory : IAIProjectClientFactory
             throw new InvalidOperationException(
                 $"Provider '{providerName}' configuration is invalid. " +
                 $"Type: {provider.Type}, Endpoint: {provider.Endpoint}, DeploymentName: {provider.DeploymentName}");
+        }
+
+        // Check for local providers (Ollama) - these are handled separately in AgentFactory
+        if (provider.IsLocalProvider())
+        {
+            throw new InvalidOperationException(
+                $"Local provider '{providerName}' should be handled separately in AgentFactory.CreateOllamaAgentAsync(). " +
+                $"This method should not be called for Ollama providers.");
         }
 
         _logger.LogInformation(

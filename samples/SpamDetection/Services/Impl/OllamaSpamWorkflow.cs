@@ -1,20 +1,18 @@
 using Cyclotron.Maf.AgentSdk.Agents;
-using Cyclotron.Maf.AgentSdk.Services;
 
 namespace SpamDetection.Services.Impl;
 
 /// <summary>
-/// Implementation of the spam detection workflow.
-/// Orchestrates vector store creation, agent setup, and message classification.
+/// Implementation of the spam detection workflow using local Ollama models.
+/// NOTE: Ollama agents do NOT support Azure AI Foundry vector stores or tools.
+/// This workflow relies solely on the model's pre-trained knowledge.
 /// </summary>
-public sealed class SpamWorkflow(
-    ILogger<SpamWorkflow> logger,
-    [FromKeyedServices("spam_detector")] IAgentFactory spamDetectorFactory,
-    IVectorStoreManager vectorStoreManager) : ISpamWorkflow
+public sealed class OllamaSpamWorkflow(
+    ILogger<OllamaSpamWorkflow> logger,
+    [FromKeyedServices("spam_detector_ollama")] IAgentFactory spamDetectorFactory) : ISpamWorkflow
 {
-    private readonly ILogger<SpamWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger<OllamaSpamWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IAgentFactory _spamDetectorFactory = spamDetectorFactory ?? throw new ArgumentNullException(nameof(spamDetectorFactory));
-    private readonly IVectorStoreManager _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
 
     /// <summary>
     /// Sample messages to test spam detection.
@@ -34,24 +32,24 @@ public sealed class SpamWorkflow(
     ];
 
     /// <summary>
-    /// Executes the complete spam detection workflow.
+    /// Executes the complete spam detection workflow using Ollama.
+    /// NOTE: No vector store creation - Ollama agents use only pre-trained knowledge.
     /// </summary>
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Starting Spam Detection Workflow...");
+        _logger.LogInformation("Starting Ollama Spam Detection Workflow (Local, Privacy-First)...");
+        _logger.LogInformation("NOTE: Using Ollama local model - no vector stores or training documents");
 
         try
         {
-            // Create a vector store with spam detection examples
-            var vectorStoreId = await CreateSpamExamplesVectorStoreAsync(cancellationToken);
+            // Create the Ollama spam detection agent WITHOUT vector store
+            // Ollama agents don't support Azure AI Foundry vector stores
+            await _spamDetectorFactory.CreateAgentAsync(cancellationToken);
 
-            // Create the spam detection agent
-            await _spamDetectorFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
-
-            _logger.LogInformation("Spam Detection Agent created successfully");
-            _logger.LogInformation("Testing {Count} sample messages...", TestMessages.Count);
+            _logger.LogInformation("Ollama Spam Detection Agent created successfully");
+            _logger.LogInformation("Testing {Count} sample messages using model's pre-trained knowledge...", TestMessages.Count);
             _logger.LogInformation(new string('=', 80));
-            _logger.LogInformation("SPAM DETECTION RESULTS");
+            _logger.LogInformation("OLLAMA SPAM DETECTION RESULTS (Local Model)");
             _logger.LogInformation(new string('=', 80));
 
             var correctPredictions = 0;
@@ -84,11 +82,11 @@ public sealed class SpamWorkflow(
             }
 
             _logger.LogInformation(new string('=', 80));
-            _logger.LogInformation("ACCURACY: {Correct}/{Total} ({Percentage:P0})", correctPredictions, totalPredictions, (double)correctPredictions / totalPredictions);
+            _logger.LogInformation("OLLAMA ACCURACY: {Correct}/{Total} ({Percentage:P0})", correctPredictions, totalPredictions, (double)correctPredictions / totalPredictions);
             _logger.LogInformation(new string('=', 80));
 
             _logger.LogInformation(
-                "Spam detection completed. Accuracy: {Correct}/{Total}",
+                "Ollama spam detection completed. Accuracy: {Correct}/{Total}",
                 correctPredictions,
                 totalPredictions);
 
@@ -101,19 +99,19 @@ public sealed class SpamWorkflow(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during spam detection");
+            _logger.LogError(ex, "Error during Ollama spam detection");
             return 1;
         }
         finally
         {
-            // Cleanup agent resources
+            // Cleanup agent resources (no Azure resources to clean for Ollama)
             await _spamDetectorFactory.CleanupAsync(cancellationToken);
-            _logger.LogInformation("Cleanup completed");
+            _logger.LogInformation("Ollama agent cleanup completed");
         }
     }
 
     /// <summary>
-    /// Classifies a message as spam or not spam.
+    /// Classifies a message as spam or not spam using Ollama.
     /// </summary>
     public async Task<SpamClassificationResult> ClassifyMessageAsync(string messageContent, CancellationToken cancellationToken)
     {
@@ -129,91 +127,6 @@ public sealed class SpamWorkflow(
         var responseText = response.Messages?.LastOrDefault()?.Text ?? string.Empty;
 
         return ParseClassificationResponse(responseText);
-    }
-
-    /// <summary>
-    /// Creates a vector store with spam detection training examples.
-    /// </summary>
-    private async Task<string> CreateSpamExamplesVectorStoreAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Creating vector store with spam examples...");
-
-        var providerName = _spamDetectorFactory.AgentDefinition.Provider;
-
-        // Get or create a shared vector store for spam detection training data
-        var vectorStoreId = await _vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
-            providerName,
-            key: "spam-detection-examples",
-            purpose: "Spam detection training examples",
-            name: "SpamDetectionExamples",
-            cancellationToken);
-
-        // Create a training document with spam examples
-        var trainingContent = GenerateTrainingDocument();
-
-        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(trainingContent));
-
-        await _vectorStoreManager.AddFileToVectorStoreAsync(
-            providerName,
-            vectorStoreId,
-            stream,
-            "spam_training_examples.md",
-            cancellationToken);
-
-        _logger.LogInformation("Vector store created with ID: {VectorStoreId}", vectorStoreId);
-
-        return vectorStoreId;
-    }
-
-    /// <summary>
-    /// Generates a training document with spam detection examples and guidelines.
-    /// </summary>
-    private static string GenerateTrainingDocument()
-    {
-        return """
-            # Spam Detection Training Examples
-
-            ## Common Spam Indicators
-
-            ### Financial Scams
-            - Messages promising large sums of money
-            - "You've won" or "Congratulations" with no context
-            - Requests for personal financial information
-            - Urgent calls to action regarding money
-
-            ### Phishing Attempts
-            - Suspicious links (shortened URLs, misspelled domains)
-            - Urgent account verification requests
-            - Messages impersonating known companies
-            - Threats of account suspension
-
-            ### Marketing Spam
-            - Unsolicited product promotions
-            - "Limited time offers" with excessive urgency
-            - Work-from-home schemes
-            - Weight loss or health product promotions
-
-            ## Examples of Spam Messages
-
-            1. "Congratulations! You've won $1,000,000 in our lottery!"
-            2. "URGENT: Verify your account now or face suspension!"
-            3. "Make money fast! $5000/day working from home!"
-            4. "Click here for exclusive deals you won't believe!"
-            5. "Your package delivery failed. Click to reschedule."
-
-            ## Examples of Legitimate Messages
-
-            1. "Hi, can we schedule a meeting for next week?"
-            2. "Please review the attached document when you have time."
-            3. "Thanks for your help with the project yesterday."
-            4. "The code review looks good, approved!"
-            5. "Reminder: Team standup at 10am tomorrow."
-
-            ## Classification Guidelines
-
-            - **SPAM**: Messages with deceptive intent, unsolicited promotions, or phishing attempts
-            - **NOT_SPAM**: Legitimate business communications, personal messages, or expected notifications
-            """;
     }
 
     /// <summary>

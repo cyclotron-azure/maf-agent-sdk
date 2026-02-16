@@ -82,14 +82,11 @@ public static class AgentSdkServiceCollectionExtensions
                             };
                         }
 
-                        // Bind AIFrameworkOptions section (maps from framework_config)
+                        // Bind Provider from framework_config section
                         var frameworkSection = agentSection.GetSection("framework_config");
                         if (frameworkSection.Exists())
                         {
-                            agentDef.AIFrameworkOptions = new AIFrameworkOptions
-                            {
-                                Provider = frameworkSection.GetValue<string>("provider") ?? string.Empty
-                            };
+                            agentDef.Provider = frameworkSection.GetValue<string>("provider") ?? string.Empty;
                         }
 
                         agents[agentSection.Key] = agentDef;

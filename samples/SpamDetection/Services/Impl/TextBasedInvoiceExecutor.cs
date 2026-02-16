@@ -41,7 +41,7 @@ public sealed class TextBasedInvoiceExecutor(ILogger<TextBasedInvoiceExecutor> l
             _logger.LogInformation("PDF converted to markdown. Length: {Length} characters", markdown.Length);
 
             // Step 2: Create vector store
-            var providerName = agentFactory.AgentDefinition.AIFrameworkOptions.Provider;
+            var providerName = agentFactory.AgentDefinition.Provider;
 
             _logger.LogInformation("Creating vector store...");
             var vectorStoreId = await vectorStoreManager.GetOrCreateSharedVectorStoreAsync(

@@ -15,12 +15,12 @@ namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 /// </summary>
 public class AzureFoundryCleanupServiceTests
 {
-    private readonly Mock<IAIProjectClientFactory> _mockClientFactory;
+    private readonly Mock<IProviderClientFactory> _mockClientFactory;
     private readonly Mock<ILogger<AIFoundryCleanupService>> _mockLogger;
 
     public AzureFoundryCleanupServiceTests()
     {
-        _mockClientFactory = new Mock<IAIProjectClientFactory>();
+        _mockClientFactory = new Mock<IProviderClientFactory>();
         _mockLogger = new Mock<ILogger<AIFoundryCleanupService>>();
     }
 
