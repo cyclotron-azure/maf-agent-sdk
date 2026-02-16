@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Middleware;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
+using Cyclotron.Maf.AgentSdk.Services.Impl;
 using Azure.AI.Projects;
 using Azure.AI.Projects.OpenAI;
 using Microsoft.Agents.AI;
@@ -37,6 +38,8 @@ public class AgentFactory : IAgentFactory
     private readonly string _agentKey;
     private readonly AgentDefinitionOptions _agentDefinition;
     private readonly TelemetryOptions _telemetryOptions;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILoggerFactory _loggerFactory;
     private string? _createdAgentName;
     private string? _createdAgentVersion;
 
@@ -51,6 +54,8 @@ public class AgentFactory : IAgentFactory
     /// <param name="clientFactory">The factory for creating Azure AI Foundry clients.</param>
     /// <param name="vectorStoreManager">The manager for vector store operations.</param>
     /// <param name="telemetryOptions">The telemetry configuration options.</param>
+    /// <param name="httpClientFactory">The HTTP client factory for creating clients to Ollama.</param>
+    /// <param name="loggerFactory">The logger factory for creating loggers.</param>
     /// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
     public AgentFactory(
         string agentKey,
@@ -60,13 +65,17 @@ public class AgentFactory : IAgentFactory
         IOptions<AgentOptions> agentOptions,
         IProviderClientFactory clientFactory,
         IVectorStoreManager vectorStoreManager,
-        IOptions<TelemetryOptions> telemetryOptions)
+        IOptions<TelemetryOptions> telemetryOptions,
+        IHttpClientFactory httpClientFactory,
+        ILoggerFactory loggerFactory)
     {
         _agentKey = agentKey ?? throw new ArgumentNullException(nameof(agentKey));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
         _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
 
         ArgumentNullException.ThrowIfNull(providerOptions, nameof(providerOptions));
         ArgumentNullException.ThrowIfNull(agentOptions, nameof(agentOptions));
@@ -353,15 +362,10 @@ public class AgentFactory : IAgentFactory
                 $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
         }
 
-        // Check if using local provider - not yet fully implemented
+        // Check if using local provider (Ollama) - create using ChatClientAgent pattern
         if (provider.IsLocalProvider())
         {
-            throw new NotImplementedException(
-                $"Local provider '{provider.Type}' (Ollama) support is configured but not yet fully implemented in v2.0.0.\n" +
-                $"Agent: {_agentKey}\n" +
-                $"Provider configuration is valid. Ollama and other local providers will be fully supported in a future release.\n" +
-                $"For now, use Azure AI Foundry providers (azure_foundry or azure_openai) for full agent support.\n" +
-                $"To disable this agent, set enabled: false in agent.config.yaml under agents.{_agentKey}");
+            return await CreateOllamaAgentAsync(provider, cancellationToken);
         }
 
         _logger.LogInformation(
@@ -449,6 +453,70 @@ public class AgentFactory : IAgentFactory
         }
     }
 
+    /// <summary>
+    /// Creates an AI agent for Ollama local models using OpenAI-compatible API.
+    /// </summary>
+    private async Task<AIAgent> CreateOllamaAgentAsync(
+        ModelProviderDefinitionOptions provider,
+        CancellationToken cancellationToken)
+    {
+        var providerName = _agentDefinition.Provider;
+
+        _logger.LogInformation(
+            "Creating {AgentKey} agent for Ollama provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model})",
+            _agentKey,
+            providerName,
+            provider.Endpoint,
+            provider.GetEffectiveModel());
+
+        try
+        {
+            // Get system prompt (instructions) from prompt rendering service
+            var instructions = _promptService.RenderSystemPrompt(_agentKey);
+
+            // Create Ollama chat client using OllamaChatClient
+            var httpClient = _httpClientFactory.CreateClient("ollama");
+            var ollamaLogger = _loggerFactory.CreateLogger<OllamaChatClient>();
+            var chatClient = new OllamaChatClient(httpClient, provider, ollamaLogger);
+
+            // Wrap chat client in ChatClientAgent to get full AIAgent capabilities
+            var chatClientLogger = _loggerFactory.CreateLogger<ChatClientAgent>();
+            var chatOptions = new ChatOptions { Instructions = instructions };
+            AIAgent agent = new ChatClientAgent(
+                chatClient,
+                instructions: instructions,
+                name: $"{_promptService.GetAgentNamePrefix(_agentKey)}-ollama",
+                loggerFactory: _loggerFactory);
+
+            _logger.LogInformation(
+                "Created {AgentKey} agent for Ollama provider '{ProviderName}' (Model: {Model})",
+                _agentKey,
+                providerName,
+                provider.GetEffectiveModel());
+
+            // Apply middleware using centralized helper
+            agent = ApplyMiddleware(agent);
+
+            // Store agent and create session automatically
+            Agent = agent;
+            Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
+            VectorStoreId = null; // No vector store for Ollama agents
+            _logger.LogDebug("Created session for {AgentKey} Ollama agent", _agentKey);
+
+            return agent;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to create {AgentKey} agent for Ollama provider '{ProviderName}'",
+                _agentKey,
+                providerName);
+
+            throw;
+        }
+    }
+
     /// <inheritdoc/>
     public async Task DeleteAgentAsync(CancellationToken cancellationToken = default)
     {
@@ -463,6 +531,14 @@ public class AgentFactory : IAgentFactory
         try
         {
             var providerName = _agentDefinition.Provider;
+
+            // Skip cleanup for Ollama local providers - they don't support agent deletion
+            if (IsOllamaProvider(providerName))
+            {
+                _logger.LogDebug("Skipping agent deletion for Ollama provider '{ProviderName}'", providerName);
+                return;
+            }
+
             var projectClient = _clientFactory.GetClient(providerName);
             if (TryParseAgentId(agentId, out var agentName, out var agentVersion))
             {
@@ -507,6 +583,14 @@ public class AgentFactory : IAgentFactory
         try
         {
             var providerName = _agentDefinition.Provider;
+
+            // Skip cleanup for Ollama local providers - they don't support session management
+            if (IsOllamaProvider(providerName))
+            {
+                _logger.LogDebug("Skipping session deletion for Ollama provider '{ProviderName}'", providerName);
+                return;
+            }
+
             var projectClient = _clientFactory.GetClient(providerName);
 
             // V2 API: Session/conversation deletion is not directly supported via AIProjectClient
@@ -733,5 +817,14 @@ public class AgentFactory : IAgentFactory
             Enabled = true,
             AutoDelete = true
         };
+    }
+
+    private bool IsOllamaProvider(string providerName)
+    {
+        // Check if the provider is for Ollama (local models that don't need cleanup)
+        return !string.IsNullOrWhiteSpace(providerName) &&
+               (providerName.Equals("ollama_local", StringComparison.OrdinalIgnoreCase) ||
+                providerName.Equals("ollama", StringComparison.OrdinalIgnoreCase) ||
+                providerName.StartsWith("ollama_", StringComparison.OrdinalIgnoreCase));
     }
 }

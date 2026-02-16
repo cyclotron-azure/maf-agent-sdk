@@ -22,6 +22,12 @@ public static class DocumentWorkflowServiceExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddDocumentWorkflowServices(this IServiceCollection services)
     {
+        // Register HttpClient factory for Ollama and other HTTP-based providers
+        services.AddHttpClient("ollama", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(300); // Default 5 minutes
+        });
+
         // Register provider client factory as scoped service (supports Azure and Ollama)
         services.AddScoped<IProviderClientFactory, ProviderClientFactory>();
 
@@ -73,7 +79,9 @@ public static class DocumentWorkflowServiceExtensions
                     sp.GetRequiredService<IOptions<AgentOptions>>(),
                     sp.GetRequiredService<IProviderClientFactory>(),
                     sp.GetRequiredService<IVectorStoreManager>(),
-                    sp.GetRequiredService<IOptions<TelemetryOptions>>()));
+                    sp.GetRequiredService<IOptions<TelemetryOptions>>(),
+                    sp.GetRequiredService<IHttpClientFactory>(),
+                    sp.GetRequiredService<ILoggerFactory>()));
         }
 
         return services;
