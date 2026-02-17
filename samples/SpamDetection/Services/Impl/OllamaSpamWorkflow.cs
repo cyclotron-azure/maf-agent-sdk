@@ -1,4 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Agents;
+using SpamDetection.Models;
 
 namespace SpamDetection.Services.Impl;
 

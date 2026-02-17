@@ -14,7 +14,7 @@ public static class AgentSdkServiceCollectionExtensions
 {
     /// <summary>
     /// Registers core AgentSdk services including configuration value substitution,
-    /// model provider options, agent options, telemetry, and PDF conversion.
+    /// model provider options, agent options, telemetry, and PDF processing.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -28,15 +28,9 @@ public static class AgentSdkServiceCollectionExtensions
 
         services.AddAgentOptions();
         services.AddTelemetryOptions();
-        services.AddPdfConversionOptions();
-        services.AddPdfContentAnalysisOptions();
-        services.AddPdfImageExtractionOptions();
 
-        // Register PDF to Markdown converter
-        services.AddSingleton<IPdfToMarkdownConverter, PdfPigMarkdownConverter>();
-
-        // Register PDF image extractor
-        services.AddKeyedSingleton<IPdfImageExtractor, PdfPigImageExtractor>("pdfpig");
+        // Register PDF services from AgentSdk.Pdf package
+        services.AddPdfServices();
 
         return services;
     }
@@ -178,93 +172,6 @@ public static class AgentSdkServiceCollectionExtensions
                 }
 
                 options.Providers = providers;
-            })
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers and configures <see cref="PdfConversionOptions"/> from the <c>PdfConversion:</c> section in configuration.
-    /// Controls PDF to Markdown conversion behavior and debug output settings.
-    /// Supports named options for multiple configurations.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddPdfConversionOptions(
-        this IServiceCollection services,
-        string? name = null)
-    {
-        name ??= string.Empty;
-
-        services.AddOptions<PdfConversionOptions>(name)
-            .Configure<IConfiguration>((options, configuration) =>
-            {
-                var pdfSection = configuration.GetSection(PdfConversionOptions.SectionName);
-                if (pdfSection.Exists())
-                {
-                    pdfSection.Bind(options);
-                }
-            })
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers and configures <see cref="PdfContentAnalysisOptions"/> from the <c>PdfContentAnalysis:</c> section in configuration.
-    /// Controls PDF content analysis behavior, analyzer selection, and failure handling strategies.
-    /// Supports named options for multiple configurations.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddPdfContentAnalysisOptions(
-        this IServiceCollection services,
-        string? name = null)
-    {
-        name ??= string.Empty;
-
-        services.AddOptions<PdfContentAnalysisOptions>(name)
-            .Configure<IConfiguration>((options, configuration) =>
-            {
-                var analysisSection = configuration.GetSection(PdfContentAnalysisOptions.SectionName);
-                if (analysisSection.Exists())
-                {
-                    analysisSection.Bind(options);
-                }
-            })
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers and configures <see cref="PdfImageExtractionOptions"/> from the <c>PdfImageExtraction:</c> section in configuration.
-    /// Controls PDF image extraction behavior, format preferences, and performance characteristics.
-    /// Supports named options for multiple configurations.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddPdfImageExtractionOptions(
-        this IServiceCollection services,
-        string? name = null)
-    {
-        name ??= string.Empty;
-
-        services.AddOptions<PdfImageExtractionOptions>(name)
-            .Configure<IConfiguration>((options, configuration) =>
-            {
-                var extractionSection = configuration.GetSection(PdfImageExtractionOptions.SectionName);
-                if (extractionSection.Exists())
-                {
-                    extractionSection.Bind(options);
-                }
             })
             .ValidateDataAnnotations()
             .ValidateOnStart();

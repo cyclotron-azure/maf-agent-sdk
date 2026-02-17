@@ -2,7 +2,7 @@ using Cyclotron.Maf.AgentSdk.Options;
 using AwesomeAssertions;
 using Xunit;
 
-namespace Cyclotron.Maf.AgentSdk.UnitTests.Options;
+namespace Cyclotron.Maf.AgentSdk.Pdf.UnitTests.Options;
 
 /// <summary>
 /// Unit tests for the <see cref="PdfImageExtractionOptions"/> class.

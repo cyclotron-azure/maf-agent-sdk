@@ -1,3 +1,5 @@
+using SpamDetection.Models;
+
 namespace SpamDetection.Services;
 
 /// <summary>
@@ -22,7 +24,3 @@ public interface ISpamWorkflow
     Task<SpamClassificationResult> ClassifyMessageAsync(string messageContent, CancellationToken cancellationToken);
 }
 
-/// <summary>
-/// Represents the result of spam classification.
-/// </summary>
-public sealed record SpamClassificationResult(string Classification, double Confidence, string Reason);

@@ -110,9 +110,9 @@ public class ProviderClientFactory : IProviderClientFactory
         // Check for local providers (Ollama) - these are handled separately in AgentFactory
         if (provider.IsLocalProvider())
         {
-            throw new InvalidOperationException(
-                $"Local provider '{providerName}' should be handled separately in AgentFactory.CreateOllamaAgentAsync(). " +
-                $"This method should not be called for Ollama providers.");
+            throw new NotImplementedException(
+                $"Local provider '{provider.Type}' support is configured but not yet implemented in ProviderClientFactory. " +
+                $"Ollama providers should be handled separately in AgentFactory.CreateOllamaAgentAsync().");
         }
 
         _logger.LogInformation(

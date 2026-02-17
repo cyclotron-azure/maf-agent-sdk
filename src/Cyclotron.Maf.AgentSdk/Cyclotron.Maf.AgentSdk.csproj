@@ -3,8 +3,8 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>AgentSdk</PackageId>
-    <Description>A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF) and Azure AI Foundry. Provides workflow orchestration, agent factories, vector store management, PDF processing, and OpenTelemetry integration.</Description>
-    <PackageTags>ai;agents;azure;azure-ai;workflow;opentelemetry;maf;document-processing;vector-store</PackageTags>
+    <Description>A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF) and Azure AI Foundry. Provides workflow orchestration, agent factories, vector store management, and OpenTelemetry integration.</Description>
+    <PackageTags>ai;agents;azure;azure-ai;workflow;opentelemetry;maf;vector-store</PackageTags>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
@@ -51,12 +51,15 @@
 
   <!-- Utility Packages -->
   <ItemGroup>
-    <PackageReference Include="System.Drawing.Common" />
-    <PackageReference Include="PdfPig" />
     <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="NetEscapades.Configuration.Yaml" />
     <PackageReference Include="Polly.Core" />
+  </ItemGroup>
+
+  <!-- Project References -->
+  <ItemGroup>
+    <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Pdf/Cyclotron.Maf.AgentSdk.Pdf.csproj" />
   </ItemGroup>
 
   <!-- Package Content -->

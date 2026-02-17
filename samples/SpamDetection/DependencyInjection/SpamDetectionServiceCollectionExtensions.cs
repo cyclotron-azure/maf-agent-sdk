@@ -22,6 +22,23 @@ public static class SpamDetectionServiceCollectionExtensions
         // Add document workflow services (includes vector store, prompt rendering, PDF services, etc.)
         services.AddDocumentWorkflowServices();
 
+        // Register spam detection services
+        services.AddSpamDetectionServices();
+
+        // Register invoice extraction services
+        services.AddInvoiceExtractionServices();
+
+        // Register the main application entry point
+        services.AddScoped<IMain, Main>();
+    }
+
+    /// <summary>
+    /// Configures all services required for the spam detection workflow, including both Azure AI Foundry and Ollama implementations.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddSpamDetectionServices(this IServiceCollection services)
+    {
         // Register keyed agent factories for both Azure and Ollama spam detectors
         services.AddKeyedAgentFactories("spam_detector");          // Azure AI Foundry
         services.AddKeyedAgentFactories("spam_detector_ollama");   // Ollama local
@@ -44,10 +61,27 @@ public static class SpamDetectionServiceCollectionExtensions
             };
         });
 
-        // Register invoice extraction services
-        services.AddInvoiceExtractionServices();
+        return services;
+    }
 
-        // Register the main application entry point
-        services.AddScoped<IMain, Main>();
+    /// <summary>
+    /// Configures all services required for the invoice extraction workflow.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddInvoiceExtractionServices(this IServiceCollection services)
+    {
+        // Register keyed agent factory for invoice_extractor
+        services.AddKeyedAgentFactories("invoice_extractor");
+
+        // Register the three executors as transient services
+        services.AddTransient<TextBasedInvoiceExecutor>();
+        services.AddTransient<ImageOnlyInvoiceExecutor>();
+        services.AddTransient<MixedInvoiceExecutor>();
+
+        // Register the invoice extraction workflow service
+        services.AddScoped<IInvoiceExtractionWorkflow, InvoiceExtractionWorkflow>();
+
+        return services;
     }
 }

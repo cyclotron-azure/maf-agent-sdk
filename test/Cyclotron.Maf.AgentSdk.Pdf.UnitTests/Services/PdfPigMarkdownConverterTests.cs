@@ -3,7 +3,7 @@ using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
-using Cyclotron.Maf.AgentSdk.UnitTests.TestFixtures;
+using Cyclotron.Maf.AgentSdk.Pdf.UnitTests.TestFixtures;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,7 +11,7 @@ using Moq;
 using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
 
-namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
+namespace Cyclotron.Maf.AgentSdk.Pdf.UnitTests.Services;
 
 /// <summary>
 /// Unit tests for the <see cref="PdfPigMarkdownConverter"/> class.

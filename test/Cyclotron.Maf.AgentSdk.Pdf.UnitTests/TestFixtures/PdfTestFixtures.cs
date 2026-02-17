@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Cyclotron.Maf.AgentSdk.UnitTests.TestFixtures;
+namespace Cyclotron.Maf.AgentSdk.Pdf.UnitTests.TestFixtures;
 
 /// <summary>
 /// Provides minimal valid PDF test fixtures for unit testing.

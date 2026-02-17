@@ -6,22 +6,29 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 
-A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF) and Azure AI Foundry. Provides workflow orchestration, agent factories, vector store management, PDF processing, and OpenTelemetry integration.
+A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF) and Azure AI Foundry. Provides workflow orchestration, agent factories, vector store management, and OpenTelemetry integration.
+
+**For PDF processing features**, see [AgentSdk.Pdf](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
 ## Features
 
 - **Workflow Orchestration** - Build sequential executor pipelines using MAF's `Executor<TInput, TOutput>` pattern
 - **Agent Factory** - Create and manage ephemeral Azure AI Foundry agents with keyed DI support
 - **Vector Store Management** - Lifecycle management for Azure AI Foundry vector stores with automatic indexing wait
-- **PDF Processing** - Convert PDF documents to markdown using PdfPig for better text extraction
 - **Prompt Rendering** - Handlebars-based template rendering for dynamic agent prompts
 - **OpenTelemetry** - Built-in tracing, metrics, and logging with OTLP exporter support
 - **Configurable Tools** - Enable `file_search` and/or `code_interpreter` via YAML configuration
+- **Multi-Provider Support** - Azure AI Foundry and Ollama provider support
+
+For PDF processing features (image extraction, content analysis, markdown conversion), see [AgentSdk.Pdf](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
 ## Installation
 
 ```bash
-dotnet add package Cyclotron.Maf.AgentSdk
+dotnet add package AgentSdk
+
+# For PDF processing features
+dotnet add package AgentSdk.Pdf
 ```
 
 ## Session Management
@@ -240,17 +247,7 @@ deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
 }
 ```
 
-#### PDF Conversion Options
-
-```json
-{
-  "PdfConversion": {
-    "Enabled": true,
-    "SaveMarkdownForDebug": false,
-    "OutputDirectory": "./output"
-  }
-}
-```
+For PDF-related configuration options, see [AgentSdk.Pdf README](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
 ## Namespaces
 
@@ -271,10 +268,11 @@ deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
 |-----------|-------------|
 | `IAgentFactory` | Creates and manages Azure AI Foundry agents |
 | `IVectorStoreManager` | Manages vector store lifecycle |
-| `IPdfToMarkdownConverter` | Converts PDF documents to markdown |
 | `IPromptRenderingService` | Renders Handlebars templates |
 | `IProviderClientFactory` | Creates AI provider clients (Azure, Ollama) |
 | `IAzureFoundryCleanupService` | Cleans up Azure AI Foundry resources |
+
+For PDF processing interfaces, see [AgentSdk.Pdf README](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
 ## Microsoft Learn Documentation
 
@@ -326,9 +324,10 @@ var data = await context.ReadStateAsync<MyType>(
 | Microsoft.Agents.AI.AzureAI | 1.0.0-preview.251114.1 |
 | Microsoft.Extensions.AI | 10.0.0 |
 | OpenTelemetry | 1.9.0 |
-| PdfPig | 0.1.12 |
 | Handlebars.Net | 2.1.6 |
 | Polly.Core | 8.5.0 |
+
+For PDF processing dependencies (PdfPig, System.Drawing.Common), see [AgentSdk.Pdf](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
 ## Requirements
 

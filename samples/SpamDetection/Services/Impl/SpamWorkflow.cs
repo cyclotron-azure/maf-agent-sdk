@@ -1,5 +1,6 @@
 using Cyclotron.Maf.AgentSdk.Agents;
 using Cyclotron.Maf.AgentSdk.Services;
+using SpamDetection.Models;
 
 namespace SpamDetection.Services.Impl;
 

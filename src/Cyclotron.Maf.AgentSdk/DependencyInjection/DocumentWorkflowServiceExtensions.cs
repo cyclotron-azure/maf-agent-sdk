@@ -40,12 +40,8 @@ public static class DocumentWorkflowServiceExtensions
         // Register unified prompt rendering service
         services.AddSingleton<IPromptRenderingService, PromptRenderingService>();
 
-        // Register PDF content analyzers as keyed services for pluggable implementation support
-        services.AddKeyedSingleton<IPdfContentAnalyzer>(
-            "pdfpig",
-            (sp, _) => new PdfPigContentAnalyzer(
-                sp.GetRequiredService<ILogger<PdfPigContentAnalyzer>>(),
-                sp.GetRequiredService<IOptions<PdfContentAnalysisOptions>>()));
+        // Note: PDF services are registered via AddPdfServices() from AgentSdk.Pdf package
+        // PDF services include: IPdfContentAnalyzer, IPdfImageExtractor, IPdfToMarkdownConverter
 
         // Note: Domain-specific executors (FileRead, VectorStore, etc.) should be registered
         // by domain-specific packages (e.g., AgentSdk.HOA)

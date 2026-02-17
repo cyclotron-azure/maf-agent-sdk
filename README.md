@@ -13,7 +13,11 @@ A .NET SDK for building AI agent workflows using **Microsoft Agent Framework (MA
 ### Installation
 
 ```bash
-dotnet add package Cyclotron.Maf.AgentSdk
+# Core SDK
+dotnet add package AgentSdk
+
+# PDF processing extensions (optional)
+dotnet add package AgentSdk.Pdf
 ```
 
 ### Minimal Setup
@@ -72,29 +76,45 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o
 
 ## ✨ Features
 
+### Core SDK (AgentSdk)
+
 | Feature | Description |
 |---------|-------------|
 | **Workflow Orchestration** | Build sequential executor pipelines using MAF's `Executor<TInput, TOutput>` pattern |
 | **Agent Factory** | Create and manage ephemeral Azure AI Foundry agents with keyed DI support |
 | **Vector Store Management** | Lifecycle management with automatic indexing wait and exponential backoff |
-| **PDF Processing** | Convert PDF documents to markdown using PdfPig for better text extraction |
 | **Prompt Rendering** | Handlebars-based template rendering for dynamic agent prompts |
 | **OpenTelemetry** | Built-in tracing, metrics, and logging with OTLP exporter support |
 | **Configurable Tools** | Enable `file_search` and/or `code_interpreter` via YAML configuration |
+| **Multi-Provider Support** | Azure AI Foundry and Ollama provider support |
+
+### PDF Extensions (AgentSdk.Pdf)
+
+| Feature | Description |
+|---------|-------------|
+| **Content Analysis** | Automatic detection of PDF content type (TextBased, ImageOnly, Mixed) |
+| **Image Extraction** | Extract embedded images and render pages for vision model processing |
+| **Markdown Conversion** | Convert text-based PDFs to markdown using PdfPig with layout detection |
+| **Vision Model Ready** | Base64-encoded images compatible with Azure OpenAI GPT-4 Vision |
+
+See [AgentSdk.Pdf README](src/Cyclotron.Maf.AgentSdk.Pdf/README.md) for PDF processing documentation.
 
 ## 📁 Project Structure
 
 ```text
 maf-agent-sdk/
 ├── src/
-│   └── Cyclotron.Maf.AgentSdk/     # Main SDK library
+│   ├── Cyclotron.Maf.AgentSdk/     # Core SDK library
+│   └── Cyclotron.Maf.AgentSdk.Pdf/ # PDF processing extensions
 ├── samples/
-│   └── SpamDetection/              # Complete working example
+│   └── SpamDetection/              # Complete working example with PDF workflows
 ├── test/
-│   └── Cyclotron.Maf.AgentSdk.UnitTests/
+│   ├── Cyclotron.Maf.AgentSdk.UnitTests/
+│   └── Cyclotron.Maf.AgentSdk.Pdf.UnitTests/
 └── docs/
     ├── CICD.md                     # CI/CD and versioning
-    └── TELEMETRY.md                # Observability setup
+    ├── TELEMETRY.md                # Observability setup
+    └── BREAKING-CHANGES-v2.0.0.md  # Migration guides
 ```
 
 ## 📖 Documentation
