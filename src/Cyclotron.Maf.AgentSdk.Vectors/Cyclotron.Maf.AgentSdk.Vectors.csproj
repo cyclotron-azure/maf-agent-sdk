@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- NuGet Package Metadata -->
+    <PackageId>AgentSdk.Vectors</PackageId>
+    <Description>Vector store management extensions for Cyclotron.Maf.AgentSdk. Provides vector store lifecycle management, file upload, and indexing operations for document processing workflows with Azure AI Foundry and OpenAI vector stores.</Description>
+    <PackageTags>ai;agents;vector-store;vector-search;rag;document-processing;azure-ai-foundry;openai;file-search;embeddings</PackageTags>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <!-- Expose internals to test project -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cyclotron.Maf.AgentSdk.Vectors.UnitTests" />
+  </ItemGroup>
+
+  <!-- Microsoft.Extensions Packages (minimal set for DI and configuration) -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+  </ItemGroup>
+
+  <!-- Microsoft Agent Framework Packages -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI.AzureAI" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+  </ItemGroup>
+
+  <!-- Azure AI and OpenAI Packages for Vector Store Operations -->
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.Projects" />
+    <PackageReference Include="OpenAI" />
+  </ItemGroup>
+
+  <!-- Polly for Retry Logic -->
+  <ItemGroup>
+    <PackageReference Include="Polly.Core" />
+  </ItemGroup>
+
+  <!-- Package Content -->
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

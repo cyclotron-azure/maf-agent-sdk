@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Services;
 using SpamDetection;
 using SpamDetection.Services;
 using SpamDetection.Services.Impl;
@@ -19,7 +20,11 @@ public static class SpamDetectionServiceCollectionExtensions
         // Add core AgentSdk services
         services.AddAgentSdkServices();
 
-        // Add document workflow services (includes vector store, prompt rendering, PDF services, etc.)
+        // Add vector store services from the Vectors package
+        services.AddVectorStoreServices(sp =>
+            providerName => sp.GetRequiredService<IProviderClientFactory>().GetClient(providerName));
+
+        // Add document workflow services (includes prompt rendering, PDF services, etc.)
         services.AddDocumentWorkflowServices();
 
         // Register spam detection services

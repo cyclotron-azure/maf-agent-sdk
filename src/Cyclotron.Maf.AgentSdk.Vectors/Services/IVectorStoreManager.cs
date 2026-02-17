@@ -1,4 +1,4 @@
-namespace Cyclotron.Maf.AgentSdk.Services;
+namespace Cyclotron.Maf.AgentSdk.VectorStore.Services;
 
 /// <summary>
 /// Manages vector store lifecycle for AI agent document processing workflows.

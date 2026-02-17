@@ -5,12 +5,14 @@ PDF processing extensions for [Cyclotron.Maf.AgentSdk](../Cyclotron.Maf.AgentSdk
 ## Features
 
 ### 📄 PDF Content Analysis
+
 - **Automatic content type detection** - Classifies PDFs as TextBased, ImageOnly, or Mixed
 - **Configurable thresholds** - Customizable text/image ratio for classification
 - **Page-level analysis** - Per-page statistics and diagnostics
 - **Pluggable analyzers** - Keyed DI pattern for custom implementations
 
 ### 🖼️ PDF Image Extraction
+
 - **Embedded image extraction** - Extract XObject images from PDF pages
 - **Image rendering** - Rasterize image-only pages for vision models
 - **Format conversion** - PNG, JPEG output with configurable quality
@@ -19,6 +21,7 @@ PDF processing extensions for [Cyclotron.Maf.AgentSdk](../Cyclotron.Maf.AgentSdk
 - **Platform support** - Cross-platform with libgdiplus on Linux
 
 ### 📝 PDF to Markdown Conversion
+
 - **Smart layout detection** - Uses DocstrumBoundingBoxes for text block detection
 - **Reading order preservation** - Maintains logical document flow
 - **Debug output** - Optional markdown file saving for troubleshooting

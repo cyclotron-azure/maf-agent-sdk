@@ -1,14 +1,15 @@
-using Cyclotron.Maf.AgentSdk.Options;
+using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using Azure.AI.Projects;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Files;
-using OpenAI.VectorStores;
 using System.ClientModel;
+using OpenAIVectorStore = OpenAI.VectorStores.VectorStore;
+using OpenAIVectorStoreStatus = OpenAI.VectorStores.VectorStoreFileStatus;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 
-namespace Cyclotron.Maf.AgentSdk.Services.Impl;
+namespace Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 
 /// <summary>
 /// Manages vector store lifecycle for AI agent document processing workflows using Azure.AI.Projects V2 API.
@@ -27,12 +28,12 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class VectorStoreManager(
     ILogger<VectorStoreManager> logger,
-    IProviderClientFactory clientFactory,
-    IOptions<ModelProviderOptions> providerOptions) : IVectorStoreManager
+    Func<string, AIProjectClient> clientFactory,
+    IOptions<VectorStoreIndexingOptions> indexingOptions) : IVectorStoreManager
 {
     private readonly ILogger<VectorStoreManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IProviderClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-    private readonly VectorStoreIndexingOptions _indexingOptions = providerOptions?.Value?.VectorStoreIndexing ?? new VectorStoreIndexingOptions();
+    private readonly Func<string, AIProjectClient> _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+    private readonly VectorStoreIndexingOptions _indexingOptions = indexingOptions?.Value ?? new VectorStoreIndexingOptions();
 
     /// <inheritdoc/>
     public async Task<string> GetOrCreateSharedVectorStoreAsync(
@@ -44,7 +45,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var projectClient = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory(providerName);
             var openAIClient = projectClient.GetProjectOpenAIClient();
             var vectorStoreClient = openAIClient.GetVectorStoreClient();
 
@@ -55,7 +56,7 @@ public class VectorStoreManager(
             // Note: Metadata is read-only in SDK, so we can't set custom metadata via creation options
             // Metadata would need to be set via separate update call if supported
 
-            ClientResult<VectorStore> vectorStoreResponse = await vectorStoreClient.CreateVectorStoreAsync(
+            ClientResult<OpenAIVectorStore> vectorStoreResponse = await vectorStoreClient.CreateVectorStoreAsync(
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation("Created vector store: {VectorStoreId}", vectorStoreResponse.Value.Id);
@@ -75,7 +76,7 @@ public class VectorStoreManager(
         string vectorStoreId,
         CancellationToken cancellationToken = default)
     {
-        var projectClient = _clientFactory.GetClient(providerName);
+        var projectClient = _clientFactory(providerName);
         var openAIClient = projectClient.GetProjectOpenAIClient();
         var vectorStoreClient = openAIClient.GetVectorStoreClient();
         var fileClient = openAIClient.GetOpenAIFileClient();
@@ -119,7 +120,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var projectClient = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory(providerName);
             var openAIClient = projectClient.GetProjectOpenAIClient();
             var fileClient = openAIClient.GetOpenAIFileClient();
             var vectorStoreClient = openAIClient.GetVectorStoreClient();
@@ -187,7 +188,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var projectClient = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory(providerName);
             var openAIClient = projectClient.GetProjectOpenAIClient();
             var fileClient = openAIClient.GetOpenAIFileClient();
             var vectorStoreClient = openAIClient.GetVectorStoreClient();
@@ -275,7 +276,7 @@ public class VectorStoreManager(
     /// <exception cref="InvalidOperationException">Thrown when file indexing fails.</exception>
     /// <exception cref="OperationCanceledException">Thrown when file indexing is cancelled.</exception>
     /// <exception cref="TimeoutException">Thrown when indexing times out after max attempts.</exception>
-    public async Task WaitForFileProcessingAsync(
+    internal async Task WaitForFileProcessingAsync(
         string providerName,
         string vectorStoreId,
         string fileId,
@@ -283,7 +284,7 @@ public class VectorStoreManager(
     {
         try
         {
-            var projectClient = _clientFactory.GetClient(providerName);
+            var projectClient = _clientFactory(providerName);
             var openAIClient = projectClient.GetProjectOpenAIClient();
             var vectorStoreClient = openAIClient.GetVectorStoreClient();
 
@@ -318,7 +319,7 @@ public class VectorStoreManager(
                     maxAttempts,
                     currentDelayMs);
 
-                if (status == VectorStoreFileStatus.Completed)
+                if (status == OpenAIVectorStoreStatus.Completed)
                 {
                     _logger.LogInformation(
                         "File {FileId} indexing completed successfully after {Attempts} attempts",
@@ -327,14 +328,14 @@ public class VectorStoreManager(
                     return;
                 }
 
-                if (status == VectorStoreFileStatus.Failed)
+                if (status == OpenAIVectorStoreStatus.Failed)
                 {
                     var errorMessage = $"File indexing failed for {fileId} in vector store {vectorStoreId}";
                     _logger.LogError(errorMessage);
                     throw new InvalidOperationException(errorMessage);
                 }
 
-                if (status == VectorStoreFileStatus.Cancelled)
+                if (status == OpenAIVectorStoreStatus.Cancelled)
                 {
                     var errorMessage = $"File indexing was cancelled for {fileId} in vector store {vectorStoreId}";
                     _logger.LogWarning(errorMessage);

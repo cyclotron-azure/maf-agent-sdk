@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Models.Workflow;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
+using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using Cyclotron.Maf.AgentSdk.Workflows.Executors;
 using AwesomeAssertions;
 using Microsoft.Agents.AI.Workflows;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
+using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Workflows.Executors;
 
@@ -55,19 +57,18 @@ public class CleanupExecutorTests
 
     #region Constructor Tests
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when vectorStoreManager is null")]
-    public void Constructor_NullVectorStoreManager_ThrowsArgumentNullException()
+    [Fact(DisplayName = "Constructor should accept null vectorStoreManager (optional)")]
+    public void Constructor_NullVectorStoreManager_IsValid()
     {
         // Act
-        var act = () => new CleanupExecutor<TestCleanupableResult>(
-            null!,
+        var executor = new CleanupExecutor<TestCleanupableResult>(
+            null,
             _mockCleanupService.Object,
             _mockLogger.Object,
             _providerOptions);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("vectorStoreManager");
+        executor.Should().NotBeNull();
     }
 
     [Fact(DisplayName = "Constructor should throw ArgumentNullException when cleanupService is null")]

@@ -2,11 +2,15 @@ using Cyclotron.Maf.AgentSdk.Agents;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
+using Cyclotron.Maf.AgentSdk.VectorStore.Services;
+using Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
+using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
+using VectorStoreManagerImpl = Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl.VectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.DependencyInjection;
 
@@ -38,8 +42,8 @@ public class DocumentWorkflowServiceExtensionsTests
         service.Should().BeOfType<ProviderClientFactory>();
     }
 
-    [Fact(DisplayName = "AddDocumentWorkflowServices should register IVectorStoreManager as scoped")]
-    public void AddDocumentWorkflowServices_RegistersVectorStoreManager()
+    [Fact(DisplayName = "AddDocumentWorkflowServices does not require IVectorStoreManager (optional)")]
+    public void AddDocumentWorkflowServices_VectorStoreManagerIsOptional()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -51,11 +55,10 @@ public class DocumentWorkflowServiceExtensionsTests
         services.AddDocumentWorkflowServices();
         var serviceProvider = services.BuildServiceProvider();
 
-        // Assert
+        // Assert - VectorStoreManager is NOT registered, it's optional
         using var scope = serviceProvider.CreateScope();
         var service = scope.ServiceProvider.GetService<IVectorStoreManager>();
-        service.Should().NotBeNull();
-        service.Should().BeOfType<VectorStoreManager>();
+        service.Should().BeNull(); // This is by design - it's optional
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices should register IAzureFoundryCleanupService as scoped")]

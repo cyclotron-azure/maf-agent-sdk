@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Agents;
-using Cyclotron.Maf.AgentSdk.Services;
+using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using SpamDetection.Models;
+using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace SpamDetection.Services.Impl;
 

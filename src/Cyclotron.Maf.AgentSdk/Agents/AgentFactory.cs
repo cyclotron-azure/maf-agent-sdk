@@ -11,6 +11,9 @@ using Microsoft.Extensions.Options;
 using OpenAI.Responses;
 using Polly;
 using Polly.Retry;
+using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
+
+#pragma warning disable CS0618 // Type or member is obsolete
 
 namespace Cyclotron.Maf.AgentSdk.Agents;
 
@@ -33,7 +36,7 @@ public class AgentFactory : IAgentFactory
     private readonly ILogger<AgentFactory> _logger;
     private readonly IPromptRenderingService _promptService;
     private readonly IProviderClientFactory _clientFactory;
-    private readonly IVectorStoreManager _vectorStoreManager;
+    private readonly VectorStoreManager? _vectorStoreManager;
     private readonly ModelProviderOptions _providerOptions;
     private readonly string _agentKey;
     private readonly AgentDefinitionOptions _agentDefinition;
@@ -52,7 +55,7 @@ public class AgentFactory : IAgentFactory
     /// <param name="providerOptions">The model provider configuration options.</param>
     /// <param name="agentOptions">The agent configuration options.</param>
     /// <param name="clientFactory">The factory for creating Azure AI Foundry clients.</param>
-    /// <param name="vectorStoreManager">The manager for vector store operations.</param>
+    /// <param name="vectorStoreManager">Optional manager for vector store operations. If null, vector store functionality will be disabled.</param>
     /// <param name="telemetryOptions">The telemetry configuration options.</param>
     /// <param name="httpClientFactory">The HTTP client factory for creating clients to Ollama.</param>
     /// <param name="loggerFactory">The logger factory for creating loggers.</param>
@@ -64,7 +67,7 @@ public class AgentFactory : IAgentFactory
         IOptions<ModelProviderOptions> providerOptions,
         IOptions<AgentOptions> agentOptions,
         IProviderClientFactory clientFactory,
-        IVectorStoreManager vectorStoreManager,
+        VectorStoreManager? vectorStoreManager,
         IOptions<TelemetryOptions> telemetryOptions,
         IHttpClientFactory httpClientFactory,
         ILoggerFactory loggerFactory)
@@ -73,7 +76,7 @@ public class AgentFactory : IAgentFactory
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-        _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
+        _vectorStoreManager = vectorStoreManager; // Optional - can be null
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
 
@@ -239,6 +242,13 @@ public class AgentFactory : IAgentFactory
         if (string.IsNullOrWhiteSpace(vectorStoreId))
         {
             throw new ArgumentException("Vector store ID cannot be null or empty", nameof(vectorStoreId));
+        }
+
+        if (_vectorStoreManager == null)
+        {
+            throw new InvalidOperationException(
+                "IVectorStoreManager is not registered. Vector store functionality requires the AgentSdk.Vectors package. " +
+                "Add a package reference to AgentSdk.Vectors and call AddVectorStoreServices() in your startup configuration.");
         }
 
         // Get provider configuration from agent's provider property
@@ -623,7 +633,7 @@ public class AgentFactory : IAgentFactory
         }
 
         // Cleanup vector store if AutoCleanupResources is enabled
-        if (_agentDefinition.AutoCleanupResources && !string.IsNullOrWhiteSpace(VectorStoreId))
+        if (_agentDefinition.AutoCleanupResources && !string.IsNullOrWhiteSpace(VectorStoreId) && _vectorStoreManager != null)
         {
             var providerName = _agentDefinition.Provider;
             _logger.LogInformation(
@@ -654,6 +664,11 @@ public class AgentFactory : IAgentFactory
                 VectorStoreId = null;
             }
         }
+        else if (_agentDefinition.AutoCleanupResources && _vectorStoreManager == null)
+        {
+            _logger.LogWarning(
+                "Vector store cleanup requested but IVectorStoreManager is not registered. Add AgentSdk.Vectors package and call AddVectorStoreServices() to enable vector store support.");
+        }
         else if (_agentDefinition.AutoCleanupResources)
         {
             _logger.LogDebug("No vector store to clean up for {AgentKey}", _agentKey);
@@ -677,13 +692,20 @@ public class AgentFactory : IAgentFactory
         var tools = new List<AITool>();
         var configuredTools = _agentDefinition.Metadata.Tools;
 
-        // Default to file_search if no tools are configured
-        if (configuredTools.Count == 0)
+        // Default to file_search if no tools are configured and vector store manager is available
+        if (configuredTools.Count == 0 && _vectorStoreManager != null)
         {
             _logger.LogDebug(
                 "No tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
             configuredTools = ["file_search"];
+        }
+        else if (configuredTools.Count == 0)
+        {
+            _logger.LogDebug(
+                "No tools configured for {AgentKey} and vector store manager not available - no tools will be added",
+                _agentKey);
+            return tools;
         }
 
         foreach (var tool in configuredTools)
@@ -691,6 +713,14 @@ public class AgentFactory : IAgentFactory
             switch (tool.ToLowerInvariant())
             {
                 case "file_search":
+                    if (_vectorStoreManager == null)
+                    {
+                        _logger.LogWarning(
+                            "file_search tool requested for {AgentKey} but IVectorStoreManager is not registered. " +
+                            "Add AgentSdk.Vectors package and call AddVectorStoreServices() to enable vector store support. Skipping file_search tool.",
+                            _agentKey);
+                        continue;
+                    }
                     var fileSearchTool = new HostedFileSearchTool();
                     fileSearchTool.Inputs ??= [];
                     fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
@@ -712,8 +742,8 @@ public class AgentFactory : IAgentFactory
             }
         }
 
-        // Ensure at least one tool is configured
-        if (tools.Count == 0)
+        // Only ensure at least one tool if vector store manager is available
+        if (tools.Count == 0 && _vectorStoreManager != null && configuredTools.Any(t => t.Equals("file_search", StringComparison.OrdinalIgnoreCase)))
         {
             _logger.LogWarning(
                 "No valid tools configured for {AgentKey}, defaulting to file_search",

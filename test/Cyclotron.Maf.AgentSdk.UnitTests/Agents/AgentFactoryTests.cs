@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Agents;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
+using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using AwesomeAssertions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
+using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Agents;
 
@@ -166,25 +168,24 @@ public class AgentFactoryTests
             .WithParameterName("clientFactory");
     }
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when vectorStoreManager is null")]
-    public void Constructor_NullVectorStoreManager_ThrowsArgumentNullException()
+    [Fact(DisplayName = "Constructor should accept null vectorStoreManager (optional)")]
+    public void Constructor_NullVectorStoreManager_IsValid()
     {
         // Act
-        var act = () => new AgentFactory(
+        var factory = new AgentFactory(
             "classification",
             _mockLogger.Object,
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
             _mockClientFactory.Object,
-            null!,
+            null,
             CreateTelemetryOptions(),
             _mockHttpClientFactory.Object,
             _mockLoggerFactory.Object);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("vectorStoreManager");
+        factory.Should().NotBeNull();
     }
 
     [Fact(DisplayName = "Constructor should throw ArgumentNullException when providerOptions is null")]

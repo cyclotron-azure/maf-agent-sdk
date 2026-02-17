@@ -60,6 +60,7 @@
   <!-- Project References -->
   <ItemGroup>
     <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Pdf/Cyclotron.Maf.AgentSdk.Pdf.csproj" />
+    <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Vectors/Cyclotron.Maf.AgentSdk.Vectors.csproj" />
   </ItemGroup>
 
   <!-- Package Content -->
