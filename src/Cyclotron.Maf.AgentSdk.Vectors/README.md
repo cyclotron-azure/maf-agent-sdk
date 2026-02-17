@@ -35,6 +35,7 @@ builder.Services.AddDocumentWorkflowServices();
 ### 2. Configure Vector Store Indexing Options
 
 **Recommended Configuration Path** (new):
+
 ```yaml
 # appsettings.json or agent.config.yaml
 VectorStoreIndexing:
@@ -45,6 +46,7 @@ VectorStoreIndexing:
 ```
 
 **Legacy Configuration Path** (still supported with deprecation warning):
+
 ```yaml
 ModelProvider:
   VectorStoreIndexing:
@@ -113,6 +115,7 @@ Controls the polling behavior when waiting for files to be indexed in the vector
 ### IVectorStoreManager
 
 #### GetOrCreateSharedVectorStoreAsync
+
 Gets an existing shared vector store or creates a new one.
 
 ```csharp
@@ -125,6 +128,7 @@ Task<string> GetOrCreateSharedVectorStoreAsync(
 ```
 
 #### AddFileToVectorStoreAsync
+
 Uploads a single file and waits for indexing to complete.
 
 ```csharp
@@ -137,6 +141,7 @@ Task<string> AddFileToVectorStoreAsync(
 ```
 
 #### AddFilesToVectorStoreAsync
+
 Uploads multiple files and waits for all to be indexed.
 
 ```csharp
@@ -148,6 +153,7 @@ Task<IReadOnlyList<string>> AddFilesToVectorStoreAsync(
 ```
 
 #### CleanupVectorStoreAsync
+
 Deletes a vector store and all associated files.
 
 ```csharp

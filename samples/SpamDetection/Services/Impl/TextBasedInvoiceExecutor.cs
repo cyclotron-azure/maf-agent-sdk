@@ -1,4 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Cyclotron.Maf.AgentSdk.Agents;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services;
@@ -64,6 +69,7 @@ public sealed class TextBasedInvoiceExecutor(ILogger<TextBasedInvoiceExecutor> l
                 vectorStoreId,
                 markdownStream,
                 $"{Path.GetFileNameWithoutExtension(fileName)}.md",
+                SimpleChunkingAsync,
                 cancellationToken);
 
             _logger.LogInformation("File uploaded with ID: {FileId}", fileId);
@@ -164,6 +170,23 @@ public sealed class TextBasedInvoiceExecutor(ILogger<TextBasedInvoiceExecutor> l
             {
                 ExtractionNotes = $"Parsing error: {ex.Message}"
             };
+        }
+    }
+
+    /// <summary>
+    /// Simple fixed-size chunking strategy for markdown documents.
+    /// </summary>
+    private static async IAsyncEnumerable<(string Text, string ChunkId)> SimpleChunkingAsync(
+        Stream stream,
+        string fileName)
+    {
+        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+        var text = await reader.ReadToEndAsync();
+        var chunkSize = 1000;
+        for (int i = 0; i < text.Length; i += chunkSize)
+        {
+            var chunkText = text.Substring(i, Math.Min(chunkSize, text.Length - i));
+            yield return (chunkText, $"{fileName}#{i / chunkSize}");
         }
     }
 }

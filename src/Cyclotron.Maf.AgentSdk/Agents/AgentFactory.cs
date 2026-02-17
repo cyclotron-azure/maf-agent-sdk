@@ -13,8 +13,6 @@ using Polly;
 using Polly.Retry;
 using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
-#pragma warning disable CS0618 // Type or member is obsolete
-
 namespace Cyclotron.Maf.AgentSdk.Agents;
 
 /// <summary>

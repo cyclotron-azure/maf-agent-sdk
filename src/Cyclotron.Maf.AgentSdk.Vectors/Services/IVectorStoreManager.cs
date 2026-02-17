@@ -39,13 +39,14 @@ public interface IVectorStoreManager
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Uploads a file to Azure AI Foundry and adds it to the specified vector store.
+    /// Uploads a file to the specified vector store, chunking it using the provided delegate.
     /// The method waits for the file to be fully indexed before returning.
     /// </summary>
-    /// <param name="providerName">Name of the model provider to use (e.g., "azure_foundry").</param>
+    /// <param name="providerName">Name of the model provider to use (e.g., "azure_foundry", "ollama").</param>
     /// <param name="vectorStoreId">The unique identifier of the target vector store.</param>
     /// <param name="fileContent">The stream containing the file content to upload.</param>
     /// <param name="fileName">The name of the file being uploaded.</param>
+    /// <param name="chunkingDelegate">A delegate that takes the file stream and name, returning an async enumerable of (text, chunkId) tuples. The delegate is responsible for document parsing and chunking.</param>
     /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
     /// <returns>
     /// A task that represents the asynchronous operation.
@@ -56,15 +57,17 @@ public interface IVectorStoreManager
         string vectorStoreId,
         Stream fileContent,
         string fileName,
+        Func<Stream, string, IAsyncEnumerable<(string Text, string ChunkId)>> chunkingDelegate,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Uploads multiple files to Azure AI Foundry and adds them to the specified vector store.
+    /// Uploads multiple files to the specified vector store, chunking them using the provided delegate.
     /// The method waits for all files to be fully indexed before returning.
     /// </summary>
-    /// <param name="providerName">Name of the model provider to use (e.g., "azure_foundry").</param>
+    /// <param name="providerName">Name of the model provider to use (e.g., "azure_foundry", "ollama").</param>
     /// <param name="vectorStoreId">The unique identifier of the target vector store.</param>
     /// <param name="files">A collection of tuples containing the file content stream and file name for each file to upload.</param>
+    /// <param name="chunkingDelegate">A delegate that takes the file stream and name, returning an async enumerable of (text, chunkId) tuples. The delegate is responsible for document parsing and chunking.</param>
     /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
     /// <returns>
     /// A task that represents the asynchronous operation.
@@ -74,5 +77,6 @@ public interface IVectorStoreManager
         string providerName,
         string vectorStoreId,
         IEnumerable<(Stream Content, string FileName)> files,
+        Func<Stream, string, IAsyncEnumerable<(string Text, string ChunkId)>> chunkingDelegate,
         CancellationToken cancellationToken = default);
 }

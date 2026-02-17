@@ -17,12 +17,14 @@ public static class SpamDetectionServiceCollectionExtensions
     /// <param name="services">The service collection to configure.</param>
     public static void ConfigureServices(HostBuilderContext hostBuilder, IServiceCollection services)
     {
-        // Add core AgentSdk services
+        // Add core AgentSdk services (registers ModelProviderOptions)
         services.AddAgentSdkServices();
 
         // Add vector store services from the Vectors package
-        services.AddVectorStoreServices(sp =>
-            providerName => sp.GetRequiredService<IProviderClientFactory>().GetClient(providerName));
+        services.AddVectorStoreServices();
+
+        // Add IVectorStoreManager service (requires ModelProviderOptions to be registered)
+        services.AddVectorStoreManagerService();
 
         // Add document workflow services (includes prompt rendering, PDF services, etc.)
         services.AddDocumentWorkflowServices();

@@ -1,3 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Cyclotron.Maf.AgentSdk.Agents;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using SpamDetection.Models;
@@ -160,6 +168,7 @@ public sealed class SpamWorkflow(
             vectorStoreId,
             stream,
             "spam_training_examples.md",
+            SimpleChunkingAsync,
             cancellationToken);
 
         _logger.LogInformation("Vector store created with ID: {VectorStoreId}", vectorStoreId);
@@ -266,4 +275,21 @@ public sealed class SpamWorkflow(
     /// Represents a sample message for testing.
     /// </summary>
     private sealed record SampleMessage(string Content, string ExpectedLabel);
+
+    /// <summary>
+    /// Simple fixed-size chunking strategy for markdown documents.
+    /// </summary>
+    private static async IAsyncEnumerable<(string Text, string ChunkId)> SimpleChunkingAsync(
+        Stream stream,
+        string fileName)
+    {
+        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+        var text = await reader.ReadToEndAsync();
+        var chunkSize = 1000;
+        for (int i = 0; i < text.Length; i += chunkSize)
+        {
+            var chunkText = text.Substring(i, Math.Min(chunkSize, text.Length - i));
+            yield return (chunkText, $"{fileName}#{i / chunkSize}");
+        }
+    }
 }

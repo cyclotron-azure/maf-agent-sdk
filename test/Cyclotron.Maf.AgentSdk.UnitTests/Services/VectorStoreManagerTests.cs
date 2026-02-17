@@ -9,6 +9,8 @@ using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
 using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl.VectorStoreManager;
 
+#pragma warning disable CS0618 // Type or member is obsolete
+
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 
 /// <summary>
