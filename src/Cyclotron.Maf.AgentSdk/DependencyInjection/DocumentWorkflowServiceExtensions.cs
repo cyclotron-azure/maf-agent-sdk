@@ -6,8 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
-#pragma warning disable CS0618 // Type or member is obsolete
-
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>

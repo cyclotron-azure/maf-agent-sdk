@@ -16,12 +16,6 @@ public class ModelProviderOptions
     public string? DefaultProviderName { get; set; }
 
     /// <summary>
-    /// Configuration for vector store indexing behavior.
-    /// </summary>
-    [Obsolete("VectorStoreIndexing configuration has been moved to the AgentSdk.Vectors package. Please migrate to the root-level 'VectorStoreIndexing' configuration section. This property will be removed in version 4.0.")]
-    public VectorStoreIndexingOptions VectorStoreIndexing { get; set; } = new();
-
-    /// <summary>
     /// Gets the default provider name (configured or first available).
     /// </summary>
     public string GetDefaultProviderName()
@@ -38,4 +32,5 @@ public class ModelProviderOptions
         }
 
         return Providers.Keys.First();
-    }}
+    }
+}

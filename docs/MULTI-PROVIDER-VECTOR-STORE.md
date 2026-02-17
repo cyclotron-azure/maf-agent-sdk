@@ -373,7 +373,7 @@ dotnet test --filter "FullyQualifiedName~.Vectors.UnitTests"
 1. **Method signatures changed** - all `AddFileToVectorStoreAsync` methods now require `chunkingDelegate` parameter
    - **Azure**: Parameter is ignored (server-side chunking used instead)
    - **Ollama**: Parameter is required and used for client-side chunking
-2. **VectorStoreManager deprecated** - use `AzureVectorStoreManager` directly or via factory
+2. **VectorStoreManager removed** - use `AzureVectorStoreManager` directly or via factory
 3. **DI registration updated** - `AddVectorStoreServices` now requires both factories
 4. **Azure chunking behavior changed** - Previously used client-side chunking (incorrect), now uses Azure's native server-side chunking
 

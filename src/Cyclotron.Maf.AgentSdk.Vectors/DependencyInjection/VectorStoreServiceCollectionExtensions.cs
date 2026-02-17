@@ -302,8 +302,7 @@ public static class VectorStoreServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers and configures <see cref="VectorStoreIndexingOptions"/> with backward-compatible configuration binding.
-    /// Supports both the new path (<c>VectorStoreIndexing:</c>) and legacy path (<c>ModelProvider:VectorStoreIndexing:</c>).
+    /// Registers and configures <see cref="VectorStoreIndexingOptions"/> using the <c>VectorStoreIndexing</c> section.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
     /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
@@ -317,45 +316,14 @@ public static class VectorStoreServiceCollectionExtensions
         services.AddOptions<VectorStoreIndexingOptions>(name)
             .Configure<IConfiguration>((options, configuration) =>
             {
-                // Try new configuration path first (recommended)
-                var newSection = configuration.GetSection(VectorStoreIndexingOptions.SectionName);
-                if (newSection.Exists())
+                var section = configuration.GetSection(VectorStoreIndexingOptions.SectionName);
+                if (section.Exists())
                 {
-                    newSection.Bind(options);
-                    return;
-                }
-
-                // Fall back to legacy path for backward compatibility
-                var legacySection = configuration.GetSection("ModelProvider:VectorStoreIndexing");
-                if (legacySection.Exists())
-                {
-                    legacySection.Bind(options);
-
-                    // Note: We can't log directly here as ILogger isn't available in Configure
-                    // The deprecation will be logged when the service is first used
+                    section.Bind(options);
                 }
             })
             .ValidateDataAnnotations()
             .ValidateOnStart();
-
-        // Add post-configuration to log deprecation warning
-        services.AddSingleton<IConfigureOptions<VectorStoreIndexingOptions>>(sp =>
-            new ConfigureNamedOptions<VectorStoreIndexingOptions>(name, options =>
-            {
-                var configuration = sp.GetRequiredService<IConfiguration>();
-                var legacySection = configuration.GetSection("ModelProvider:VectorStoreIndexing");
-                var newSection = configuration.GetSection(VectorStoreIndexingOptions.SectionName);
-
-                if (legacySection.Exists() && !newSection.Exists())
-                {
-                    var logger = sp.GetService<ILoggerFactory>()?.CreateLogger("VectorStoreConfiguration");
-                    logger?.LogWarning(
-                        "Configuration path 'ModelProvider:VectorStoreIndexing' is deprecated. " +
-                        "Please migrate to '{NewPath}' in your configuration. " +
-                        "The legacy path will be removed in a future version.",
-                        VectorStoreIndexingOptions.SectionName);
-                }
-            }));
 
         return services;
     }

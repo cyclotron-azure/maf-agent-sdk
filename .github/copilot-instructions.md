@@ -138,7 +138,7 @@ Values in `agent.config.yaml` support `${VAR_NAME}` syntax for environment varia
 
 ### Exponential Backoff for Indexing
 
-`VectorStoreManager.WaitForFileProcessingAsync` uses configurable polling with exponential backoff controlled by `VectorStoreIndexingOptions`.
+`AzureVectorStoreManager.WaitForFileProcessingAsync` uses configurable polling with exponential backoff controlled by `VectorStoreIndexingOptions`.
 
 ### OpenTelemetry Integration
 

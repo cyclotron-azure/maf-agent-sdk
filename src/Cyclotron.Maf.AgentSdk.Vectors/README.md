@@ -34,7 +34,7 @@ builder.Services.AddDocumentWorkflowServices();
 
 ### 2. Configure Vector Store Indexing Options
 
-**Recommended Configuration Path** (new):
+**Configuration Path**:
 
 ```yaml
 # appsettings.json or agent.config.yaml
@@ -43,15 +43,6 @@ VectorStoreIndexing:
   InitialDelaySeconds: 2
   MaxDelaySeconds: 30
   BackoffMultiplier: 1.5
-```
-
-**Legacy Configuration Path** (still supported with deprecation warning):
-
-```yaml
-ModelProvider:
-  VectorStoreIndexing:
-    MaxPollingAttempts: 60
-    InitialDelaySeconds: 2
 ```
 
 ### 3. Use Vector Store Manager
@@ -169,7 +160,7 @@ If you're upgrading from AgentSdk 2.x where vector store management was included
 
 1. Add the `AgentSdk.Vectors` package reference
 2. Add `services.AddVectorStoreServices()` to your DI registration
-3. (Optional) Migrate configuration from `ModelProvider:VectorStoreIndexing` to root-level `VectorStoreIndexing`
+3. Ensure configuration uses the root-level `VectorStoreIndexing` section
 
 See the [Migration Guide](../../docs/MIGRATION-GUIDE-v3.0.0.md) for detailed instructions.
 

@@ -3,7 +3,6 @@ using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using AwesomeAssertions;
 using Xunit;
 using VectorStoreIndexingOptions = Cyclotron.Maf.AgentSdk.VectorStore.Options.VectorStoreIndexingOptions;
-using LegacyVectorStoreIndexingOptions = Cyclotron.Maf.AgentSdk.Options.VectorStoreIndexingOptions;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Options;
 
@@ -238,9 +237,6 @@ public class ModelProviderOptionsTests
         options.Providers.Should().NotBeNull();
         options.Providers.Should().BeEmpty();
         options.DefaultProviderName.Should().BeNull();
-#pragma warning disable CS0618 // Type or member is obsolete - testing backward compatibility
-        options.VectorStoreIndexing.Should().NotBeNull();
-#pragma warning restore CS0618
     }
 
     [Fact(DisplayName = "GetDefaultProviderName should return configured default when it exists")]
