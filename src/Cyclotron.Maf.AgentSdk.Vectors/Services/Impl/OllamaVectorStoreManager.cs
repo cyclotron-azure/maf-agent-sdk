@@ -36,7 +36,7 @@ public class OllamaVectorStoreManager(
     private readonly Func<string, VectorStoreProviderConfig> _configFactory = configFactory ?? throw new ArgumentNullException(nameof(configFactory));
 
     // In-memory store of vector stores: vectorStoreId -> list of documents
-    private static readonly Dictionary<string, VectorStoreData> _vectorStores = new();
+    private static readonly Dictionary<string, VectorStoreData> _vectorStores = [];
     private static readonly object _lock = new();
 
     /// <inheritdoc/>
@@ -50,13 +50,9 @@ public class OllamaVectorStoreManager(
         try
         {
             // Validate provider configuration
-            var providerConfig = _configFactory(providerName);
-            if (providerConfig == null)
-            {
-                throw new VectorStoreConfigurationException(
+            var providerConfig = _configFactory(providerName) ?? throw new VectorStoreConfigurationException(
                     $"Provider configuration not found for: {providerName}",
                     providerName);
-            }
 
             // Create a new vector store ID
             var vectorStoreId = Guid.NewGuid().ToString();
@@ -70,7 +66,7 @@ public class OllamaVectorStoreManager(
                     Name = name,
                     Purpose = purpose,
                     CreatedAt = DateTime.UtcNow,
-                    Documents = new List<DocumentData>()
+                    Documents = []
                 };
             }
 
@@ -140,14 +136,9 @@ public class OllamaVectorStoreManager(
         var sw = Stopwatch.StartNew();
         try
         {
-            var providerConfig = _configFactory(providerName);
-            if (providerConfig == null)
-            {
-                throw new VectorStoreConfigurationException(
+            var providerConfig = _configFactory(providerName) ?? throw new VectorStoreConfigurationException(
                     $"Provider configuration not found for: {providerName}",
                     providerName);
-            }
-
             _logger.LogInformation(
                 "Processing file {FileName} for Ollama vector store {VectorStoreId}",
                 fileName,
@@ -263,14 +254,9 @@ public class OllamaVectorStoreManager(
         var sw = Stopwatch.StartNew();
         try
         {
-            var providerConfig = _configFactory(providerName);
-            if (providerConfig == null)
-            {
-                throw new VectorStoreConfigurationException(
+            var providerConfig = _configFactory(providerName) ?? throw new VectorStoreConfigurationException(
                     $"Provider configuration not found for: {providerName}",
                     providerName);
-            }
-
             var allFileIds = new List<string>();
             var totalChunks = 0;
             var httpClient = _httpClientFactory.CreateClient();

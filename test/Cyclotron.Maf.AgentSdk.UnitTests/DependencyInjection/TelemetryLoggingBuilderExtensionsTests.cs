@@ -20,7 +20,7 @@ public class TelemetryLoggingBuilderExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateConfiguration());
+        services.AddSingleton(CreateConfiguration());
         services.AddTelemetryOptions();
 
         // Act
@@ -37,7 +37,7 @@ public class TelemetryLoggingBuilderExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateConfiguration());
+        services.AddSingleton(CreateConfiguration());
         services.AddTelemetryOptions();
 
         ILoggingBuilder? capturedBuilder = null;

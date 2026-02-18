@@ -93,7 +93,7 @@ public class AgentMiddlewareHelperTests
         var agent = CreateMockAgent();
         var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
         var serviceProvider = new ServiceCollection()
-            .AddSingleton<ILoggerFactory>(loggerFactory)
+            .AddSingleton(loggerFactory)
             .AddSingleton(typeof(ILogger<>), typeof(Logger<>))
             .BuildServiceProvider();
 
@@ -178,7 +178,7 @@ public class AgentMiddlewareHelperTests
         };
 
         var serviceProvider = new ServiceCollection()
-            .AddSingleton<ILoggerFactory>(loggerFactory)
+            .AddSingleton(loggerFactory)
             .BuildServiceProvider();
 
         // Act

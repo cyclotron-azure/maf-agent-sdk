@@ -23,7 +23,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -43,7 +43,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -62,7 +62,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -82,7 +82,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -104,7 +104,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -122,7 +122,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -142,7 +142,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -163,7 +163,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -186,7 +186,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -206,7 +206,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -231,7 +231,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -248,7 +248,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();

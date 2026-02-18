@@ -59,9 +59,9 @@ public static class AgentSdkServiceCollectionExtensions
                         var agentDef = new AgentDefinitionOptions
                         {
                             Type = agentSection.GetValue<string>("type") ?? string.Empty,
-                            AutoDelete = agentSection.GetValue<bool>("auto_delete", true),
-                            AutoCleanupResources = agentSection.GetValue<bool>("auto_cleanup_resources", true),
-                            Enabled = agentSection.GetValue<bool>("enabled", true),
+                            AutoDelete = agentSection.GetValue("auto_delete", true),
+                            AutoCleanupResources = agentSection.GetValue("auto_cleanup_resources", true),
+                            Enabled = agentSection.GetValue("enabled", true),
                             Version = agentSection.GetValue<string?>("version"),
                             SystemPromptTemplate = agentSection.GetValue<string>("system_prompt_template"),
                             UserPromptTemplate = agentSection.GetValue<string>("user_prompt_template")
@@ -156,8 +156,8 @@ public static class AgentSdkServiceCollectionExtensions
                             Model = substitution.SubstituteNullable(providerSection.GetValue<string>("model")),
                             ApiVersion = substitution.SubstituteNullable(providerSection.GetValue<string>("api_version")),
                             ApiKey = substitution.SubstituteNullable(providerSection.GetValue<string>("api_key")),
-                            TimeoutSeconds = providerSection.GetValue<int>("timeout_seconds", 300),
-                            MaxRetries = providerSection.GetValue<int>("max_retries", 3)
+                            TimeoutSeconds = providerSection.GetValue("timeout_seconds", 300),
+                            MaxRetries = providerSection.GetValue("max_retries", 3)
                         };
 
                         // Validate provider configuration

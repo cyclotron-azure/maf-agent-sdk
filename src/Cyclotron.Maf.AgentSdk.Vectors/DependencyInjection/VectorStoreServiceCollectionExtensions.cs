@@ -48,7 +48,7 @@ public static class VectorStoreServiceCollectionExtensions
         services.AddSingleton<VectorStoreTelemetry>();
 
         // Register Azure vector store manager
-        services.AddScoped<AzureVectorStoreManager>(sp =>
+        services.AddScoped(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<AzureVectorStoreManager>>();
             var options = sp.GetRequiredService<IOptions<VectorStoreIndexingOptions>>();
@@ -87,7 +87,7 @@ public static class VectorStoreServiceCollectionExtensions
         });
 
         // Register Ollama vector store manager
-        services.AddScoped<OllamaVectorStoreManager>(sp =>
+        services.AddScoped(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<OllamaVectorStoreManager>>();
             var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();

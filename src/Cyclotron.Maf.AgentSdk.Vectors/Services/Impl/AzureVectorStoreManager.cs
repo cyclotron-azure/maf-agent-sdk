@@ -82,7 +82,7 @@ public class AzureVectorStoreManager(
 
             return vectorStoreResponse.Value.Id;
         }
-        catch (Exception ex) when (!(ex is VectorStoreException))
+        catch (Exception ex) when (ex is not VectorStoreException)
         {
             var message = $"Failed to create Azure vector store with key: {key}";
             _logger.LogError(ex, message);
@@ -126,7 +126,7 @@ public class AzureVectorStoreManager(
                 await vectorStoreClient.DeleteVectorStoreAsync(vectorStoreId, cancellationToken);
                 _logger.LogInformation("Deleted Azure vector store: {VectorStoreId}", vectorStoreId);
             }
-            catch (Exception ex) when (!(ex is VectorStoreException))
+            catch (Exception ex) when (ex is not VectorStoreException)
             {
                 var message = $"Failed to cleanup Azure vector store: {vectorStoreId}";
                 _logger.LogError(ex, message);

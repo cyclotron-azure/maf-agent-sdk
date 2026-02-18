@@ -106,7 +106,7 @@ public class OllamaChatClient : IChatClient, IDisposable
             throw new InvalidOperationException(
                 $"Ollama request timed out after {_timeout.TotalSeconds} seconds", ex);
         }
-        catch (Exception ex) when (!(ex is InvalidOperationException))
+        catch (Exception ex) when (ex is not InvalidOperationException)
         {
             _logger.LogError(ex, "OllamaChatClient error in GetResponseAsync");
             throw;
@@ -129,7 +129,7 @@ public class OllamaChatClient : IChatClient, IDisposable
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
-        System.Collections.Generic.IAsyncEnumerable<ChatMessage>? messageEdits = null,
+        IAsyncEnumerable<ChatMessage>? messageEdits = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _logger.LogDebug(

@@ -22,7 +22,7 @@ public class TelemetryServiceCollectionExtensionsTests
         var configuration = CreateConfiguration();
         var services = new ServiceCollection();
         services.AddTelemetryOptions();
-        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton(configuration);
 
         // Act
         services.AddAgentTelemetryPipeline(configuration);
@@ -44,7 +44,7 @@ public class TelemetryServiceCollectionExtensionsTests
         var configuration = CreateConfiguration();
         var services = new ServiceCollection();
         services.AddTelemetryOptions();
-        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton(configuration);
 
         // Act
         services.AddAgentTelemetryPipeline(configuration);
@@ -95,7 +95,7 @@ public class TelemetryServiceCollectionExtensionsTests
         var configuration = CreateConfiguration();
         var services = new ServiceCollection();
         services.AddTelemetryOptions();
-        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton(configuration);
 
         // Act
         var result = services.AddAgentTelemetryPipeline(configuration);

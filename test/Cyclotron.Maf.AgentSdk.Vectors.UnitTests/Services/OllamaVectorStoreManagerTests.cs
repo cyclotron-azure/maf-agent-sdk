@@ -27,7 +27,7 @@ public class OllamaVectorStoreManagerTests
     private readonly Mock<ILogger<OllamaVectorStoreManager>> _mockLogger;
     private readonly Mock<IHttpClientFactory> _mockHttpClientFactory;
     private readonly Mock<VectorStoreTelemetry> _mockTelemetry;
-    private readonly IOptions<Cyclotron.Maf.AgentSdk.VectorStore.Options.VectorStoreIndexingOptions> _indexingOptions;
+    private readonly IOptions<VectorStore.Options.VectorStoreIndexingOptions> _indexingOptions;
     private readonly IServiceProvider _serviceProvider;
 
     public OllamaVectorStoreManagerTests()
@@ -45,7 +45,7 @@ public class OllamaVectorStoreManagerTests
         var mockTelemetryLogger = new Mock<ILogger<VectorStoreTelemetry>>();
         _mockTelemetry = new Mock<VectorStoreTelemetry>(MockBehavior.Loose, mockMeterFactory.Object, mockTelemetryLogger.Object);
 
-        _indexingOptions = MsOptions.Create(new Cyclotron.Maf.AgentSdk.VectorStore.Options.VectorStoreIndexingOptions());
+        _indexingOptions = MsOptions.Create(new VectorStore.Options.VectorStoreIndexingOptions());
 
         // Build a real service provider with ModelProviderOptions for testing
         var services = new ServiceCollection();
