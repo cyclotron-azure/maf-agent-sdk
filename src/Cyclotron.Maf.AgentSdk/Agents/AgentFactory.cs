@@ -3,13 +3,13 @@ using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
-using Cyclotron.Maf.AgentSdk.Services.Impl;
 using Azure.AI.Projects;
 using Azure.AI.Projects.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OllamaSharp;
 using OpenAI.Responses;
 using Polly;
 using Polly.Retry;
@@ -464,45 +464,65 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <summary>
-    /// Creates an AI agent for Ollama local models using OpenAI-compatible API.
+    /// Creates an AI agent for Ollama local models using OllamaSharp SDK.
+    /// Supports standard chat, reasoning mode, and multimodal capabilities.
     /// </summary>
     private async Task<AIAgent> CreateOllamaAgentAsync(
         ModelProviderDefinitionOptions provider,
         CancellationToken cancellationToken)
     {
         var providerName = _agentDefinition.Provider;
+        var modelName = provider.GetEffectiveModel();
+        var endpoint = provider.Endpoint.TrimEnd('/');
 
         _logger.LogInformation(
-            "Creating {AgentKey} agent for Ollama provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model})",
+            "Creating {AgentKey} agent for Ollama provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model}, ReasoningMode: {ReasoningMode})",
             _agentKey,
             providerName,
-            provider.Endpoint,
-            provider.GetEffectiveModel());
+            endpoint,
+            modelName,
+            provider.EnableReasoningMode);
 
         try
         {
             // Get system prompt (instructions) from prompt rendering service
             var instructions = _promptService.RenderSystemPrompt(_agentKey);
 
-            // Create Ollama chat client using OllamaChatClient
-            var httpClient = _httpClientFactory.CreateClient("ollama");
-            var ollamaLogger = _loggerFactory.CreateLogger<OllamaChatClient>();
-            var chatClient = new OllamaChatClient(httpClient, provider, ollamaLogger);
+            // Create OllamaApiClient using OllamaSharp SDK
+            var ollamaClient = new OllamaApiClient(new Uri(endpoint), modelName);
 
-            // Wrap chat client in ChatClientAgent to get full AIAgent capabilities
-            var chatClientLogger = _loggerFactory.CreateLogger<ChatClientAgent>();
-            var chatOptions = new ChatOptions { Instructions = instructions };
+            // Configure reasoning mode if enabled
+            if (provider.EnableReasoningMode)
+            {
+                var reasoningModel = provider.GetReasoningModel();
+                _logger.LogInformation(
+                    "Reasoning mode enabled for {AgentKey} agent using model '{ReasoningModel}'",
+                    _agentKey,
+                    reasoningModel);
+
+                // If a specific reasoning model is configured, update the model
+                if (!string.IsNullOrEmpty(provider.ReasoningModel))
+                {
+                    ollamaClient.SelectedModel = reasoningModel;
+                }
+            }
+
+            // OllamaApiClient implements IChatClient via Microsoft.Extensions.AI
+            IChatClient chatClient = ollamaClient;
+
+            // Create AIAgent using ChatClientAgent wrapper from Microsoft.Agents.AI
+            var agentName = $"{_promptService.GetAgentNamePrefix(_agentKey)}-ollama";
             AIAgent agent = new ChatClientAgent(
                 chatClient,
-                instructions: instructions,
-                name: $"{_promptService.GetAgentNamePrefix(_agentKey)}-ollama",
-                loggerFactory: _loggerFactory);
+                name: agentName,
+                description: $"Ollama agent using model {modelName}",
+                instructions: instructions);
 
             _logger.LogInformation(
                 "Created {AgentKey} agent for Ollama provider '{ProviderName}' (Model: {Model})",
                 _agentKey,
                 providerName,
-                provider.GetEffectiveModel());
+                modelName);
 
             // Apply middleware using centralized helper
             agent = ApplyMiddleware(agent);

@@ -323,16 +323,20 @@ var data = await context.ReadStateAsync<MyType>(
 | Microsoft.Agents.AI.Workflows | 1.0.0-preview.251114.1 |
 | Microsoft.Agents.AI.AzureAI | 1.0.0-preview.251114.1 |
 | Microsoft.Extensions.AI | 10.0.0 |
+| OllamaSharp | 5.0.1 |
 | OpenTelemetry | 1.9.0 |
 | Handlebars.Net | 2.1.6 |
 | Polly.Core | 8.5.0 |
 
 For PDF processing dependencies (PdfPig, System.Drawing.Common), see [AgentSdk.Pdf](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
+For vector store dependencies (OllamaSharp), see [AgentSdk.Vectors](../Cyclotron.Maf.AgentSdk.Vectors/README.md).
+
 ## Requirements
 
 - .NET 8.0 or later
-- Azure AI Foundry project endpoint
+- **For Azure providers**: Azure AI Foundry project endpoint
+- **For Ollama providers**: Ollama installed and running locally or remotely
 - Azure credentials (DefaultAzureCredential or API key)
 
 ## Samples

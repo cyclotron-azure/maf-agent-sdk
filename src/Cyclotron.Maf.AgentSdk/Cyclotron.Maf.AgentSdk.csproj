@@ -54,6 +54,7 @@
     <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="NetEscapades.Configuration.Yaml" />
+    <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Polly.Core" />
   </ItemGroup>
 

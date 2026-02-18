@@ -86,7 +86,7 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o
 | **Prompt Rendering** | Handlebars-based template rendering for dynamic agent prompts |
 | **OpenTelemetry** | Built-in tracing, metrics, and logging with OTLP exporter support |
 | **Configurable Tools** | Enable `file_search` and/or `code_interpreter` via YAML configuration |
-| **Multi-Provider Support** | Azure AI Foundry and Ollama provider support |
+| **Multi-Provider Support** | Azure AI Foundry and Ollama (with reasoning mode, multimodal, and vector store integration) |
 
 ### PDF Extensions (AgentSdk.Pdf)
 

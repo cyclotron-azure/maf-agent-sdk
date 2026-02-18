@@ -39,6 +39,11 @@
     <PackageReference Include="Polly.Core" />
   </ItemGroup>
 
+  <!-- OllamaSharp for Ollama Operations -->
+  <ItemGroup>
+    <PackageReference Include="OllamaSharp" />
+  </ItemGroup>
+
   <!-- Project References -->
   <ItemGroup>
     <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Common/Cyclotron.Maf.AgentSdk.Common.csproj" />

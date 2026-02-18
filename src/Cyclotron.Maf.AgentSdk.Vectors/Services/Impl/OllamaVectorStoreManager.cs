@@ -4,8 +4,9 @@ using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OllamaSharp;
+using OllamaSharp.Models;
 using System.Diagnostics;
-using System.Text.Json;
 
 namespace Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 
@@ -24,13 +25,11 @@ namespace Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 /// </remarks>
 public class OllamaVectorStoreManager(
     ILogger<OllamaVectorStoreManager> logger,
-    IHttpClientFactory httpClientFactory,
     IOptions<VectorStoreIndexingOptions> indexingOptions,
     VectorStoreTelemetry telemetry,
     Func<string, VectorStoreProviderConfig> configFactory) : IVectorStoreManager
 {
     private readonly ILogger<OllamaVectorStoreManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     private readonly IOptions<VectorStoreIndexingOptions> _indexingOptions = indexingOptions ?? throw new ArgumentNullException(nameof(indexingOptions));
     private readonly VectorStoreTelemetry _telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
     private readonly Func<string, VectorStoreProviderConfig> _configFactory = configFactory ?? throw new ArgumentNullException(nameof(configFactory));
@@ -159,7 +158,9 @@ public class OllamaVectorStoreManager(
             _logger.LogInformation("Chunked {FileName} into {ChunkCount} chunks", fileName, chunks.Count);
 
             var fileIds = new List<string>();
-            var httpClient = _httpClientFactory.CreateClient();
+
+            // Create OllamaApiClient for embeddings
+            var ollamaClient = CreateOllamaClient(providerConfig);
 
             // Process each chunk
             foreach (var (chunkText, chunkId) in chunks)
@@ -168,9 +169,9 @@ public class OllamaVectorStoreManager(
 
                 try
                 {
-                    // Generate embedding using Ollama
+                    // Generate embedding using OllamaSharp
                     var embedding = await GenerateEmbeddingAsync(
-                        httpClient,
+                        ollamaClient,
                         providerConfig,
                         chunkText,
                         cancellationToken);
@@ -259,7 +260,9 @@ public class OllamaVectorStoreManager(
                     providerName);
             var allFileIds = new List<string>();
             var totalChunks = 0;
-            var httpClient = _httpClientFactory.CreateClient();
+
+            // Create OllamaApiClient for embeddings
+            var ollamaClient = CreateOllamaClient(providerConfig);
 
             _logger.LogInformation("Processing multiple files for Ollama vector store {VectorStoreId}", vectorStoreId);
 
@@ -293,9 +296,9 @@ public class OllamaVectorStoreManager(
 
                     try
                     {
-                        // Generate embedding using Ollama
+                        // Generate embedding using OllamaSharp
                         var embedding = await GenerateEmbeddingAsync(
-                            httpClient,
+                            ollamaClient,
                             providerConfig,
                             chunkText,
                             cancellationToken);
@@ -365,77 +368,53 @@ public class OllamaVectorStoreManager(
     }
 
     /// <summary>
-    /// Generates an embedding for text using the Ollama API.
+    /// Creates an OllamaApiClient instance from provider configuration.
+    /// </summary>
+    private static OllamaApiClient CreateOllamaClient(VectorStoreProviderConfig providerConfig)
+    {
+        var endpoint = providerConfig.Endpoint?.TrimEnd('/') ?? "http://localhost:11434";
+        var embeddingModel = providerConfig.DeploymentName ?? "nomic-embed-text";
+
+        return new OllamaApiClient(new Uri(endpoint), embeddingModel);
+    }
+
+    /// <summary>
+    /// Generates an embedding for text using the OllamaSharp SDK.
     /// </summary>
     private async Task<float[]> GenerateEmbeddingAsync(
-        HttpClient httpClient,
+        OllamaApiClient ollamaClient,
         VectorStoreProviderConfig providerConfig,
         string text,
         CancellationToken cancellationToken)
     {
         try
         {
-            var endpoint = providerConfig.Endpoint?.TrimEnd('/') ?? "http://localhost:11434";
             var embeddingModel = providerConfig.DeploymentName ?? "nomic-embed-text";
 
-            var requestUri = $"{endpoint}/api/embed";
-            var requestBody = new
+            _logger.LogDebug(
+                "Generating embedding using model '{Model}' for text of length {Length}",
+                embeddingModel,
+                text.Length);
+
+            // Generate embeddings using OllamaSharp - ensure model is set correctly
+            ollamaClient.SelectedModel = embeddingModel;
+
+            var embedResponse = await ollamaClient.EmbedAsync(text, cancellationToken);
+
+            if (embedResponse?.Embeddings == null || embedResponse.Embeddings.Count == 0)
             {
-                model = embeddingModel,
-                input = text
-            };
-
-            var content = new StringContent(
-                JsonSerializer.Serialize(requestBody),
-                System.Text.Encoding.UTF8,
-                "application/json");
-
-            var response = await httpClient.PostAsync(requestUri, content, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                throw new HttpRequestException(
-                    $"Ollama embedding API failed with status {response.StatusCode}: {errorContent}");
+                throw new VectorStoreIndexingException(
+                    "No embeddings returned from Ollama API");
             }
 
-            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var jsonDoc = JsonDocument.Parse(responseContent);
-            var root = jsonDoc.RootElement;
+            // Take the first embedding (we only sent one text input)
+            var embedding = embedResponse.Embeddings[0];
 
-            if (root.TryGetProperty("embeddings", out var embeddingsElement) &&
-                embeddingsElement.ValueKind == System.Text.Json.JsonValueKind.Array &&
-                embeddingsElement.GetArrayLength() > 0)
-            {
-                var firstEmbedding = embeddingsElement[0];
-                if (firstEmbedding.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    var embedding = new List<float>();
-                    foreach (var element in firstEmbedding.EnumerateArray())
-                    {
-                        if (element.TryGetSingle(out var value))
-                        {
-                            embedding.Add(value);
-                        }
-                    }
-                    return embedding.ToArray();
-                }
-            }
+            _logger.LogDebug(
+                "Generated embedding with {Dimensions} dimensions",
+                embedding.Length);
 
-            throw new VectorStoreIndexingException(
-                "Invalid embedding response format from Ollama API");
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new VectorStoreIndexingException(
-                $"Failed to call Ollama embedding API: {ex.Message}",
-                ex);
-        }
-        catch (JsonException ex)
-        {
-            throw new VectorStoreIndexingException(
-                $"Failed to parse Ollama embedding response: {ex.Message}",
-                ex);
+            return embedding;
         }
         catch (VectorStoreException)
         {
@@ -444,7 +423,7 @@ public class OllamaVectorStoreManager(
         catch (Exception ex)
         {
             throw new VectorStoreIndexingException(
-                $"Unexpected error generating embedding: {ex.Message}",
+                $"Failed to generate embedding using OllamaSharp: {ex.Message}",
                 ex);
         }
     }

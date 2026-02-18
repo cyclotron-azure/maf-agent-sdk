@@ -1,11 +1,9 @@
 <Project>
-
   <!--
     Central Package Version Management
     All package versions are managed here. Individual projects reference packages without versions.
     See: https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management
   -->
-
   <!-- Azure SDK Packages -->
   <ItemGroup>
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
@@ -14,14 +12,12 @@
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.6.0" />
     <PackageVersion Include="OpenAI" Version="2.8.0" />
   </ItemGroup>
-
   <!-- Microsoft Agent Framework Packages -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Agents.AI.AzureAI" Version="1.0.0-preview.260212.1" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-preview.260212.1" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.260212.1" />
   </ItemGroup>
-
   <!-- Microsoft.Extensions Packages -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.3.0" />
@@ -35,7 +31,6 @@
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
   </ItemGroup>
-
   <!-- OpenTelemetry Packages -->
   <ItemGroup>
     <PackageVersion Include="OpenTelemetry" Version="1.15.0" />
@@ -45,7 +40,6 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
   </ItemGroup>
-
   <!-- Utility Packages -->
   <ItemGroup>
     <PackageVersion Include="System.Drawing.Common" Version="8.0.2" />
@@ -53,13 +47,13 @@
     <PackageVersion Include="DotNetEnv" Version="3.1.1" />
     <PackageVersion Include="Handlebars.Net" Version="2.1.6" />
     <PackageVersion Include="NetEscapades.Configuration.Yaml" Version="3.1.0" />
+    <PackageVersion Include="OllamaSharp" Version="5.4.16" />
     <PackageVersion Include="Polly.Core" Version="8.6.5" />
     <PackageVersion Include="Bet.Extensions.Templating.Console" Version="2.0.1" />
     <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
     <PackageVersion Include="Serilog" Version="4.3.1" />
     <PackageVersion Include="Serilog.Sinks.AzureAnalytics" Version="5.0.0" />
   </ItemGroup>
-
   <!-- Testing Packages -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -69,10 +63,8 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.3.0" />
     <PackageVersion Include="coverlet.collector" Version="8.0.0" />
   </ItemGroup>
-
   <!-- Build/Source Link Packages -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.103" />
   </ItemGroup>
-
 </Project>

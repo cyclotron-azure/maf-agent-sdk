@@ -110,7 +110,6 @@ public static class VectorStoreServiceCollectionExtensions
 
             return new OllamaVectorStoreManager(
                 logger,
-                httpClientFactory,
                 indexingOptions,
                 telemetry,
                 configFactory);

@@ -93,15 +93,7 @@ public class OllamaVectorStoreManagerTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new OllamaVectorStoreManager(null!, _mockHttpClientFactory.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory()));
-    }
-
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when httpClientFactory is null")]
-    public void Constructor_NullHttpClientFactory_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
-            new OllamaVectorStoreManager(_mockLogger.Object, null!, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory()));
+            new OllamaVectorStoreManager(null!, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory()));
     }
 
     [Fact(DisplayName = "Constructor should throw ArgumentNullException when indexingOptions is null")]
@@ -109,14 +101,14 @@ public class OllamaVectorStoreManagerTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new OllamaVectorStoreManager(_mockLogger.Object, _mockHttpClientFactory.Object, null!, _mockTelemetry.Object, CreateConfigFactory()));
+            new OllamaVectorStoreManager(_mockLogger.Object, null!, _mockTelemetry.Object, CreateConfigFactory()));
     }
 
     [Fact(DisplayName = "GetOrCreateSharedVectorStoreAsync should create new vector store with valid ID")]
     public async Task GetOrCreateSharedVectorStoreAsync_ValidParameters_ReturnsVectorStoreId()
     {
         // Arrange
-        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _mockHttpClientFactory.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
+        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
 
         // Act
         var vectorStoreId = await manager.GetOrCreateSharedVectorStoreAsync(
@@ -155,7 +147,7 @@ public class OllamaVectorStoreManagerTests
         var httpClient = new HttpClient(httpMessageHandler.Object);
         _mockHttpClientFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
-        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _mockHttpClientFactory.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
+        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
 
         var vectorStoreId = await manager.GetOrCreateSharedVectorStoreAsync("ollama", "key", "purpose", "name", CancellationToken.None);
 
@@ -195,7 +187,7 @@ public class OllamaVectorStoreManagerTests
         var httpClient = new HttpClient(httpMessageHandler.Object);
         _mockHttpClientFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
-        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _mockHttpClientFactory.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
+        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
 
         var vectorStoreId = await manager.GetOrCreateSharedVectorStoreAsync("ollama", "key", "purpose", "name", CancellationToken.None);
         using var fileStream = new MemoryStream(Encoding.UTF8.GetBytes("Test content"));
@@ -215,7 +207,7 @@ public class OllamaVectorStoreManagerTests
     public async Task CleanupVectorStoreAsync_ExistingStore_RemovesSuccessfully()
     {
         // Arrange
-        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _mockHttpClientFactory.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
+        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
         var vectorStoreId = await manager.GetOrCreateSharedVectorStoreAsync("ollama", "key", "purpose", "name", CancellationToken.None);
 
         // Act
@@ -249,7 +241,7 @@ public class OllamaVectorStoreManagerTests
         var httpClient = new HttpClient(httpMessageHandler.Object);
         _mockHttpClientFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
-        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _mockHttpClientFactory.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
+        var manager = new OllamaVectorStoreManager(_mockLogger.Object, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory());
         var vectorStoreId = await manager.GetOrCreateSharedVectorStoreAsync("ollama", "key", "purpose", "name", CancellationToken.None);
 
         var files = new[]

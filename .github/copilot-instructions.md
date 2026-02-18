@@ -126,6 +126,7 @@ public void RenderSystemPrompt_WithValidAgentKey_ReturnsRenderedTemplate()
 |---------|---------|
 | `Microsoft.Agents.AI.Workflows` | MAF workflow orchestration |
 | `Azure.AI.Agents.Persistent` | Azure AI Foundry agent APIs |
+| `OllamaSharp` | Ollama provider integration for agents and embeddings |
 | `Handlebars.Net` | Template rendering |
 | `Polly.Core` | Retry policies with exponential backoff |
 | `OpenTelemetry` | Distributed tracing and metrics |
