@@ -6,11 +6,11 @@ using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services.Chunking;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Azure.AI.Projects;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Cyclotron.Maf.AgentSdk.Vectors.Internal;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -46,10 +46,6 @@ public static class VectorStoreServiceCollectionExtensions
 
         // Register telemetry
         services.AddSingleton<VectorStoreTelemetry>();
-
-        // Register chunking implementations
-        services.AddSingleton<IDocumentChunker, SemanticDocumentChunker>();
-        services.AddSingleton<IDocumentChunker, SimpleDocumentChunker>();
 
         // Register Azure vector store manager
         services.AddScoped<AzureVectorStoreManager>(sp =>
@@ -127,6 +123,21 @@ public static class VectorStoreServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Registers document chunking services.
+    /// Use this when you want DI-resolved chunkers available to consumers.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddVectorStoreChunkingServices(
+        this IServiceCollection services)
+    {
+        services.AddSingleton<IDocumentChunker, SemanticDocumentChunker>();
+        services.AddSingleton<IDocumentChunker, SimpleDocumentChunker>();
+
+        return services;
+    }
+
+    /// <summary>
     /// Adds the global IVectorStoreManager service with access to model provider configuration.
     /// This is typically called from the main SDK's DI configuration where ModelProviderOptions is available.
     /// </summary>
@@ -170,95 +181,5 @@ public static class VectorStoreServiceCollectionExtensions
             .ValidateOnStart();
 
         return services;
-    }
-}
-
-/// <summary>
-/// Adapter that wraps VectorStoreManagerFactory to provide direct IVectorStoreManager interface.
-/// Delegates all operations to the factory-selected implementation based on provider name.
-/// </summary>
-internal class VectorStoreManagerAdapter(
-    VectorStoreManagerFactory factory,
-    IOptions<ModelProviderOptions> modelProviderOptions) : IVectorStoreManager
-{
-    private readonly VectorStoreManagerFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-    private readonly IOptions<ModelProviderOptions> _modelProviderOptions = modelProviderOptions ?? throw new ArgumentNullException(nameof(modelProviderOptions));
-
-    private IVectorStoreManager GetManager(string providerName)
-    {
-        try
-        {
-            var options = _modelProviderOptions.Value;
-            if (!options.Providers.TryGetValue(providerName, out var providerDef))
-            {
-                var availableProviders = string.Join(", ", options.Providers.Keys);
-                throw new InvalidOperationException(
-                    $"Provider '{providerName}' not found in ModelProviderOptions configuration. " +
-                    $"Available providers: {(string.IsNullOrEmpty(availableProviders) ? "none" : availableProviders)}");
-            }
-
-            var providerType = providerDef.Type;
-            if (string.IsNullOrWhiteSpace(providerType))
-            {
-                throw new InvalidOperationException($"Provider type for '{providerName}' is not configured");
-            }
-
-            return _factory.GetManager(providerName, providerType);
-        }
-        catch (InvalidOperationException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Failed to get manager for provider '{providerName}'", ex);
-        }
-    }
-
-    /// <inheritdoc/>
-    public Task<string> GetOrCreateSharedVectorStoreAsync(
-        string providerName,
-        string key,
-        string purpose,
-        string name,
-        CancellationToken cancellationToken = default)
-    {
-        return GetManager(providerName)
-            .GetOrCreateSharedVectorStoreAsync(providerName, key, purpose, name, cancellationToken);
-    }
-
-    /// <inheritdoc/>
-    public Task CleanupVectorStoreAsync(
-        string providerName,
-        string vectorStoreId,
-        CancellationToken cancellationToken = default)
-    {
-        return GetManager(providerName)
-            .CleanupVectorStoreAsync(providerName, vectorStoreId, cancellationToken);
-    }
-
-    /// <inheritdoc/>
-    public Task<string> AddFileToVectorStoreAsync(
-        string providerName,
-        string vectorStoreId,
-        Stream fileContent,
-        string fileName,
-        Func<Stream, string, IAsyncEnumerable<(string Text, string ChunkId)>> chunkingDelegate,
-        CancellationToken cancellationToken = default)
-    {
-        return GetManager(providerName)
-            .AddFileToVectorStoreAsync(providerName, vectorStoreId, fileContent, fileName, chunkingDelegate, cancellationToken);
-    }
-
-    /// <inheritdoc/>
-    public Task<IReadOnlyList<string>> AddFilesToVectorStoreAsync(
-        string providerName,
-        string vectorStoreId,
-        IEnumerable<(Stream Content, string FileName)> files,
-        Func<Stream, string, IAsyncEnumerable<(string Text, string ChunkId)>> chunkingDelegate,
-        CancellationToken cancellationToken = default)
-    {
-        return GetManager(providerName)
-            .AddFilesToVectorStoreAsync(providerName, vectorStoreId, files, chunkingDelegate, cancellationToken);
     }
 }
