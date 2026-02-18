@@ -36,8 +36,9 @@ public static class DocumentWorkflowServiceExtensions
         services.AddScoped<IProviderClientFactory, ProviderClientFactory>();
 
         // Register provider-specific agent factories and resolver
-        services.AddSingleton<IAgentProvider, AzureAgentProvider>();
-        services.AddSingleton<IAgentProvider, OllamaAgentProvider>();
+        // Note: Providers are Transient (not Singleton) to allow safe dependency on scoped IProviderClientFactory
+        services.AddTransient<IAgentProvider, AzureAgentProvider>();
+        services.AddTransient<IAgentProvider, OllamaAgentProvider>();
         services.AddSingleton<IAgentProviderResolver, AgentProviderResolver>();
 
         // Note: Vector store services have been moved to the AgentSdk.Vectors package.

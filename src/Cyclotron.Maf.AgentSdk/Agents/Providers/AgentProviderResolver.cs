@@ -1,14 +1,15 @@
 using Cyclotron.Maf.AgentSdk.Common.Options;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cyclotron.Maf.AgentSdk.Agents.Providers;
 
 /// <summary>
 /// Default resolver for provider implementations based on provider type.
+/// Creates a service scope when resolving providers to allow dependency on scoped services like IProviderClientFactory.
 /// </summary>
-internal sealed class AgentProviderResolver(IEnumerable<IAgentProvider> providers) : IAgentProviderResolver
+internal sealed class AgentProviderResolver(IServiceProvider serviceProvider) : IAgentProviderResolver
 {
-    private readonly IReadOnlyList<IAgentProvider> _providers = (providers ?? throw new ArgumentNullException(nameof(providers)))
-        .ToList();
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
 
     /// <inheritdoc/>
     public IAgentProvider Resolve(ModelProviderDefinitionOptions provider)
@@ -20,7 +21,11 @@ internal sealed class AgentProviderResolver(IEnumerable<IAgentProvider> provider
             throw new InvalidOperationException("Provider type is required for agent creation.");
         }
 
-        var match = _providers.FirstOrDefault(
+        // Create a scope to resolve scoped dependencies (like IProviderClientFactory)
+        // This allows transient providers to safely depend on scoped services
+        using var scope = _serviceProvider.CreateScope();
+        var providers = scope.ServiceProvider.GetServices<IAgentProvider>();
+        var match = providers.FirstOrDefault(
             candidate => candidate.SupportedProviderTypes.Contains(provider.Type, StringComparer.OrdinalIgnoreCase));
 
         if (match != null)
@@ -28,7 +33,7 @@ internal sealed class AgentProviderResolver(IEnumerable<IAgentProvider> provider
             return match;
         }
 
-        var supportedTypes = _providers
+        var supportedTypes = providers
             .SelectMany(candidate => candidate.SupportedProviderTypes)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(type => type)

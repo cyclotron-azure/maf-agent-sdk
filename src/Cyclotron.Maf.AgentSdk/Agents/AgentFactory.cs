@@ -6,6 +6,7 @@ using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Http;
@@ -643,13 +644,18 @@ public class AgentFactory : IAgentFactory
         ArgumentNullException.ThrowIfNull(clientFactory, nameof(clientFactory));
         ArgumentNullException.ThrowIfNull(loggerFactory, nameof(loggerFactory));
 
-        var providers = new IAgentProvider[]
-        {
-            new AzureAgentProvider(clientFactory, loggerFactory.CreateLogger<AzureAgentProvider>()),
-            new OllamaAgentProvider(loggerFactory.CreateLogger<OllamaAgentProvider>())
-        };
+        // Create a minimal service provider that can resolve the providers
+        // This is only used for backward compatibility with the legacy constructor
+        var services = new ServiceCollection();
+        services.AddSingleton(clientFactory);
+        services.AddSingleton(loggerFactory);
 
-        return new AgentProviderResolver(providers);
+        // Register provider implementations
+        services.AddTransient<IAgentProvider, AzureAgentProvider>();
+        services.AddTransient<IAgentProvider, OllamaAgentProvider>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        return new AgentProviderResolver(serviceProvider);
     }
 
     /// <summary>
