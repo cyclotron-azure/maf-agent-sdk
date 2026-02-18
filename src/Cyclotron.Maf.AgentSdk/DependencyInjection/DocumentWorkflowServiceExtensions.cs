@@ -1,4 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
 using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
@@ -33,6 +34,11 @@ public static class DocumentWorkflowServiceExtensions
 
         // Register provider client factory as scoped service (supports Azure and Ollama)
         services.AddScoped<IProviderClientFactory, ProviderClientFactory>();
+
+        // Register provider-specific agent factories and resolver
+        services.AddSingleton<IAgentProvider, AzureAgentProvider>();
+        services.AddSingleton<IAgentProvider, OllamaAgentProvider>();
+        services.AddSingleton<IAgentProviderResolver, AgentProviderResolver>();
 
         // Note: Vector store services have been moved to the AgentSdk.Vectors package.
         // To enable vector store functionality, add a reference to AgentSdk.Vectors
@@ -78,11 +84,9 @@ public static class DocumentWorkflowServiceExtensions
                     sp.GetRequiredService<IPromptRenderingService>(),
                     sp.GetRequiredService<IOptions<ModelProviderOptions>>(),
                     sp.GetRequiredService<IOptions<AgentOptions>>(),
-                    sp.GetRequiredService<IProviderClientFactory>(),
+                    sp.GetRequiredService<IAgentProviderResolver>(),
                     sp.GetService<VectorStoreManager>(), // Optional - returns null if AgentSdk.Vectors not registered
-                    sp.GetRequiredService<IOptions<TelemetryOptions>>(),
-                    sp.GetRequiredService<IHttpClientFactory>(),
-                    sp.GetRequiredService<ILoggerFactory>()));
+                    sp.GetRequiredService<IOptions<TelemetryOptions>>()));
         }
 
         return services;

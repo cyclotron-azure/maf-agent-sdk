@@ -1,4 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
@@ -36,6 +37,45 @@ public class DocumentWorkflowServiceExtensionsTests
         var service = scope.ServiceProvider.GetService<IProviderClientFactory>();
         service.Should().NotBeNull();
         service.Should().BeOfType<ProviderClientFactory>();
+    }
+
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register IAgentProviderResolver as singleton")]
+    public void AddDocumentWorkflowServices_RegistersAgentProviderResolver()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton(CreateTestConfiguration());
+        services.AddLogging();
+        services.AddAgentSdkServices();
+
+        // Act
+        services.AddDocumentWorkflowServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        var service = serviceProvider.GetService<IAgentProviderResolver>();
+        service.Should().NotBeNull();
+        service.Should().BeOfType<AgentProviderResolver>();
+    }
+
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register provider implementations")]
+    public void AddDocumentWorkflowServices_RegistersAgentProviders()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton(CreateTestConfiguration());
+        services.AddLogging();
+        services.AddAgentSdkServices();
+
+        // Act
+        services.AddDocumentWorkflowServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        var providers = serviceProvider.GetServices<IAgentProvider>().ToArray();
+        providers.Should().NotBeEmpty();
+        providers.Should().Contain(provider => provider is AzureAgentProvider);
+        providers.Should().Contain(provider => provider is OllamaAgentProvider);
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices does not require IVectorStoreManager (optional)")]

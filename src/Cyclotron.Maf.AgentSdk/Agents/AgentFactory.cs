@@ -1,16 +1,14 @@
-using Cyclotron.Maf.AgentSdk.Middleware;
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
 using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Common.Services;
+using Cyclotron.Maf.AgentSdk.Middleware;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
-using Azure.AI.Projects;
-using Azure.AI.Projects.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OllamaSharp;
-using OpenAI.Responses;
+using System.Net.Http;
 using Polly;
 using Polly.Retry;
 using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
@@ -35,19 +33,68 @@ public class AgentFactory : IAgentFactory
 {
     private readonly ILogger<AgentFactory> _logger;
     private readonly IPromptRenderingService _promptService;
-    private readonly IProviderClientFactory _clientFactory;
+    private readonly IAgentProviderResolver _providerResolver;
     private readonly VectorStoreManager? _vectorStoreManager;
     private readonly ModelProviderOptions _providerOptions;
     private readonly string _agentKey;
     private readonly AgentDefinitionOptions _agentDefinition;
     private readonly TelemetryOptions _telemetryOptions;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILoggerFactory _loggerFactory;
     private string? _createdAgentName;
     private string? _createdAgentVersion;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AgentFactory"/> class.
+    /// </summary>
+    /// <param name="agentKey">The unique key identifying this agent type.</param>
+    /// <param name="logger">The logger instance.</param>
+    /// <param name="promptService">The service for rendering agent prompts.</param>
+    /// <param name="providerOptions">The model provider configuration options.</param>
+    /// <param name="agentOptions">The agent configuration options.</param>
+    /// <param name="providerResolver">Resolver for provider-specific agent factories.</param>
+    /// <param name="vectorStoreManager">Optional manager for vector store operations. If null, vector store functionality will be disabled.</param>
+    /// <param name="telemetryOptions">The telemetry configuration options.</param>
+    /// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
+    public AgentFactory(
+        string agentKey,
+        ILogger<AgentFactory> logger,
+        IPromptRenderingService promptService,
+        IOptions<ModelProviderOptions> providerOptions,
+        IOptions<AgentOptions> agentOptions,
+        IAgentProviderResolver providerResolver,
+        VectorStoreManager? vectorStoreManager,
+        IOptions<TelemetryOptions> telemetryOptions)
+    {
+        _agentKey = agentKey ?? throw new ArgumentNullException(nameof(agentKey));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
+        _providerResolver = providerResolver ?? throw new ArgumentNullException(nameof(providerResolver));
+        _vectorStoreManager = vectorStoreManager; // Optional - can be null
+
+        ArgumentNullException.ThrowIfNull(providerOptions, nameof(providerOptions));
+        ArgumentNullException.ThrowIfNull(agentOptions, nameof(agentOptions));
+        ArgumentNullException.ThrowIfNull(telemetryOptions, nameof(telemetryOptions));
+
+        _providerOptions = providerOptions.Value;
+        _telemetryOptions = telemetryOptions.Value;
+
+        // Validate that configuration exists for this agent key
+        if (!_promptService.HasConfiguration(_agentKey))
+        {
+            _logger.LogWarning(
+                "No configuration found for agent key '{AgentKey}'. Using default instructions.",
+                _agentKey);
+        }
+
+        // Get agent definition from configuration (creates default if not found)
+        _agentDefinition = GetAgentDefinition(agentOptions.Value, _agentKey);
+
+        // Validate provider reference
+        ValidateProviderReference();
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AgentFactory"/> class using legacy dependencies.
+    /// This overload preserves compatibility with prior constructors.
     /// </summary>
     /// <param name="agentKey">The unique key identifying this agent type.</param>
     /// <param name="logger">The logger instance.</param>
@@ -71,35 +118,17 @@ public class AgentFactory : IAgentFactory
         IOptions<TelemetryOptions> telemetryOptions,
         IHttpClientFactory httpClientFactory,
         ILoggerFactory loggerFactory)
+        : this(
+            agentKey,
+            logger,
+            promptService,
+            providerOptions,
+            agentOptions,
+            BuildDefaultProviderResolver(clientFactory, loggerFactory),
+            vectorStoreManager,
+            telemetryOptions)
     {
-        _agentKey = agentKey ?? throw new ArgumentNullException(nameof(agentKey));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
-        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-        _vectorStoreManager = vectorStoreManager; // Optional - can be null
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-
-        ArgumentNullException.ThrowIfNull(providerOptions, nameof(providerOptions));
-        ArgumentNullException.ThrowIfNull(agentOptions, nameof(agentOptions));
-        ArgumentNullException.ThrowIfNull(telemetryOptions, nameof(telemetryOptions));
-
-        _providerOptions = providerOptions.Value;
-        _telemetryOptions = telemetryOptions.Value;
-
-        // Validate that configuration exists for this agent key
-        if (!_promptService.HasConfiguration(_agentKey))
-        {
-            _logger.LogWarning(
-                "No configuration found for agent key '{AgentKey}'. Using default instructions.",
-                _agentKey);
-        }
-
-        // Get agent definition from configuration (creates default if not found)
-        _agentDefinition = GetAgentDefinition(agentOptions.Value, _agentKey);
-
-        // Validate provider reference
-        ValidateProviderReference();
+        ArgumentNullException.ThrowIfNull(httpClientFactory, nameof(httpClientFactory));
     }
 
     /// <summary>
@@ -251,13 +280,14 @@ public class AgentFactory : IAgentFactory
                 "Add a package reference to AgentSdk.Vectors and call AddVectorStoreServices() in your startup configuration.");
         }
 
-        // Get provider configuration from agent's provider property
         var providerName = _agentDefinition.Provider;
-        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
+        var provider = GetProviderDefinition(providerName);
+        var providerImplementation = _providerResolver.Resolve(provider);
+        if (!providerImplementation.Capabilities.SupportsVectorStore)
         {
             throw new InvalidOperationException(
-                $"Provider '{providerName}' referenced by agent '{_agentKey}' not found in configuration. " +
-                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
+                $"Provider '{providerName}' does not support vector store agents. " +
+                "Use CreateAgentAsync without a vector store for local providers.");
         }
 
         _logger.LogInformation(
@@ -273,110 +303,38 @@ public class AgentFactory : IAgentFactory
         // Configure tools based on agent metadata configuration
         var tools = BuildToolConfiguration(vectorStoreId);
 
-        // Create ephemeral agent with unique name
-        var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
-        var agentName = $"{namePrefix}-{Guid.NewGuid().ToString("N")[..8]}";
+        var creationRequest = new AgentProviderCreationRequest(
+            _agentKey,
+            providerName,
+            provider,
+            vectorStoreId,
+            tools,
+            instructions,
+            _promptService.GetAgentNamePrefix(_agentKey),
+            _agentDefinition.Version);
 
-        try
-        {
-            _logger.LogDebug(
-                "Creating {AgentKey} agent with name: {AgentName}, provider: {ProviderName}, model: {Model}, tools: [{Tools}]",
-                _agentKey,
-                agentName,
-                providerName,
-                provider.GetEffectiveModel(),
-                string.Join(", ", _agentDefinition.Metadata.Tools));
+        var providerResult = await providerImplementation
+            .CreateAgentAsync(creationRequest, cancellationToken)
+            .ConfigureAwait(false);
 
-            // Get provider-specific client
-            var projectClient = _clientFactory.GetClient(providerName);
+        _createdAgentName = providerResult.CreatedAgentName;
+        _createdAgentVersion = providerResult.CreatedAgentVersion;
 
-            _logger.LogDebug(
-                "Creating {AgentKey} agent with configured version: {ConfiguredVersion}",
-                _agentKey,
-                _agentDefinition.Version ?? "(auto-generated)");
+        var agent = ApplyMiddleware(providerResult.Agent);
+        Agent = agent;
+        Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        VectorStoreId = vectorStoreId;
+        _logger.LogDebug("Created session for {AgentKey} agent: {AgentId}", _agentKey, agent.Id);
 
-            // Create agent using V2 versioned API with PromptAgentDefinition
-            var promptDefinition = new PromptAgentDefinition(model: provider.GetEffectiveModel())
-            {
-                Instructions = instructions,
-            };
-
-            if (tools.Count > 0)
-            {
-                var agentTools = tools
-                    .Select(t => t.AsOpenAIResponseTool())
-                    .Where(t => t is not null)
-                    .Select(t => t!.AsAgentTool())
-                    .ToList();
-
-                foreach (var tool in agentTools)
-                {
-                    promptDefinition.Tools.Add(tool);
-                }
-            }
-
-            var versionOptions = new AgentVersionCreationOptions(promptDefinition);
-            AgentVersion createdAgentVersion = await projectClient.Agents.CreateAgentVersionAsync(
-                agentName: agentName,
-                options: versionOptions,
-                cancellationToken: cancellationToken);
-
-            _createdAgentName = agentName;
-            _createdAgentVersion = createdAgentVersion.Version;
-
-            // Get the AIAgent from the created version
-            var agentRecord = projectClient.Agents.GetAgent(agentName).Value;
-            var agentReference = new AgentReference(agentRecord.Id);
-            AIAgent agent = projectClient.AsAIAgent(agentReference);
-            var agentId = agent.Id;
-
-            _logger.LogInformation(
-                "Created {AgentKey} agent: {AgentId} (Name: {AgentName}, Provider: {ProviderName})",
-                _agentKey,
-                agentId,
-                agentName,
-                providerName);
-
-            // Apply middleware using centralized helper
-            agent = ApplyMiddleware(agent);
-
-            // Store agent and create session automatically
-            Agent = agent;
-            Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
-            VectorStoreId = vectorStoreId;
-            _logger.LogDebug("Created session for {AgentKey} agent: {AgentId}", _agentKey, agentId);
-
-            return agent;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Failed to create {AgentKey} agent with provider '{ProviderName}'",
-                _agentKey,
-                providerName);
-
-            throw;
-        }
+        return agent;
     }
 
     /// <inheritdoc/>
     public async Task<AIAgent> CreateAgentAsync(CancellationToken cancellationToken = default)
     {
-        // Get provider configuration from agent's provider property
         var providerName = _agentDefinition.Provider;
-        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
-        {
-            throw new InvalidOperationException(
-                $"Provider '{providerName}' referenced by agent '{_agentKey}' not found in configuration. " +
-                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
-        }
-
-        // Check if using local provider (Ollama) - create using ChatClientAgent pattern
-        if (provider.IsLocalProvider())
-        {
-            return await CreateOllamaAgentAsync(provider, cancellationToken);
-        }
+        var provider = GetProviderDefinition(providerName);
+        var providerImplementation = _providerResolver.Resolve(provider);
 
         _logger.LogInformation(
             "Creating {AgentKey} agent WITHOUT vector store with provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model})",
@@ -391,160 +349,30 @@ public class AgentFactory : IAgentFactory
         // No tools configuration for agents without vector stores (e.g., Ollama)
         // (BuildToolConfiguration returns List<AITool>, but we don't call it here)
 
-        // Create ephemeral agent with unique name
-        var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
-        var agentName = $"{namePrefix}-{Guid.NewGuid().ToString("N")[..8]}";
-
-        try
-        {
-            _logger.LogDebug(
-                "Creating {AgentKey} agent with name: {AgentName}, provider: {ProviderName}, model: {Model} (no tools configured)",
-                _agentKey,
-                agentName,
-                providerName,
-                provider.GetEffectiveModel());
-
-            // Get provider-specific client
-            var projectClient = _clientFactory.GetClient(providerName);
-
-            _logger.LogDebug(
-                "Creating {AgentKey} agent with configured version: {ConfiguredVersion}",
-                _agentKey,
-                _agentDefinition.Version ?? "(auto-generated)");
-
-            // Create agent using V2 versioned API with PromptAgentDefinition
-            var promptDefinition = new PromptAgentDefinition(model: provider.GetEffectiveModel())
-            {
-                Instructions = instructions,
-            };
-
-            var versionOptions = new AgentVersionCreationOptions(promptDefinition);
-            AgentVersion createdAgentVersion = await projectClient.Agents.CreateAgentVersionAsync(
-                agentName: agentName,
-                options: versionOptions,
-                cancellationToken: cancellationToken);
-
-            _createdAgentName = agentName;
-            _createdAgentVersion = createdAgentVersion.Version;
-
-            // Get the AIAgent from the created version
-            var agentRecord = projectClient.Agents.GetAgent(agentName).Value;
-            var agentReference = new AgentReference(agentRecord.Id);
-            AIAgent agent = projectClient.AsAIAgent(agentReference);
-            var agentId = agent.Id;
-
-            _logger.LogInformation(
-                "Created {AgentKey} agent WITHOUT vector store: {AgentId} (Name: {AgentName}, Provider: {ProviderName})",
-                _agentKey,
-                agentId,
-                agentName,
-                providerName);
-
-            // Apply middleware using centralized helper
-            agent = ApplyMiddleware(agent);
-
-            // Store agent and create session automatically
-            Agent = agent;
-            Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
-            VectorStoreId = null; // No vector store for this agent
-            _logger.LogDebug("Created session for {AgentKey} agent: {AgentId} (no vector store)", _agentKey, agentId);
-
-            return agent;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Failed to create {AgentKey} agent WITHOUT vector store with provider '{ProviderName}'",
-                _agentKey,
-                providerName);
-
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Creates an AI agent for Ollama local models using OllamaSharp SDK.
-    /// Supports standard chat, reasoning mode, and multimodal capabilities.
-    /// </summary>
-    private async Task<AIAgent> CreateOllamaAgentAsync(
-        ModelProviderDefinitionOptions provider,
-        CancellationToken cancellationToken)
-    {
-        var providerName = _agentDefinition.Provider;
-        var modelName = provider.GetEffectiveModel();
-        var endpoint = provider.Endpoint.TrimEnd('/');
-
-        _logger.LogInformation(
-            "Creating {AgentKey} agent for Ollama provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model}, ReasoningMode: {ReasoningMode})",
+        var creationRequest = new AgentProviderCreationRequest(
             _agentKey,
             providerName,
-            endpoint,
-            modelName,
-            provider.EnableReasoningMode);
+            provider,
+            null,
+            Array.Empty<AITool>(),
+            instructions,
+            _promptService.GetAgentNamePrefix(_agentKey),
+            _agentDefinition.Version);
 
-        try
-        {
-            // Get system prompt (instructions) from prompt rendering service
-            var instructions = _promptService.RenderSystemPrompt(_agentKey);
+        var providerResult = await providerImplementation
+            .CreateAgentAsync(creationRequest, cancellationToken)
+            .ConfigureAwait(false);
 
-            // Create OllamaApiClient using OllamaSharp SDK
-            var ollamaClient = new OllamaApiClient(new Uri(endpoint), modelName);
+        _createdAgentName = providerResult.CreatedAgentName;
+        _createdAgentVersion = providerResult.CreatedAgentVersion;
 
-            // Configure reasoning mode if enabled
-            if (provider.EnableReasoningMode)
-            {
-                var reasoningModel = provider.GetReasoningModel();
-                _logger.LogInformation(
-                    "Reasoning mode enabled for {AgentKey} agent using model '{ReasoningModel}'",
-                    _agentKey,
-                    reasoningModel);
+        var agent = ApplyMiddleware(providerResult.Agent);
+        Agent = agent;
+        Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        VectorStoreId = null; // No vector store for this agent
+        _logger.LogDebug("Created session for {AgentKey} agent: {AgentId} (no vector store)", _agentKey, agent.Id);
 
-                // If a specific reasoning model is configured, update the model
-                if (!string.IsNullOrEmpty(provider.ReasoningModel))
-                {
-                    ollamaClient.SelectedModel = reasoningModel;
-                }
-            }
-
-            // OllamaApiClient implements IChatClient via Microsoft.Extensions.AI
-            IChatClient chatClient = ollamaClient;
-
-            // Create AIAgent using ChatClientAgent wrapper from Microsoft.Agents.AI
-            var agentName = $"{_promptService.GetAgentNamePrefix(_agentKey)}-ollama";
-            AIAgent agent = new ChatClientAgent(
-                chatClient,
-                name: agentName,
-                description: $"Ollama agent using model {modelName}",
-                instructions: instructions);
-
-            _logger.LogInformation(
-                "Created {AgentKey} agent for Ollama provider '{ProviderName}' (Model: {Model})",
-                _agentKey,
-                providerName,
-                modelName);
-
-            // Apply middleware using centralized helper
-            agent = ApplyMiddleware(agent);
-
-            // Store agent and create session automatically
-            Agent = agent;
-            Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken);
-            VectorStoreId = null; // No vector store for Ollama agents
-            _logger.LogDebug("Created session for {AgentKey} Ollama agent", _agentKey);
-
-            return agent;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Failed to create {AgentKey} agent for Ollama provider '{ProviderName}'",
-                _agentKey,
-                providerName);
-
-            throw;
-        }
+        return agent;
     }
 
     /// <inheritdoc/>
@@ -556,42 +384,33 @@ public class AgentFactory : IAgentFactory
             return;
         }
 
-        var agentId = Agent.Id;
-
         try
         {
             var providerName = _agentDefinition.Provider;
+            var provider = GetProviderDefinition(providerName);
+            var providerImplementation = _providerResolver.Resolve(provider);
 
-            // Skip cleanup for Ollama local providers - they don't support agent deletion
-            if (IsOllamaProvider(providerName))
+            if (!providerImplementation.Capabilities.SupportsAgentDeletion)
             {
-                _logger.LogDebug("Skipping agent deletion for Ollama provider '{ProviderName}'", providerName);
+                _logger.LogDebug("Skipping agent deletion for provider '{ProviderName}'", providerName);
                 return;
             }
 
-            var projectClient = _clientFactory.GetClient(providerName);
-            if (TryParseAgentId(agentId, out var agentName, out var agentVersion))
-            {
-                await projectClient.Agents.DeleteAgentVersionAsync(agentName, agentVersion, cancellationToken);
-                _logger.LogDebug("Deleted {AgentKey} agent version {AgentVersion}: {AgentName}", _agentKey, agentVersion, agentName);
-            }
-            else if (!string.IsNullOrWhiteSpace(_createdAgentName) && !string.IsNullOrWhiteSpace(_createdAgentVersion))
-            {
-                await projectClient.Agents.DeleteAgentVersionAsync(_createdAgentName, _createdAgentVersion, cancellationToken);
-                _logger.LogDebug(
-                    "Deleted {AgentKey} agent version {AgentVersion}: {AgentName} (fallback)",
-                    _agentKey,
-                    _createdAgentVersion,
-                    _createdAgentName);
-            }
-            else
-            {
-                _logger.LogWarning("Agent ID format unexpected: {AgentId}. Expected 'name:version' format", agentId);
-            }
+            var deletionRequest = new AgentProviderDeletionRequest(
+                _agentKey,
+                providerName,
+                provider,
+                Agent,
+                _createdAgentName,
+                _createdAgentVersion);
+
+            await providerImplementation
+                .DeleteAgentAsync(deletionRequest, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete {AgentKey} agent: {AgentId}", _agentKey, agentId);
+            _logger.LogWarning(ex, "Failed to delete {AgentKey} agent: {AgentId}", _agentKey, Agent.Id);
         }
         finally
         {
@@ -613,19 +432,24 @@ public class AgentFactory : IAgentFactory
         try
         {
             var providerName = _agentDefinition.Provider;
+            var provider = GetProviderDefinition(providerName);
+            var providerImplementation = _providerResolver.Resolve(provider);
 
-            // Skip cleanup for Ollama local providers - they don't support session management
-            if (IsOllamaProvider(providerName))
+            if (!providerImplementation.Capabilities.SupportsSessionDeletion)
             {
-                _logger.LogDebug("Skipping session deletion for Ollama provider '{ProviderName}'", providerName);
+                _logger.LogDebug("Skipping session deletion for provider '{ProviderName}'", providerName);
                 return;
             }
 
-            var projectClient = _clientFactory.GetClient(providerName);
+            var deletionRequest = new AgentProviderSessionDeletionRequest(
+                _agentKey,
+                providerName,
+                provider,
+                Session);
 
-            // V2 API: Session/conversation deletion is not directly supported via AIProjectClient
-            // Sessions are managed through agent lifecycle and are automatically cleaned up
-            _logger.LogDebug("Session for {AgentKey} - deletion not directly supported in V2 API, will be cleaned up automatically", _agentKey);
+            await providerImplementation
+                .DeleteSessionAsync(deletionRequest, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -780,27 +604,6 @@ public class AgentFactory : IAgentFactory
         return tools;
     }
 
-    private static bool TryParseAgentId(string agentId, out string agentName, out string agentVersion)
-    {
-        agentName = string.Empty;
-        agentVersion = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(agentId))
-        {
-            return false;
-        }
-
-        var parts = agentId.Split(':');
-        if (parts.Length != 2)
-        {
-            return false;
-        }
-
-        agentName = parts[0];
-        agentVersion = parts[1];
-        return !string.IsNullOrWhiteSpace(agentName) && !string.IsNullOrWhiteSpace(agentVersion);
-    }
-
     private void ValidateProviderReference()
     {
         var providerName = _agentDefinition.Provider;
@@ -819,6 +622,34 @@ public class AgentFactory : IAgentFactory
                 $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}. " +
                 $"Please add '{providerName}' to the providers: section in agent.config.yaml.");
         }
+    }
+
+    private ModelProviderDefinitionOptions GetProviderDefinition(string providerName)
+    {
+        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
+        {
+            throw new InvalidOperationException(
+                $"Provider '{providerName}' referenced by agent '{_agentKey}' not found in configuration. " +
+                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
+        }
+
+        return provider;
+    }
+
+    private static IAgentProviderResolver BuildDefaultProviderResolver(
+        IProviderClientFactory clientFactory,
+        ILoggerFactory loggerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(clientFactory, nameof(clientFactory));
+        ArgumentNullException.ThrowIfNull(loggerFactory, nameof(loggerFactory));
+
+        var providers = new IAgentProvider[]
+        {
+            new AzureAgentProvider(clientFactory, loggerFactory.CreateLogger<AzureAgentProvider>()),
+            new OllamaAgentProvider(loggerFactory.CreateLogger<OllamaAgentProvider>())
+        };
+
+        return new AgentProviderResolver(providers);
     }
 
     /// <summary>
@@ -869,12 +700,4 @@ public class AgentFactory : IAgentFactory
         };
     }
 
-    private bool IsOllamaProvider(string providerName)
-    {
-        // Check if the provider is for Ollama (local models that don't need cleanup)
-        return !string.IsNullOrWhiteSpace(providerName) &&
-               (providerName.Equals("ollama_local", StringComparison.OrdinalIgnoreCase) ||
-                providerName.Equals("ollama", StringComparison.OrdinalIgnoreCase) ||
-                providerName.StartsWith("ollama_", StringComparison.OrdinalIgnoreCase));
-    }
 }
