@@ -4,7 +4,6 @@ using Cyclotron.Maf.AgentSdk.Options;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.DependencyInjection;
 

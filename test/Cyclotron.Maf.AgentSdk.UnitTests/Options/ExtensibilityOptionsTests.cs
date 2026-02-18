@@ -2,7 +2,6 @@ using Cyclotron.Maf.AgentSdk.Options;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Moq;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Options;
 

@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 using Cyclotron.Maf.AgentSdk.VectorStore.Models;
 using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services;
@@ -81,13 +76,13 @@ public static class VectorStoreServiceCollectionExtensions
                     throw new InvalidOperationException($"IProviderClientFactory service not registered for provider {providerName}. Call AddAgentSdkServices() during DI configuration.");
                 }
 
-                var getClientMethod = factoryType.GetMethod("GetClient", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance, null, new[] { typeof(string) }, null);
+                var getClientMethod = factoryType.GetMethod("GetClient", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance, null, [typeof(string)], null);
                 if (getClientMethod == null)
                 {
                     throw new InvalidOperationException("GetClient method not found on IProviderClientFactory.");
                 }
 
-                var client = getClientMethod.Invoke(factory, new object[] { providerName });
+                var client = getClientMethod.Invoke(factory, [providerName]);
                 return (AIProjectClient)(client ?? throw new InvalidOperationException($"Failed to get Azure client for provider {providerName}"));
             };
 
@@ -159,7 +154,7 @@ public static class VectorStoreServiceCollectionExtensions
             };
 
             return new AzureVectorStoreManager(logger, options, telemetry, clientFactory, configFactory);
-        });;
+        });
 
         // Register Ollama vector store manager
         services.AddScoped<OllamaVectorStoreManager>(sp =>

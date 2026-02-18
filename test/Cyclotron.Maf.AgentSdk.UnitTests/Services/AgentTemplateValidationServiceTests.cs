@@ -5,7 +5,6 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;

@@ -1,6 +1,4 @@
-using Microsoft.Extensions.AI;
 using SpamDetection.Services;
-using System.IO;
 
 namespace SpamDetection;
 

@@ -1,8 +1,6 @@
 using Cyclotron.Maf.AgentSdk.Models;
 using Azure.AI.Projects;
 using Microsoft.Extensions.Logging;
-using OpenAI.Files;
-using OpenAI.VectorStores;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 

@@ -1,7 +1,6 @@
 using Cyclotron.Maf.AgentSdk.Middleware;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Middleware;
 

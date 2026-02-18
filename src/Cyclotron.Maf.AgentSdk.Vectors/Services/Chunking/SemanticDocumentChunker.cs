@@ -32,7 +32,7 @@ public class SemanticDocumentChunker(
         }
 
         // Split by sentences while preserving paragraph structure
-        var paragraphs = documentText.Split(new[] { "\n\n", "\r\n\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var paragraphs = documentText.Split(["\n\n", "\r\n\r\n"], StringSplitOptions.RemoveEmptyEntries);
         var sentences = new List<string>();
 
         foreach (var paragraph in paragraphs)

@@ -1,4 +1,3 @@
-using Cyclotron.Maf.AgentSdk.Services;
 using SpamDetection;
 using SpamDetection.Services;
 using SpamDetection.Services.Impl;

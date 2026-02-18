@@ -3,7 +3,6 @@ using Cyclotron.Maf.AgentSdk.VectorStore.Exceptions;
 using Cyclotron.Maf.AgentSdk.VectorStore.Models;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
 using Azure.AI.Projects;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Files;

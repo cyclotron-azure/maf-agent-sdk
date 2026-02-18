@@ -2,19 +2,10 @@ using Cyclotron.Maf.AgentSdk.VectorStore.Exceptions;
 using Cyclotron.Maf.AgentSdk.VectorStore.Models;
 using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 

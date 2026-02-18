@@ -1,13 +1,11 @@
 using Cyclotron.Maf.AgentSdk.Agents;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
-using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using AwesomeAssertions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
 using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 

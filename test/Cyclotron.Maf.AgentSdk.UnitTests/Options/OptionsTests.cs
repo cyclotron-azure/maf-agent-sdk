@@ -1,7 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Options;
-using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using AwesomeAssertions;
-using Xunit;
 using VectorStoreIndexingOptions = Cyclotron.Maf.AgentSdk.VectorStore.Options.VectorStoreIndexingOptions;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Options;

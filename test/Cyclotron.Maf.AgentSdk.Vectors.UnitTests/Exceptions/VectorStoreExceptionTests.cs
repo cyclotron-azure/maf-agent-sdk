@@ -1,4 +1,3 @@
-using System;
 using Cyclotron.Maf.AgentSdk.VectorStore.Exceptions;
 using Xunit;
 
