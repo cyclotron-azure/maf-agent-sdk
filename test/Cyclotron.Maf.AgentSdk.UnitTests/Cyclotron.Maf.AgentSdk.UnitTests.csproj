@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cyclotron.Maf.AgentSdk\Cyclotron.Maf.AgentSdk.csproj" />
     <ProjectReference Include="..\..\src\Cyclotron.Maf.AgentSdk.Vectors\Cyclotron.Maf.AgentSdk.Vectors.csproj" />
+    <ProjectReference Include="..\..\src\Cyclotron.Maf.AgentSdk.Pdf\Cyclotron.Maf.AgentSdk.Pdf.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,5 @@
+using Cyclotron.Maf.AgentSdk.Common.Models;
 using Cyclotron.Maf.AgentSdk.VectorStore.Exceptions;
-using Cyclotron.Maf.AgentSdk.VectorStore.Models;
 using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
 using Microsoft.Extensions.Logging;

@@ -1,4 +1,6 @@
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Common.Options;
+using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using AwesomeAssertions;

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Options;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;

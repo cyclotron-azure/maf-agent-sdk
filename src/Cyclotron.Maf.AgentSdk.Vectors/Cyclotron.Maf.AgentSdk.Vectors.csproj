@@ -39,6 +39,11 @@
     <PackageReference Include="Polly.Core" />
   </ItemGroup>
 
+  <!-- Project References -->
+  <ItemGroup>
+    <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Common/Cyclotron.Maf.AgentSdk.Common.csproj" />
+  </ItemGroup>
+
   <!-- Package Content -->
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

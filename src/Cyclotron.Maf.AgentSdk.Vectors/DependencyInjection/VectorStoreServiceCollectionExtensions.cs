@@ -1,4 +1,6 @@
-using Cyclotron.Maf.AgentSdk.VectorStore.Models;
+using Cyclotron.Maf.AgentSdk.Common.Models;
+using Cyclotron.Maf.AgentSdk.Common.Options;
+using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.VectorStore.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
@@ -63,27 +65,9 @@ public static class VectorStoreServiceCollectionExtensions
                 using var scope = scopeFactory.CreateScope();
                 var scopedSp = scope.ServiceProvider;
 
-                // Use reflection to get IProviderClientFactory to avoid circular dependency
-                var factoryType = Type.GetType("Cyclotron.Maf.AgentSdk.Services.IProviderClientFactory, Cyclotron.Maf.AgentSdk");
-                if (factoryType == null)
-                {
-                    throw new InvalidOperationException("IProviderClientFactory type not found. Ensure Cyclotron.Maf.AgentSdk is loaded.");
-                }
-
-                var factory = scopedSp.GetService(factoryType);
-                if (factory == null)
-                {
-                    throw new InvalidOperationException($"IProviderClientFactory service not registered for provider {providerName}. Call AddAgentSdkServices() during DI configuration.");
-                }
-
-                var getClientMethod = factoryType.GetMethod("GetClient", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance, null, [typeof(string)], null);
-                if (getClientMethod == null)
-                {
-                    throw new InvalidOperationException("GetClient method not found on IProviderClientFactory.");
-                }
-
-                var client = getClientMethod.Invoke(factory, [providerName]);
-                return (AIProjectClient)(client ?? throw new InvalidOperationException($"Failed to get Azure client for provider {providerName}"));
+                // Get IProviderClientFactory from the scoped service provider
+                var factory = scopedSp.GetRequiredService<IProviderClientFactory>();
+                return factory.GetClient(providerName);
             };
 
             // Create a factory that gets the provider config at method invocation time using a fresh scope
@@ -92,65 +76,15 @@ public static class VectorStoreServiceCollectionExtensions
                 using var scope = scopeFactory.CreateScope();
                 var scopedSp = scope.ServiceProvider;
 
-                // Use reflection to load ModelProviderOptions to avoid circular dependency
-                var agentSdkAssembly = System.Reflection.Assembly.Load("Cyclotron.Maf.AgentSdk");
-                var modelProviderOptionsType = agentSdkAssembly?.GetType("Cyclotron.Maf.AgentSdk.Options.ModelProviderOptions");
-                if (modelProviderOptionsType == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions type not found. Ensure Cyclotron.Maf.AgentSdk is loaded.");
-                }
-
-                var optionsType = typeof(IOptions<>).MakeGenericType(modelProviderOptionsType);
-                var modelProviderOptionsObj = scopedSp.GetService(optionsType);
-                if (modelProviderOptionsObj == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions not registered. Call AddAgentSdkServices() during DI configuration.");
-                }
-
-                // Get Value property using reflection
-                var valueProperty = optionsType.GetProperty("Value");
-                if (valueProperty == null)
-                {
-                    throw new InvalidOperationException("Options<ModelProviderOptions>.Value property not found");
-                }
-
-                var optionsValue = valueProperty.GetValue(modelProviderOptionsObj);
-                if (optionsValue == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions.Value is null");
-                }
-
-                // Get Providers dictionary using reflection
-                var providersProperty = modelProviderOptionsType.GetProperty("Providers");
-                if (providersProperty == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions.Providers property not found");
-                }
-
-                var providers = providersProperty.GetValue(optionsValue) as System.Collections.IDictionary;
-                if (providers == null || !providers.Contains(providerName))
-                {
-                    throw new InvalidOperationException($"Provider '{providerName}' not configured in ModelProviderOptions");
-                }
-
-                var providerDef = providers[providerName];
-                if (providerDef == null)
-                {
-                    throw new InvalidOperationException($"Provider definition for '{providerName}' is null");
-                }
-
-                // Extract properties from provider definition using reflection
-                var type = providerDef.GetType().GetProperty("Type")?.GetValue(providerDef) as string;
-                var endpoint = providerDef.GetType().GetProperty("Endpoint")?.GetValue(providerDef) as string;
-                var deploymentName = providerDef.GetType().GetProperty("DeploymentName")?.GetValue(providerDef) as string;
-                var apiKey = providerDef.GetType().GetProperty("ApiKey")?.GetValue(providerDef) as string;
+                var modelProviderOptions = scopedSp.GetRequiredService<IOptions<ModelProviderOptions>>();
+                var providerDef = modelProviderOptions.Value.Providers[providerName];
 
                 return new VectorStoreProviderConfig(
                     providerName,
-                    type ?? string.Empty,
-                    endpoint,
-                    deploymentName,
-                    apiKey);
+                    providerDef.Type ?? string.Empty,
+                    providerDef.Endpoint,
+                    providerDef.DeploymentName,
+                    providerDef.ApiKey);
             };
 
             return new AzureVectorStoreManager(logger, options, telemetry, clientFactory, configFactory);
@@ -163,73 +97,19 @@ public static class VectorStoreServiceCollectionExtensions
             var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
             var indexingOptions = sp.GetRequiredService<IOptions<VectorStoreIndexingOptions>>();
             var telemetry = sp.GetRequiredService<VectorStoreTelemetry>();
-            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
             // Create a factory that gets the provider config at method invocation time using a fresh scope
             Func<string, VectorStoreProviderConfig> configFactory = providerName =>
             {
-                using var scope = scopeFactory.CreateScope();
-                var scopedSp = scope.ServiceProvider;
-
-                // Use reflection to load ModelProviderOptions to avoid circular dependency
-                var agentSdkAssembly = System.Reflection.Assembly.Load("Cyclotron.Maf.AgentSdk");
-                var modelProviderOptionsType = agentSdkAssembly?.GetType("Cyclotron.Maf.AgentSdk.Options.ModelProviderOptions");
-                if (modelProviderOptionsType == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions type not found. Ensure Cyclotron.Maf.AgentSdk is loaded.");
-                }
-
-                var optionsType = typeof(IOptions<>).MakeGenericType(modelProviderOptionsType);
-                var modelProviderOptionsObj = scopedSp.GetService(optionsType);
-                if (modelProviderOptionsObj == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions not registered. Call AddAgentSdkServices() during DI configuration.");
-                }
-
-                // Get Value property using reflection
-                var valueProperty = optionsType.GetProperty("Value");
-                if (valueProperty == null)
-                {
-                    throw new InvalidOperationException("Options<ModelProviderOptions>.Value property not found");
-                }
-
-                var optionsValue = valueProperty.GetValue(modelProviderOptionsObj);
-                if (optionsValue == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions.Value is null");
-                }
-
-                // Get Providers dictionary using reflection
-                var providersProperty = modelProviderOptionsType.GetProperty("Providers");
-                if (providersProperty == null)
-                {
-                    throw new InvalidOperationException("ModelProviderOptions.Providers property not found");
-                }
-
-                var providers = providersProperty.GetValue(optionsValue) as System.Collections.IDictionary;
-                if (providers == null || !providers.Contains(providerName))
-                {
-                    throw new InvalidOperationException($"Provider '{providerName}' not configured in ModelProviderOptions");
-                }
-
-                var providerDef = providers[providerName];
-                if (providerDef == null)
-                {
-                    throw new InvalidOperationException($"Provider definition for '{providerName}' is null");
-                }
-
-                // Extract properties from provider definition using reflection
-                var type = providerDef.GetType().GetProperty("Type")?.GetValue(providerDef) as string;
-                var endpoint = providerDef.GetType().GetProperty("Endpoint")?.GetValue(providerDef) as string;
-                var deploymentName = providerDef.GetType().GetProperty("DeploymentName")?.GetValue(providerDef) as string;
-                var apiKey = providerDef.GetType().GetProperty("ApiKey")?.GetValue(providerDef) as string;
+                var modelProviderOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
+                var providerDef = modelProviderOptions.Value.Providers[providerName];
 
                 return new VectorStoreProviderConfig(
                     providerName,
-                    type ?? string.Empty,
-                    endpoint,
-                    deploymentName,
-                    apiKey);
+                    providerDef.Type ?? string.Empty,
+                    providerDef.Endpoint,
+                    providerDef.DeploymentName,
+                    providerDef.ApiKey);
             };
 
             return new OllamaVectorStoreManager(
@@ -238,7 +118,7 @@ public static class VectorStoreServiceCollectionExtensions
                 indexingOptions,
                 telemetry,
                 configFactory);
-        });;
+        });
 
         // Register factory for provider dispatch
         services.AddScoped<VectorStoreManagerFactory>();
@@ -258,38 +138,7 @@ public static class VectorStoreServiceCollectionExtensions
         services.AddScoped<IVectorStoreManager>(sp =>
         {
             var factory = sp.GetRequiredService<VectorStoreManagerFactory>();
-
-            // Load the type by finding it at runtime using the loaded assembly
-            Type? optionsType = null;
-            try
-            {
-                // Try to get the ModelProviderOptions type from the loaded assembly
-                var agentSdkAssembly = System.Reflection.Assembly.Load("Cyclotron.Maf.AgentSdk");
-                var modelProviderOptionsType = agentSdkAssembly?.GetType("Cyclotron.Maf.AgentSdk.Options.ModelProviderOptions");
-                if (modelProviderOptionsType != null)
-                {
-                    optionsType = typeof(IOptions<>).MakeGenericType(modelProviderOptionsType);
-                }
-            }
-            catch
-            {
-                // Fall back - Type not found
-            }
-
-            if (optionsType == null)
-            {
-                throw new InvalidOperationException(
-                    "ModelProviderOptions type not found. Ensure Cyclotron.Maf.AgentSdk assembly is loaded.");
-            }
-
-            var modelProviderOptions = sp.GetService(optionsType);
-            if (modelProviderOptions == null)
-            {
-                throw new InvalidOperationException(
-                    "ModelProviderOptions not registered in DI container. " +
-                    "Ensure AddAgentSdkServices() is called before AddVectorStoreManagerService().");
-            }
-
+            var modelProviderOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
             return new VectorStoreManagerAdapter(factory, modelProviderOptions);
         });
 
@@ -327,63 +176,28 @@ public static class VectorStoreServiceCollectionExtensions
 /// <summary>
 /// Adapter that wraps VectorStoreManagerFactory to provide direct IVectorStoreManager interface.
 /// Delegates all operations to the factory-selected implementation based on provider name.
-/// Uses reflection to access ModelProviderOptions since the Vectors package doesn't have a direct reference to the main SDK.
 /// </summary>
 internal class VectorStoreManagerAdapter(
     VectorStoreManagerFactory factory,
-    object modelProviderOptionsObject) : IVectorStoreManager
+    IOptions<ModelProviderOptions> modelProviderOptions) : IVectorStoreManager
 {
     private readonly VectorStoreManagerFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-    private readonly object _modelProviderOptionsObject = modelProviderOptionsObject ?? throw new ArgumentNullException(nameof(modelProviderOptionsObject));
+    private readonly IOptions<ModelProviderOptions> _modelProviderOptions = modelProviderOptions ?? throw new ArgumentNullException(nameof(modelProviderOptions));
 
     private IVectorStoreManager GetManager(string providerName)
     {
         try
         {
-            // Use reflection to get the Value property from IOptions<ModelProviderOptions>
-            var valueProperty = _modelProviderOptionsObject.GetType().GetProperty("Value");
-            if (valueProperty == null)
+            var options = _modelProviderOptions.Value;
+            if (!options.Providers.TryGetValue(providerName, out var providerDef))
             {
-                throw new InvalidOperationException("ModelProviderOptions.Value property not found");
-            }
-
-            var optionsValue = valueProperty.GetValue(_modelProviderOptionsObject);
-            if (optionsValue == null)
-            {
-                throw new InvalidOperationException("ModelProviderOptions.Value is null");
-            }
-
-            // Get the Providers property (Dictionary<string, ModelProviderDefinitionOptions>)
-            var providersProperty = optionsValue.GetType().GetProperty("Providers");
-            if (providersProperty == null)
-            {
-                throw new InvalidOperationException("ModelProviderOptions.Providers property not found");
-            }
-
-            var providers = providersProperty.GetValue(optionsValue) as System.Collections.IDictionary;
-            if (providers == null || !providers.Contains(providerName))
-            {
-                var availableProviders = string.Join(", ",
-                    providers?.Keys.Cast<string>() ?? Array.Empty<string>());
+                var availableProviders = string.Join(", ", options.Providers.Keys);
                 throw new InvalidOperationException(
                     $"Provider '{providerName}' not found in ModelProviderOptions configuration. " +
                     $"Available providers: {(string.IsNullOrEmpty(availableProviders) ? "none" : availableProviders)}");
             }
 
-            var providerDef = providers[providerName];
-            if (providerDef == null)
-            {
-                throw new InvalidOperationException($"Provider definition for '{providerName}' is null");
-            }
-
-            // Get the Type property from ModelProviderDefinitionOptions
-            var typeProperty = providerDef.GetType().GetProperty("Type");
-            if (typeProperty == null)
-            {
-                throw new InvalidOperationException($"Provider type property not found for provider '{providerName}'");
-            }
-
-            var providerType = typeProperty.GetValue(providerDef) as string;
+            var providerType = providerDef.Type;
             if (string.IsNullOrWhiteSpace(providerType))
             {
                 throw new InvalidOperationException($"Provider type for '{providerName}' is not configured");

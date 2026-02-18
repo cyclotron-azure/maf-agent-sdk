@@ -1,6 +1,6 @@
 using Azure.AI.Projects;
 
-namespace Cyclotron.Maf.AgentSdk.Services;
+namespace Cyclotron.Maf.AgentSdk.Common.Services;
 
 /// <summary>
 /// Factory for creating AI provider clients with proper authentication.

@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Options;
 using AwesomeAssertions;
 using VectorStoreIndexingOptions = Cyclotron.Maf.AgentSdk.VectorStore.Options.VectorStoreIndexingOptions;

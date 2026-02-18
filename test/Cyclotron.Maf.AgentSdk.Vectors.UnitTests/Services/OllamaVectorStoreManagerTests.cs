@@ -2,9 +2,9 @@ using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Cyclotron.Maf.AgentSdk.Options;
+using Cyclotron.Maf.AgentSdk.Common.Models;
+using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Exceptions;
-using Cyclotron.Maf.AgentSdk.VectorStore.Models;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,7 @@ using Moq;
 using Moq.Protected;
 using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
-using ProviderDefinition = Cyclotron.Maf.AgentSdk.Options.ModelProviderDefinitionOptions;
+using ProviderDefinition = Cyclotron.Maf.AgentSdk.Common.Options.ModelProviderDefinitionOptions;
 
 namespace Cyclotron.Maf.AgentSdk.Vectors.UnitTests.Services;
 

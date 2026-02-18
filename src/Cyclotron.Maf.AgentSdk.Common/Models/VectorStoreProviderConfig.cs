@@ -1,4 +1,4 @@
-namespace Cyclotron.Maf.AgentSdk.VectorStore.Models;
+namespace Cyclotron.Maf.AgentSdk.Common.Models;
 
 /// <summary>
 /// Configuration for a vector store provider (Azure or Ollama).

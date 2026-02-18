@@ -1,14 +1,15 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Cyclotron.Maf.AgentSdk.Options;
+namespace Cyclotron.Maf.AgentSdk.Common.Options;
 
 /// <summary>
 /// Defines the configuration for a model provider (Azure OpenAI, Azure AI Foundry, etc.).
+/// This is a shared configuration type used across multiple AgentSdk packages.
 /// </summary>
 public class ModelProviderDefinitionOptions
 {
     /// <summary>
-    /// Provider type (e.g., "azure_foundry", "azure_openai").
+    /// Provider type (e.g., "azure_foundry", "azure_openai", "ollama").
     /// </summary>
     [Required]
     public string Type { get; set; } = string.Empty;

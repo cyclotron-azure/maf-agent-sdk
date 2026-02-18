@@ -1,7 +1,8 @@
-namespace Cyclotron.Maf.AgentSdk.Options;
+namespace Cyclotron.Maf.AgentSdk.Common.Options;
 
 /// <summary>
 /// Contains the collection of model provider configurations.
+/// This is a shared configuration type used across multiple AgentSdk packages.
 /// </summary>
 public class ModelProviderOptions
 {
@@ -9,6 +10,7 @@ public class ModelProviderOptions
     /// Dictionary of provider configurations keyed by provider name.
     /// </summary>
     public Dictionary<string, ModelProviderDefinitionOptions> Providers { get; set; } = [];
+
     /// <summary>
     /// Default provider name to use when not specified.
     /// If not set, uses the first provider in the dictionary.
