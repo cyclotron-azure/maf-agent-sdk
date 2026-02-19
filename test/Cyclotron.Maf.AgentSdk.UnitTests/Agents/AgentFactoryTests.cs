@@ -1061,7 +1061,7 @@ public class AgentFactoryTests : IDisposable
             }
         };
 
-        _mockPromptService.Setup(x => x.RenderSystemPrompt("test")).Returns("Test instructions");
+        _mockPromptService.Setup(x => x.RenderSystemPrompt("test", It.IsAny<object?>())).Returns("Test instructions");
         _mockPromptService.Setup(x => x.GetAgentNamePrefix("test")).Returns("test");
 
         var factory = new AgentFactory(
@@ -1693,7 +1693,7 @@ public class AgentFactoryTests : IDisposable
             }
         };
 
-        _mockPromptService.Setup(x => x.RenderSystemPrompt("test")).Returns("Instructions");
+        _mockPromptService.Setup(x => x.RenderSystemPrompt("test", It.IsAny<object?>())).Returns("Instructions");
         _mockPromptService.Setup(x => x.GetAgentNamePrefix("test")).Returns("test");
 
         // Mock client that throws on cancellation
@@ -2116,7 +2116,7 @@ public class AgentFactoryTests : IDisposable
     public async Task CreateAgentAsync_ValidVectorStoreId_CallsRenderSystemPrompt()
     {
         // Arrange
-        _mockPromptService.Setup(x => x.RenderSystemPrompt("test")).Returns("System instructions");
+        _mockPromptService.Setup(x => x.RenderSystemPrompt("test", It.IsAny<object?>())).Returns("System instructions");
         _mockPromptService.Setup(x => x.GetAgentNamePrefix("test")).Returns("test-prefix");
 
         var agents = new Dictionary<string, AgentDefinitionOptions>
@@ -2154,7 +2154,7 @@ public class AgentFactoryTests : IDisposable
         }
 
         // Assert
-        _mockPromptService.Verify(x => x.RenderSystemPrompt("test"), Times.Once);
+        _mockPromptService.Verify(x => x.RenderSystemPrompt("test", It.IsAny<object?>()), Times.Once);
         _mockPromptService.Verify(x => x.GetAgentNamePrefix("test"), Times.Once);
     }
 

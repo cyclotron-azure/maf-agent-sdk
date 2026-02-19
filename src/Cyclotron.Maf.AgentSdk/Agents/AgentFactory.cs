@@ -650,6 +650,9 @@ public class AgentFactory : IAgentFactory
         services.AddSingleton(clientFactory);
         services.AddSingleton(loggerFactory);
 
+        // Register logger creation from ILoggerFactory
+        services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
+
         // Register provider implementations
         services.AddTransient<IAgentProvider, AzureAgentProvider>();
         services.AddTransient<IAgentProvider, OllamaAgentProvider>();
