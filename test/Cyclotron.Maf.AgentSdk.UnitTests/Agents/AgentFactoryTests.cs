@@ -1,4 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
 using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
@@ -22,22 +23,15 @@ public class AgentFactoryTests : IDisposable
 {
     private readonly Mock<ILogger<AgentFactory>> _mockLogger;
     private readonly Mock<IPromptRenderingService> _mockPromptService;
-    private readonly Mock<IProviderClientFactory> _mockClientFactory;
+    private readonly Mock<IAgentProviderResolver> _mockProviderResolver;
     private readonly Mock<IVectorStoreManager> _mockVectorStoreManager;
-    private readonly Mock<IHttpClientFactory> _mockHttpClientFactory;
-    private readonly ILoggerFactory _mockLoggerFactory;
 
     public AgentFactoryTests()
     {
         _mockLogger = new Mock<ILogger<AgentFactory>>();
         _mockPromptService = new Mock<IPromptRenderingService>();
-        _mockClientFactory = new Mock<IProviderClientFactory>();
+        _mockProviderResolver = new Mock<IAgentProviderResolver>();
         _mockVectorStoreManager = new Mock<IVectorStoreManager>();
-        _mockHttpClientFactory = new Mock<IHttpClientFactory>();
-
-        // Use a real LoggerFactory for all provider and agent logger instances.
-        // Despite the variable name "mock", this is actually the real factory to avoid logger initialization issues.
-        _mockLoggerFactory = new Microsoft.Extensions.Logging.LoggerFactory();
 
         // Default setup - HasConfiguration returns true
         _mockPromptService.Setup(x => x.HasConfiguration(It.IsAny<string>())).Returns(true);
@@ -45,10 +39,7 @@ public class AgentFactoryTests : IDisposable
 
     public void Dispose()
     {
-        if (_mockLoggerFactory is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
+        // Cleanup if needed
     }
 
     private IOptions<ModelProviderOptions> CreateProviderOptions(
@@ -105,11 +96,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -126,11 +115,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -147,19 +134,17 @@ public class AgentFactoryTests : IDisposable
             null!,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("promptService");
     }
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when clientFactory is null")]
-    public void Constructor_NullClientFactory_ThrowsArgumentNullException()
+    [Fact(DisplayName = "Constructor should throw ArgumentNullException when providerResolver is null")]
+    public void Constructor_NullProviderResolver_ThrowsArgumentNullException()
     {
         // Act
         var act = () => new AgentFactory(
@@ -170,13 +155,11 @@ public class AgentFactoryTests : IDisposable
             CreateAgentOptions(),
             null!,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("clientFactory");
+            .WithParameterName("providerResolver");
     }
 
     [Fact(DisplayName = "Constructor should accept null vectorStoreManager (optional)")]
@@ -189,11 +172,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             null,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -209,11 +190,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             null!,
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -230,11 +209,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             null!,
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -251,11 +228,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            null!,
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
@@ -282,11 +257,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -313,11 +286,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -335,11 +306,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -375,11 +344,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Type.Should().Be("classification_type");
@@ -406,11 +373,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Type.Should().Be("direct_classification");
@@ -449,11 +414,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Default definition is used but has no provider configured
         act.Should().Throw<InvalidOperationException>()
@@ -485,11 +448,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Should prefer _agent suffix
         factory.AgentDefinition.Type.Should().Be("from_suffix");
@@ -513,11 +474,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message = factory.CreateUserMessage();
@@ -545,11 +504,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message = factory.CreateUserMessage(context);
@@ -584,11 +541,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act & Assert
         factory.AgentKey.Should().Be(agentKey);
@@ -608,11 +563,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Agent.Should().BeNull();
@@ -628,11 +581,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Session.Should().BeNull();
@@ -648,11 +599,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.VectorStoreId.Should().BeNull();
@@ -675,11 +624,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Factory should be created (warning logged, not exception)
         factory.Should().NotBeNull();
@@ -700,11 +647,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var act = () => factory.CreateAgentAsync(null!);
@@ -724,11 +669,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var act = () => factory.CreateAgentAsync("");
@@ -748,11 +691,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var act = () => factory.CreateAgentAsync("   ");
@@ -776,11 +717,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         var messages = new List<ChatMessage>
         {
@@ -809,17 +748,14 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act & Assert - Should not throw
         await factory.DeleteAgentAsync();
 
         // Verify no client interaction
-        _mockClientFactory.Verify(x => x.GetClient(It.IsAny<string>()), Times.Never);
     }
 
     #endregion
@@ -836,17 +772,14 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act & Assert - Should not throw
         await factory.DeleteSessionAsync();
 
         // Verify no client interaction
-        _mockClientFactory.Verify(x => x.GetClient(It.IsAny<string>()), Times.Never);
     }
 
     #endregion
@@ -874,17 +807,14 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         await factory.CleanupAsync();
 
         // Assert - No client interactions (cleanup was skipped)
-        _mockClientFactory.Verify(x => x.GetClient(It.IsAny<string>()), Times.Never);
         _mockVectorStoreManager.Verify(
             x => x.CleanupVectorStoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -911,11 +841,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         await factory.CleanupAsync();
@@ -947,11 +875,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         await factory.CleanupAsync();
@@ -983,11 +909,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act - Should complete without exception (Agent and Thread are null)
         await factory.CleanupAsync();
@@ -1018,11 +942,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act - No VectorStoreId set, so vector store cleanup will be skipped
         await factory.CleanupAsync();
@@ -1070,15 +992,11 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Mock client factory to throw - simulating runtime failure
-        _mockClientFactory.Setup(x => x.GetClient("azure_foundry"))
-            .Throws(new InvalidOperationException("Client creation failed"));
 
         // Act
         var act = () => factory.CreateAgentAsync("vs-123");
@@ -1113,11 +1031,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.AutoDelete.Should().BeTrue();
@@ -1144,11 +1060,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.AutoDelete.Should().BeFalse();
@@ -1175,11 +1089,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.AutoCleanupResources.Should().BeTrue();
@@ -1206,11 +1118,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Enabled.Should().BeTrue();
@@ -1236,11 +1146,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Type.Should().Be("custom_classifier");
@@ -1266,11 +1174,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Provider.Should().NotBeNullOrWhiteSpace();
@@ -1317,11 +1223,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -1370,11 +1274,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Provider.Should().Be("provider_b");
@@ -1397,11 +1299,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         _mockPromptService.Verify(x => x.HasConfiguration("classification"), Times.Once);
@@ -1430,11 +1330,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Factory is created (just logs warning)
         factory.Should().NotBeNull();
@@ -1458,11 +1356,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message = factory.CreateUserMessage();
@@ -1494,11 +1390,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message = factory.CreateUserMessage(complexContext);
@@ -1528,11 +1422,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message = factory.CreateUserMessage(dictContext);
@@ -1563,11 +1455,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            telemetryOptions,
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            telemetryOptions);
 
         // Assert
         factory.Should().NotBeNull();
@@ -1591,11 +1481,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            telemetryOptions,
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            telemetryOptions);
 
         // Assert
         factory.Should().NotBeNull();
@@ -1619,11 +1507,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            telemetryOptions,
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            telemetryOptions);
 
         // Assert
         factory.Should().NotBeNull();
@@ -1665,11 +1551,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Default definition is created but has no provider
         act.Should().Throw<InvalidOperationException>()
@@ -1697,8 +1581,6 @@ public class AgentFactoryTests : IDisposable
         _mockPromptService.Setup(x => x.GetAgentNamePrefix("test")).Returns("test");
 
         // Mock client that throws on cancellation
-        _mockClientFactory.Setup(x => x.GetClient("azure_foundry"))
-            .Throws(new OperationCanceledException());
 
         var factory = new AgentFactory(
             "test",
@@ -1706,11 +1588,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -1732,11 +1612,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         using var cts = new CancellationTokenSource();
 
@@ -1754,11 +1632,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         using var cts = new CancellationTokenSource();
 
@@ -1787,11 +1663,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         using var cts = new CancellationTokenSource();
 
@@ -1824,11 +1698,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -1856,11 +1728,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -1880,11 +1750,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         var messages = new List<ChatMessage>
         {
@@ -1909,11 +1777,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         var messages = new List<ChatMessage>();
 
@@ -1935,11 +1801,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         var messages = new List<ChatMessage>
         {
@@ -1987,11 +1851,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         var factory2 = new AgentFactory(
             "extraction",
@@ -1999,11 +1861,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory1.AgentKey.Should().Be("classification");
@@ -2037,11 +1897,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentKey.Should().Be("my_custom_agent");
@@ -2067,11 +1925,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentKey.Should().Be("my-agent");
@@ -2098,11 +1954,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentKey.Should().Be("agent123");
@@ -2116,8 +1970,21 @@ public class AgentFactoryTests : IDisposable
     public async Task CreateAgentAsync_ValidVectorStoreId_CallsRenderSystemPrompt()
     {
         // Arrange
+        _mockPromptService.Setup(x => x.HasConfiguration("test")).Returns(true);
         _mockPromptService.Setup(x => x.RenderSystemPrompt("test", It.IsAny<object?>())).Returns("System instructions");
         _mockPromptService.Setup(x => x.GetAgentNamePrefix("test")).Returns("test-prefix");
+
+        // Setup provider resolver to return a mock provider that supports vector stores
+        var mockProvider = new Mock<IAgentProvider>();
+        mockProvider.Setup(x => x.Capabilities).Returns(new AgentProviderCapabilities(
+            SupportsVectorStore: true,
+            SupportsAgentDeletion: true,
+            SupportsSessionDeletion: false));
+        // Make the provider throw when creating the agent (after system prompt is rendered)
+        mockProvider.Setup(x => x.CreateAgentAsync(It.IsAny<AgentProviderCreationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Provider creation failed"));
+        _mockProviderResolver.Setup(x => x.Resolve(It.IsAny<ModelProviderDefinitionOptions>()))
+            .Returns(mockProvider.Object);
 
         var agents = new Dictionary<string, AgentDefinitionOptions>
         {
@@ -2128,30 +1995,21 @@ public class AgentFactoryTests : IDisposable
             }
         };
 
-        _mockClientFactory.Setup(x => x.GetClient("azure_foundry"))
-            .Throws(new Exception("Client call intercepted for verification"));
-
-        var factory = new AgentFactory(
+        AgentFactory factory = new AgentFactory(
             "test",
             _mockLogger.Object,
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
-        // Act
-        try
-        {
-            await factory.CreateAgentAsync("vs-123");
-        }
-        catch
-        {
-            // Expected - we're just verifying the calls
-        }
+        // Act - Remove try-catch to see the actual exception
+        var createTask = factory.CreateAgentAsync("vs-123");
+        // We expect the provider's CreateAgentAsync to throw, but RenderSystemPrompt should be called first
+        var actualException = await Assert.ThrowsAsync<InvalidOperationException>(async () => await createTask);
+        actualException.Message.Should().Be("Provider creation failed");
 
         // Assert
         _mockPromptService.Verify(x => x.RenderSystemPrompt("test", It.IsAny<object?>()), Times.Once);
@@ -2196,11 +2054,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -2228,11 +2084,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -2263,11 +2117,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -2290,11 +2142,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act & Assert - Multiple reads should return same value
         factory.AgentKey.Should().Be(originalKey);
@@ -2312,11 +2162,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Multiple reads should work
         factory.AgentDefinition.Should().NotBeNull();
@@ -2340,11 +2188,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message1 = factory.CreateUserMessage();
@@ -2376,11 +2222,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Act
         var message1 = factory.CreateUserMessage(context1);
@@ -2420,11 +2264,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -2456,11 +2298,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -2492,11 +2332,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -2530,11 +2368,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -2566,11 +2402,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.Should().NotBeNull();
@@ -2598,11 +2432,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         factory.AgentDefinition.Metadata.Should().NotBeNull();
@@ -2627,11 +2459,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(providers),
             CreateAgentOptions(),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert - Should throw because agent references azure_foundry but it doesn't exist
         act.Should().Throw<InvalidOperationException>()
@@ -2651,11 +2481,9 @@ public class AgentFactoryTests : IDisposable
             _mockPromptService.Object,
             CreateProviderOptions(),
             CreateAgentOptions(agents),
-            _mockClientFactory.Object,
+            _mockProviderResolver.Object,
             _mockVectorStoreManager.Object,
-            CreateTelemetryOptions(),
-            _mockHttpClientFactory.Object,
-            _mockLoggerFactory);
+            CreateTelemetryOptions());
 
         // Assert
         act.Should().Throw<InvalidOperationException>()

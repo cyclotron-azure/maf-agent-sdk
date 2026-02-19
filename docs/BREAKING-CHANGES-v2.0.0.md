@@ -116,6 +116,150 @@ public class MyService
 
 ---
 
+#### BREAKING: AgentFactory Constructor - Removed Legacy Constructor
+
+**Old Code (v1.x):**
+```csharp
+using Cyclotron.Maf.AgentSdk.Services;
+
+// Legacy constructor with explicit client factories
+var factory = new AgentFactory(
+    agentKey: "test",
+    logger: logger,
+    promptService: promptService,
+    providerOptions: providerOptions,
+    agentOptions: agentOptions,
+    clientFactory: clientFactory,              // IProviderClientFactory
+    httpClientFactory: httpClientFactory,      // IHttpClientFactory
+    loggerFactory: loggerFactory,              // ILoggerFactory
+    vectorStoreManager: vectorStoreManager,
+    telemetryOptions: telemetryOptions);
+```
+
+**New Code (v2.0.0):**
+```csharp
+using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Services;
+
+// New constructor using IAgentProviderResolver
+var factory = new AgentFactory(
+    agentKey: "test",
+    logger: logger,
+    promptService: promptService,
+    providerOptions: providerOptions,
+    agentOptions: agentOptions,
+    providerResolver: providerResolver,        // IAgentProviderResolver (NEW)
+    vectorStoreManager: vectorStoreManager,
+    telemetryOptions: telemetryOptions);
+```
+
+**Changes:**
+- **Removed Parameters:** `IProviderClientFactory clientFactory`, `IHttpClientFactory httpClientFactory`, `ILoggerFactory loggerFactory`
+- **Added Parameter:** `IAgentProviderResolver providerResolver`
+- **Removed Method:** `BuildDefaultProviderResolver` (anti-pattern removed)
+
+**Why This Change:**
+The legacy constructor created a "mini-DI container" inside `BuildDefaultProviderResolver`, violating the Dependency Inversion Principle. The new design uses proper dependency injection through `IAgentProviderResolver`, which is registered via `AddAgentProviderResolver()` extension method.
+
+**Migration Steps:**
+
+1. **For Direct Instantiation (Not Recommended):**
+   ```csharp
+   // Create provider resolver manually
+   var azureProvider = new AzureAgentProvider(clientFactory, loggerFactory);
+   var ollamaProvider = new OllamaAgentProvider(httpClientFactory, loggerFactory);
+   var providerResolver = new AgentProviderResolver(new[] { azureProvider, ollamaProvider });
+
+   // Use new constructor
+   var factory = new AgentFactory(
+       agentKey: "test",
+       logger: logger,
+       promptService: promptService,
+       providerOptions: providerOptions,
+       agentOptions: agentOptions,
+       providerResolver: providerResolver,
+       vectorStoreManager: vectorStoreManager,
+       telemetryOptions: telemetryOptions);
+   ```
+
+2. **For DI-Based Applications (Recommended):**
+   ```csharp
+   // In Startup.cs or Program.cs
+   services.AddAgentSdkServices(configuration);  // Automatically registers IAgentProviderResolver
+
+   // Or manually:
+   services.AddAgentProviderResolver();  // Registers Azure and Ollama providers
+
+   // Inject IAgentFactory with keyed services
+   public class MyExecutor(
+       [FromKeyedServices("classification")] IAgentFactory agentFactory)
+   {
+       // AgentFactory instances are created by DI with proper dependencies
+   }
+   ```
+
+3. **For Workflow Applications:**
+   ```csharp
+   // Use AddDocumentWorkflowServices which includes provider resolver setup
+   services.AddDocumentWorkflowServices(configuration);
+
+   // Then use convenience method for keyed factories
+   services.AddKeyedAgentFactories(["classification", "extraction"]);
+   ```
+
+**Test Migration Example:**
+
+**Old Test (v1.x):**
+```csharp
+var mockClientFactory = new Mock<IProviderClientFactory>();
+var mockHttpClientFactory = new Mock<IHttpClientFactory>();
+var mockLoggerFactory = new Mock<ILoggerFactory>();
+
+var factory = new AgentFactory(
+    "test",
+    mockLogger.Object,
+    mockPromptService.Object,
+    providerOptions,
+    agentOptions,
+    mockClientFactory.Object,
+    mockHttpClientFactory.Object,
+    mockLoggerFactory.Object,
+    mockVectorStoreManager.Object,
+    telemetryOptions);
+```
+
+**New Test (v2.0.0):**
+```csharp
+var mockProviderResolver = new Mock<IAgentProviderResolver>();
+var mockProvider = new Mock<IAgentProvider>();
+mockProvider.Setup(x => x.Capabilities).Returns(new AgentProviderCapabilities(
+    SupportsVectorStore: true,
+    SupportsAgentDeletion: true,
+    SupportsSessionDeletion: false));
+mockProviderResolver.Setup(x => x.Resolve(It.IsAny<ModelProviderDefinitionOptions>()))
+    .Returns(mockProvider.Object);
+
+var factory = new AgentFactory(
+    "test",
+    mockLogger.Object,
+    mockPromptService.Object,
+    providerOptions,
+    agentOptions,
+    mockProviderResolver.Object,
+    mockVectorStoreManager.Object,
+    telemetryOptions);
+```
+
+**Related New Types:**
+- `IAgentProviderResolver` - Interface for resolving provider implementations
+- `AgentProviderResolver` - Default provider resolution implementation
+- `IAgentProvider` - Interface for provider-specific agent operations
+- `AzureAgentProvider` - Azure AI Foundry provider implementation
+- `OllamaAgentProvider` - Ollama provider implementation
+- `AgentProviderCapabilities` - Provider capability descriptor
+
+---
+
 ### 3. New Features (Breaking for Ollama Users)
 
 #### Ollama Provider Configuration Support
@@ -349,9 +493,11 @@ For questions or issues during migration:
 | `AIFrameworkOptions` removed | Code | High | Low - Direct property access |
 | `IAIProjectClientFactory` → `IProviderClientFactory` | Interface | Medium | Low - Rename |
 | `AIProjectClientFactory` → `ProviderClientFactory` | Class | Medium | Low - Rename |
+| `AgentFactory` constructor - removed legacy overload | Constructor | High | Medium - DI pattern change |
+| `BuildDefaultProviderResolver` method removed | Code | Medium | Low - Use DI registration |
 | Middleware infrastructure | New Feature | Low | None - Optional |
 | Ollama configuration support | New Feature | Low | None - Additive |
 
-**Total Breaking Changes:** 4 major, 2 additive
+**Total Breaking Changes:** 6 major, 2 additive
 
-**Estimated Migration Time:** 1-2 hours for typical project
+**Estimated Migration Time:** 2-4 hours for typical project (includes DI pattern updates)

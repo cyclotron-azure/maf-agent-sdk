@@ -1,4 +1,5 @@
 
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
 using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
@@ -16,7 +17,7 @@ public static class AgentSdkServiceCollectionExtensions
 {
     /// <summary>
     /// Registers core AgentSdk services including configuration value substitution,
-    /// model provider options, agent options, telemetry, and PDF processing.
+    /// model provider options, agent options, telemetry, provider resolver, and PDF processing.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -30,6 +31,9 @@ public static class AgentSdkServiceCollectionExtensions
 
         services.AddAgentOptions();
         services.AddTelemetryOptions();
+
+        // Register agent provider resolver and provider implementations
+        services.AddAgentProviderResolver();
 
         // Register PDF services from AgentSdk.Pdf package
         services.AddPdfServices();
@@ -177,6 +181,41 @@ public static class AgentSdkServiceCollectionExtensions
             })
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers agent provider resolver and provider implementations.
+    /// Providers are registered as Transient to allow safe dependency on scoped <see cref="IProviderClientFactory"/>.
+    /// The resolver is registered as Singleton for optimal performance since it's stateless.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method registers:
+    /// <list type="bullet">
+    /// <item><description><see cref="IAgentProvider"/> implementations (Azure, Ollama) as Transient services</description></item>
+    /// <item><description><see cref="IAgentProviderResolver"/> as a Singleton service</description></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// The Transient lifetime for providers ensures they can safely depend on scoped services like
+    /// <see cref="IProviderClientFactory"/>, preventing lifetime scope violations.
+    /// The Singleton lifetime for the resolver is appropriate because it's stateless and thread-safe.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddAgentProviderResolver(this IServiceCollection services)
+    {
+        // Register provider implementations as Transient
+        // This allows them to safely depend on scoped IProviderClientFactory
+        services.AddTransient<IAgentProvider, AzureAgentProvider>();
+        services.AddTransient<IAgentProvider, OllamaAgentProvider>();
+
+        // Register provider resolver as Singleton
+        // The resolver is stateless and thread-safe, so Singleton lifetime is optimal
+        services.AddSingleton<IAgentProviderResolver, AgentProviderResolver>();
 
         return services;
     }

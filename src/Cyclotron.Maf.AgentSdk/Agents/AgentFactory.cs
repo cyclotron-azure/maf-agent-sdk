@@ -9,7 +9,6 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Http;
 using Polly;
 using Polly.Retry;
 using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
@@ -91,45 +90,6 @@ public class AgentFactory : IAgentFactory
 
         // Validate provider reference
         ValidateProviderReference();
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="AgentFactory"/> class using legacy dependencies.
-    /// This overload preserves compatibility with prior constructors.
-    /// </summary>
-    /// <param name="agentKey">The unique key identifying this agent type.</param>
-    /// <param name="logger">The logger instance.</param>
-    /// <param name="promptService">The service for rendering agent prompts.</param>
-    /// <param name="providerOptions">The model provider configuration options.</param>
-    /// <param name="agentOptions">The agent configuration options.</param>
-    /// <param name="clientFactory">The factory for creating Azure AI Foundry clients.</param>
-    /// <param name="vectorStoreManager">Optional manager for vector store operations. If null, vector store functionality will be disabled.</param>
-    /// <param name="telemetryOptions">The telemetry configuration options.</param>
-    /// <param name="httpClientFactory">The HTTP client factory for creating clients to Ollama.</param>
-    /// <param name="loggerFactory">The logger factory for creating loggers.</param>
-    /// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
-    public AgentFactory(
-        string agentKey,
-        ILogger<AgentFactory> logger,
-        IPromptRenderingService promptService,
-        IOptions<ModelProviderOptions> providerOptions,
-        IOptions<AgentOptions> agentOptions,
-        IProviderClientFactory clientFactory,
-        VectorStoreManager? vectorStoreManager,
-        IOptions<TelemetryOptions> telemetryOptions,
-        IHttpClientFactory httpClientFactory,
-        ILoggerFactory loggerFactory)
-        : this(
-            agentKey,
-            logger,
-            promptService,
-            providerOptions,
-            agentOptions,
-            BuildDefaultProviderResolver(clientFactory, loggerFactory),
-            vectorStoreManager,
-            telemetryOptions)
-    {
-        ArgumentNullException.ThrowIfNull(httpClientFactory, nameof(httpClientFactory));
     }
 
     /// <summary>
@@ -635,30 +595,6 @@ public class AgentFactory : IAgentFactory
         }
 
         return provider;
-    }
-
-    private static IAgentProviderResolver BuildDefaultProviderResolver(
-        IProviderClientFactory clientFactory,
-        ILoggerFactory loggerFactory)
-    {
-        ArgumentNullException.ThrowIfNull(clientFactory, nameof(clientFactory));
-        ArgumentNullException.ThrowIfNull(loggerFactory, nameof(loggerFactory));
-
-        // Create a minimal service provider that can resolve the providers
-        // This is only used for backward compatibility with the legacy constructor
-        var services = new ServiceCollection();
-        services.AddSingleton(clientFactory);
-        services.AddSingleton(loggerFactory);
-
-        // Register logger creation from ILoggerFactory
-        services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
-
-        // Register provider implementations
-        services.AddTransient<IAgentProvider, AzureAgentProvider>();
-        services.AddTransient<IAgentProvider, OllamaAgentProvider>();
-
-        var serviceProvider = services.BuildServiceProvider();
-        return new AgentProviderResolver(serviceProvider);
     }
 
     /// <summary>
