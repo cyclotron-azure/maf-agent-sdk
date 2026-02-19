@@ -8,7 +8,7 @@ namespace Cyclotron.Maf.AgentSdk.Options;
 /// Maps to entries in the <c>agents:</c> section of agent.config.yaml.
 /// </summary>
 /// <remarks>
-/// BREAKING CHANGE in v2.0: Configuration structure has been flattened.
+/// BREAKING CHANGE in 1.0: Configuration structure has been flattened.
 /// - Removed nested AIFrameworkOptions - use direct Provider property
 /// - Added Middleware configuration for centralized middleware management
 /// - Added Extensibility options for advanced customization
@@ -31,7 +31,7 @@ public class AgentDefinitionOptions
     /// Must match a provider key defined in the providers: section of agent.config.yaml.
     /// </summary>
     /// <remarks>
-    /// BREAKING CHANGE in v2.0: This replaces the nested AIFrameworkOptions.Provider property.
+    /// BREAKING CHANGE in 1.0: This replaces the nested AIFrameworkOptions.Provider property.
     /// </remarks>
     [Required(ErrorMessage = "provider is required and must reference a valid provider")]
     public string Provider { get; set; } = string.Empty;
@@ -78,7 +78,7 @@ public class AgentDefinitionOptions
     /// Configures OpenTelemetry, logging, and tool calling middleware.
     /// </summary>
     /// <remarks>
-    /// NEW in v2.0: Centralized middleware configuration with fixed application order.
+    /// NEW in 1.0: Centralized middleware configuration with fixed application order.
     /// </remarks>
     public MiddlewareConfiguration? Middleware { get; set; }
 
@@ -86,7 +86,7 @@ public class AgentDefinitionOptions
     /// Gets or sets extensibility options for advanced agent customization.
     /// </summary>
     /// <remarks>
-    /// NEW in v2.0: Provides hooks for custom client factories and advanced configuration.
+    /// NEW in 1.0: Provides hooks for custom client factories and advanced configuration.
     /// </remarks>
     public ExtensibilityOptions? Extensibility { get; set; }
 

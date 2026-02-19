@@ -2,7 +2,7 @@
 
 ## Overview
 
-As of **v2.0.0**, the SDK provides **full Ollama provider support** for local AI model execution using the [OllamaSharp](https://github.com/awaescher/OllamaSharp) SDK. This includes agent creation, vector store embeddings, reasoning mode, and multimodal capabilities.
+As of **version 1.0.0**, the SDK provides **full Ollama provider support** for local AI model execution using the [OllamaSharp](https://github.com/awaescher/OllamaSharp) SDK. This includes agent creation, vector store embeddings, reasoning mode, and multimodal capabilities.
 
 ## Status
 

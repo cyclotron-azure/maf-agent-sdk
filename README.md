@@ -112,15 +112,16 @@ maf-agent-sdk/
 │   ├── Cyclotron.Maf.AgentSdk.UnitTests/
 │   └── Cyclotron.Maf.AgentSdk.Pdf.UnitTests/
 └── docs/
+    ├── CHANGELOG.md                # Version history and migration guides
     ├── CICD.md                     # CI/CD and versioning
-    ├── TELEMETRY.md                # Observability setup
-    └── BREAKING-CHANGES-v2.0.0.md  # Migration guides
+    └── TELEMETRY.md                # Observability setup
 ```
 
 ## 📖 Documentation
 
 - **[SDK Documentation](src/Cyclotron.Maf.AgentSdk/README.md)** - Detailed API reference and configuration options
 - **[Spam Detection Sample](samples/SpamDetection/README.md)** - Complete working example
+- **[Changelog](docs/CHANGELOG.md)** - Version history and migration guides
 - **[Telemetry Guide](docs/TELEMETRY.md)** - OpenTelemetry setup and configuration
 - **[CI/CD Guide](docs/CICD.md)** - Build pipeline and versioning
 

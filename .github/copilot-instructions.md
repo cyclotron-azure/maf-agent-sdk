@@ -47,7 +47,7 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: false
-    provider: "azure_foundry"  # References providers: section (flattened in v2.0.0)
+    provider: "azure_foundry"  # References providers: section (flattened in 1.0.0)
     system_prompt_template: |
       Your instructions here with {{variables}}
     user_prompt_template: |

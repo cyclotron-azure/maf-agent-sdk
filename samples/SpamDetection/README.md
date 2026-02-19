@@ -610,7 +610,7 @@ SpamDetection/
 
 - [Cyclotron.Maf.AgentSdk](../../src/Cyclotron.Maf.AgentSdk/README.md) - SDK documentation
 - [Ollama Configuration Guide](../../docs/OLLAMA-CONFIGURATION.md) - Detailed Ollama setup
-- [v2.0.0 Breaking Changes](../../docs/BREAKING-CHANGES-v2.0.0.md) - Migration guide
+- [Changelog](../../docs/CHANGELOG.md) - Version history and migration guide
 - [Azure AI Foundry](https://learn.microsoft.com/azure/ai-studio/) - Cloud provider documentation
 - [Microsoft Agent Framework](https://github.com/microsoft/agents) - Framework documentation
 - [Ollama](https://ollama.ai) - Local model runtime

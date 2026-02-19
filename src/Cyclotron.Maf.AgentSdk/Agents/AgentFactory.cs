@@ -573,7 +573,7 @@ public class AgentFactory : IAgentFactory
         {
             throw new InvalidOperationException(
                 $"Agent '{_agentKey}' does not have a provider configured. " +
-                $"Please specify a provider reference in agent.config.yaml (v2.0: use 'provider' property, not 'framework_config.provider').");
+                $"Please specify a provider reference in agent.config.yaml (1.0: use 'provider' property, not 'framework_config.provider').");
         }
 
         if (!_providerOptions.Providers.ContainsKey(providerName))

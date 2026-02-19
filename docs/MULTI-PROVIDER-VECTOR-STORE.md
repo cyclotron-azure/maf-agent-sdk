@@ -366,7 +366,7 @@ Run tests:
 dotnet test --filter "FullyQualifiedName~.Vectors.UnitTests"
 ```
 
-## Migration from v1.x
+## Migration from 0.x
 
 **Breaking Changes:**
 
@@ -380,11 +380,11 @@ dotnet test --filter "FullyQualifiedName~.Vectors.UnitTests"
 **Migration steps:**
 
 ```csharp
-// OLD (v1.x) - Azure with incorrect client-side chunking
+// OLD (0.x) - Azure with incorrect client-side chunking
 await vectorStoreManager.AddFileToVectorStoreAsync(
     providerName, vectorStoreId, fileStream, fileName, cancellationToken);
 
-// NEW (v2.0) - Azure with correct server-side chunking
+// NEW (1.0.0) - Azure with correct server-side chunking
 await vectorStoreManager.AddFileToVectorStoreAsync(
     providerName: "azure_foundry",
     vectorStoreId: vectorStoreId,
@@ -393,7 +393,7 @@ await vectorStoreManager.AddFileToVectorStoreAsync(
     chunkingDelegate: (_, _) => AsyncEnumerable.Empty<(string, string)>(),  // Ignored
     cancellationToken: cancellationToken);
 
-// NEW (v2.0) - Ollama with client-side chunking
+// NEW (1.0.0) - Ollama with client-side chunking
 await vectorStoreManager.AddFileToVectorStoreAsync(
     providerName: "ollama",
     vectorStoreId: vectorStoreId,
