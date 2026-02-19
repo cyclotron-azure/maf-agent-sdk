@@ -8,21 +8,23 @@ namespace SpamDetection.Services.Impl;
 
 /// <summary>
 /// Implementation of the invoice extraction workflow.
-/// Orchestrates PDF analysis, content-based routing, and invoice data extraction.
+/// Orchestrates PDF analysis, content-based routing, and multi-provider invoice data extraction.
+/// Supports both Azure (vector store + file_search) and Ollama (local retrieval) providers.
 /// </summary>
 public sealed class InvoiceExtractionWorkflow(
     ILogger<InvoiceExtractionWorkflow> logger,
-    [FromKeyedServices("invoice_extractor")] IAgentFactory invoiceExtractorFactory,
+    IConfiguration configuration,
     [FromKeyedServices("pdfpig")] IPdfContentAnalyzer pdfContentAnalyzer,
     IPdfToMarkdownConverter pdfToMarkdownConverter,
     [FromKeyedServices("pdfpig")] IPdfImageExtractor pdfImageExtractor,
     IVectorStoreManager vectorStoreManager,
     TextBasedInvoiceExecutor textBasedExecutor,
     ImageOnlyInvoiceExecutor imageOnlyExecutor,
-    MixedInvoiceExecutor mixedExecutor) : IInvoiceExtractionWorkflow
+    MixedInvoiceExecutor mixedExecutor,
+    IEnumerable<IInvoiceProviderStrategy> providerStrategies) : IInvoiceExtractionWorkflow
 {
     private readonly ILogger<InvoiceExtractionWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IAgentFactory _invoiceExtractorFactory = invoiceExtractorFactory ?? throw new ArgumentNullException(nameof(invoiceExtractorFactory));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly IPdfContentAnalyzer _pdfContentAnalyzer = pdfContentAnalyzer ?? throw new ArgumentNullException(nameof(pdfContentAnalyzer));
     private readonly IPdfToMarkdownConverter _pdfToMarkdownConverter = pdfToMarkdownConverter ?? throw new ArgumentNullException(nameof(pdfToMarkdownConverter));
     private readonly IPdfImageExtractor _pdfImageExtractor = pdfImageExtractor ?? throw new ArgumentNullException(nameof(pdfImageExtractor));
@@ -30,6 +32,7 @@ public sealed class InvoiceExtractionWorkflow(
     private readonly TextBasedInvoiceExecutor _textBasedExecutor = textBasedExecutor ?? throw new ArgumentNullException(nameof(textBasedExecutor));
     private readonly ImageOnlyInvoiceExecutor _imageOnlyExecutor = imageOnlyExecutor ?? throw new ArgumentNullException(nameof(imageOnlyExecutor));
     private readonly MixedInvoiceExecutor _mixedExecutor = mixedExecutor ?? throw new ArgumentNullException(nameof(mixedExecutor));
+    private readonly IReadOnlyDictionary<string, IInvoiceProviderStrategy> _providerStrategies = BuildProviderStrategies(providerStrategies);
 
     /// <summary>
     /// Executes the invoice extraction workflow on the provided PDF document.
@@ -44,6 +47,10 @@ public sealed class InvoiceExtractionWorkflow(
 
         try
         {
+            // Resolve provider strategy
+            var strategy = ResolveProviderStrategy();
+            _logger.LogInformation("Invoice extraction provider: {Provider}", strategy.ProviderKey);
+
             // Buffer the PDF once so non-seekable streams can be reused across steps
             await using var bufferedStream = new MemoryStream();
             await pdfContent.CopyToAsync(bufferedStream, cancellationToken);
@@ -70,7 +77,7 @@ public sealed class InvoiceExtractionWorkflow(
                         result = await _textBasedExecutor.ExecuteAsync(
                             pdfStream,
                             fileName,
-                            _invoiceExtractorFactory,
+                            strategy,
                             _pdfToMarkdownConverter,
                             _vectorStoreManager,
                             cancellationToken);
@@ -83,9 +90,9 @@ public sealed class InvoiceExtractionWorkflow(
                         result = await _imageOnlyExecutor.ExecuteAsync(
                             pdfStream,
                             fileName,
-                            _invoiceExtractorFactory,
+                            strategy,
                             _pdfImageExtractor,
-                               _vectorStoreManager,
+                            _vectorStoreManager,
                             cancellationToken);
                     }
                     break;
@@ -96,7 +103,7 @@ public sealed class InvoiceExtractionWorkflow(
                         result = await _mixedExecutor.ExecuteAsync(
                             pdfStream,
                             fileName,
-                            _invoiceExtractorFactory,
+                            strategy,
                             _pdfToMarkdownConverter,
                             _pdfImageExtractor,
                             _vectorStoreManager,
@@ -129,4 +136,47 @@ public sealed class InvoiceExtractionWorkflow(
             throw;
         }
     }
+
+    /// <summary>
+    /// Resolves the provider strategy based on configuration.
+    /// </summary>
+    private IInvoiceProviderStrategy ResolveProviderStrategy()
+    {
+        var provider = _configuration["Workflow:InvoiceProvider"]?.ToLowerInvariant() ?? "azure";
+
+        if (_providerStrategies.TryGetValue(provider, out var strategy))
+        {
+            return strategy;
+        }
+
+        if (_providerStrategies.TryGetValue("azure", out var azureStrategy))
+        {
+            return azureStrategy;
+        }
+
+        return _providerStrategies.Values.First();
+    }
+
+    /// <summary>
+    /// Builds a dictionary of provider strategies keyed by provider name.
+    /// </summary>
+    private static IReadOnlyDictionary<string, IInvoiceProviderStrategy> BuildProviderStrategies(
+        IEnumerable<IInvoiceProviderStrategy> providerStrategies)
+    {
+        if (providerStrategies is null)
+        {
+            throw new ArgumentNullException(nameof(providerStrategies));
+        }
+
+        var strategies = providerStrategies.ToList();
+        if (strategies.Count == 0)
+        {
+            throw new ArgumentException("At least one invoice provider strategy must be registered.", nameof(providerStrategies));
+        }
+
+        return strategies.ToDictionary(
+            strategy => strategy.ProviderKey,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Services;
 using SpamDetection.Models;
 using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
@@ -9,25 +10,25 @@ namespace SpamDetection.Services.Impl;
 
 /// <summary>
 /// Executor for processing mixed PDF invoices (containing both text and images).
-/// Extracts images, converts text to markdown, creates vector store, and sends both to agent.
+/// Supports both Azure (vector store + file_search) and Ollama (local retrieval + images).
 /// </summary>
 public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
 {
     private readonly ILogger<MixedInvoiceExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
-    /// Executes mixed invoice extraction.
+    /// Executes mixed invoice extraction using the specified provider strategy.
     /// </summary>
     public async Task<InvoiceExtractionResult> ExecuteAsync(
         Stream pdfContent,
         string fileName,
-        IAgentFactory agentFactory,
+        IInvoiceProviderStrategy strategy,
         IPdfToMarkdownConverter pdfToMarkdownConverter,
         IPdfImageExtractor pdfImageExtractor,
         IVectorStoreManager vectorStoreManager,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Executing MixedInvoiceExecutor for file: {FileName}", fileName);
+        _logger.LogInformation("Executing MixedInvoiceExecutor for file: {FileName} using provider: {Provider}", fileName, strategy.ProviderKey);
 
         var result = new InvoiceExtractionResult
         {
@@ -53,9 +54,65 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
             var markdown = await pdfToMarkdownConverter.ConvertToMarkdownAsync(pdfContent, fileName, cancellationToken);
             _logger.LogInformation("PDF converted to markdown. Length: {Length} characters", markdown.Length);
 
-            // Step 2: Create vector store
-            var providerName = agentFactory.AgentDefinition.Provider;
+            if (strategy.UsesVectorStore)
+            {
+                result = await ExecuteAzureAsync(
+                    fileName,
+                    markdown,
+                    extractedImages,
+                    strategy,
+                    vectorStoreManager,
+                    cancellationToken);
+            }
+            else
+            {
+                result = await ExecuteOllamaAsync(
+                    fileName,
+                    markdown,
+                    extractedImages,
+                    strategy,
+                    vectorStoreManager,
+                    cancellationToken);
+            }
 
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in MixedInvoiceExecutor");
+            result.Action = "error";
+            throw;
+        }
+        finally
+        {
+            // Step 9: Cleanup
+            _logger.LogInformation("Cleaning up agent resources...");
+            await strategy.AgentFactory.CleanupAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Azure execution path: upload markdown to vector store and combine with images.
+    /// </summary>
+    private async Task<InvoiceExtractionResult> ExecuteAzureAsync(
+        string fileName,
+        string markdown,
+        ExtractedPdfImage[] extractedImages,
+        IInvoiceProviderStrategy strategy,
+        IVectorStoreManager vectorStoreManager,
+        CancellationToken cancellationToken)
+    {
+        var result = new InvoiceExtractionResult
+        {
+            InvoiceData = new InvoiceData(),
+            ContentType = "Mixed"
+        };
+
+        try
+        {
+            var providerName = strategy.AgentFactory.AgentDefinition.Provider;
+
+            // Step 2: Create vector store
             _logger.LogInformation("Creating vector store...");
             var vectorStoreId = await vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
                 providerName,
@@ -106,8 +163,8 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
 
             // Step 5: Create agent WITH vector store (so agent can use file_search)
             _logger.LogInformation("Creating invoice extraction agent with vector store access...");
-            await agentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
-            result.MutableAgentIds.Add(agentFactory.Agent?.Id ?? "unknown");
+            await strategy.AgentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
+            result.MutableAgentIds.Add(strategy.AgentFactory.Agent?.Id ?? "unknown");
 
             // Step 6: Create user message context (this won't be used since we already have chatMessage, but for completeness)
             var context = new
@@ -119,7 +176,7 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
 
             // Step 7: Run agent with message containing both images and prompt
             _logger.LogInformation("Running agent to extract invoice data from mixed content...");
-            var response = await agentFactory.RunAgentWithPollingAsync(
+            var response = await strategy.AgentFactory.RunAgentWithPollingAsync(
                 messages: [chatMessage],
                 cancellationToken: cancellationToken);
 
@@ -137,15 +194,173 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in MixedInvoiceExecutor");
+            _logger.LogError(ex, "Error in Azure execution path");
             result.Action = "error";
             throw;
         }
-        finally
+    }
+
+    /// <summary>
+    /// Ollama execution path: index markdown locally, retrieve chunks, and combine with images.
+    /// </summary>
+    private async Task<InvoiceExtractionResult> ExecuteOllamaAsync(
+        string fileName,
+        string markdown,
+        ExtractedPdfImage[] extractedImages,
+        IInvoiceProviderStrategy strategy,
+        IVectorStoreManager vectorStoreManager,
+        CancellationToken cancellationToken)
+    {
+        var result = new InvoiceExtractionResult
         {
-            // Step 9: Cleanup
-            _logger.LogInformation("Cleaning up agent resources...");
-            await agentFactory.CleanupAsync(cancellationToken);
+            InvoiceData = new InvoiceData(),
+            ContentType = "Mixed"
+        };
+
+        try
+        {
+            var providerName = strategy.AgentFactory.AgentDefinition.Provider;
+
+            // Step 2: Create local vector store for RAG
+            _logger.LogInformation("Creating local vector store for Ollama RAG...");
+            var vectorStoreId = await vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
+                providerName,
+                key: $"invoice-ollama-mixed-{fileName}",
+                purpose: "Mixed invoice document for local RAG",
+                name: $"Invoice_Ollama_Mixed_{Path.GetFileNameWithoutExtension(fileName)}",
+                cancellationToken);
+
+            _logger.LogInformation("Local vector store created with ID: {VectorStoreId}", vectorStoreId);
+            result.MutableVectorStoreIds.Add(vectorStoreId);
+
+            // Step 3: Index markdown in local vector store
+            _logger.LogInformation("Indexing markdown in local vector store...");
+            using var markdownStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(markdown));
+            await vectorStoreManager.AddFileToVectorStoreAsync(
+                providerName,
+                vectorStoreId,
+                markdownStream,
+                $"{Path.GetFileNameWithoutExtension(fileName)}_text.md",
+                SimpleChunkingAsync,
+                cancellationToken);
+
+            _logger.LogInformation("Markdown indexed in local vector store");
+
+            // Step 4: Create agent WITHOUT vector store
+            _logger.LogInformation("Creating invoice extraction agent without vector store...");
+            await strategy.AgentFactory.CreateAgentAsync(cancellationToken);
+            result.MutableAgentIds.Add(strategy.AgentFactory.Agent?.Id ?? "unknown");
+
+            // Step 5: Create ChatMessage with retrieved text context and images
+            _logger.LogInformation("Creating chat message with context and {Count} image(s)...", extractedImages.Length);
+
+            var contentItems = new List<AIContent>();
+
+            // Generate and add text prompt with retrieved context
+            var retrievedContext = await RetrieveContextAsync(
+                vectorStoreId,
+                providerName,
+                vectorStoreManager,
+                cancellationToken);
+
+            var userPrompt = GenerateMixedAnalysisPromptWithContext(fileName, extractedImages.Length, retrievedContext);
+            contentItems.Add(new TextContent(userPrompt));
+
+            // Add each image as DataContent
+            foreach (var image in extractedImages)
+            {
+                _logger.LogDebug(
+                    "Adding image to message: {ImageName}, Size: {Size} bytes, Format: {MimeType}",
+                    image.ImageName,
+                    image.ImageBytes.Length,
+                    image.MimeType);
+
+                contentItems.Add(new DataContent(image.ImageBytes, image.MimeType));
+            }
+
+            var chatMessage = new ChatMessage(ChatRole.User, contentItems);
+
+            // Step 6: Run agent with message containing context and images
+            _logger.LogInformation("Running agent to extract invoice data from mixed content with Ollama...");
+            var response = await strategy.AgentFactory.RunAgentWithPollingAsync(
+                messages: [chatMessage],
+                cancellationToken: cancellationToken);
+
+            var responseText = response.Messages?.LastOrDefault()?.Text ?? string.Empty;
+            result.AgentResponse = responseText;
+
+            _logger.LogInformation("Agent response received. Response length: {Length} characters", responseText.Length);
+
+            // Step 7: Parse JSON response into InvoiceData
+            result.InvoiceData = ParseInvoiceDataFromJson(responseText);
+
+            _logger.LogInformation("Invoice data extracted successfully from mixed content with Ollama");
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in Ollama execution path");
+            result.Action = "error";
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Retrieves context from the local vector store for embedding in the prompt.
+    /// </summary>
+    private async Task<string> RetrieveContextAsync(
+        string vectorStoreId,
+        string providerName,
+        IVectorStoreManager vectorStoreManager,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = "invoice information including number dates amounts vendor customer line items";
+            var topK = 5;
+
+            _logger.LogDebug(
+                "Retrieving top {TopK} chunks for invoice context from vector store {VectorStoreId}",
+                topK,
+                vectorStoreId);
+
+            // The vector store manager is expected to have a QuerySimilarChunksAsync method for Ollama
+            if (vectorStoreManager is Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl.OllamaVectorStoreManager ollamaManager)
+            {
+                var chunks = await ollamaManager.QuerySimilarChunksAsync(
+                    providerName,
+                    vectorStoreId,
+                    query,
+                    topK,
+                    cancellationToken);
+
+                if (chunks.Count == 0)
+                {
+                    _logger.LogWarning("No chunks retrieved from vector store");
+                    return "No document context available.";
+                }
+
+                var contextBuilder = new System.Text.StringBuilder();
+                contextBuilder.AppendLine("Retrieved document context:");
+                contextBuilder.AppendLine("---");
+                foreach (var (chunkId, text) in chunks)
+                {
+                    contextBuilder.AppendLine($"[{chunkId}] {text}");
+                    contextBuilder.AppendLine();
+                }
+                contextBuilder.AppendLine("---");
+
+                return contextBuilder.ToString();
+            }
+
+            _logger.LogWarning("Vector store manager does not support querying");
+            return "No document context available.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to retrieve context from vector store; will continue without context");
+            return "Document context retrieval failed.";
         }
     }
 
@@ -167,6 +382,40 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
         Extraction Instructions:
         1. First, examine the provided images to identify key invoice fields
         2. Use document search to retrieve supporting text information (line items, payment terms, etc.)
+        3. Combine information from both sources for complete accuracy
+
+        Extract all invoice information:
+        - Invoice number, dates, and vendor information
+        - Line items with quantities and prices
+        - Totals, taxes, and payment information
+        - Any special terms or notes
+
+        Return ONLY valid JSON matching the required schema. Do not include any explanation or additional text.
+        """;
+    }
+
+    /// <summary>
+    /// Generates the prompt for mixed invoice analysis with retrieved context (Ollama).
+    /// </summary>
+    private static string GenerateMixedAnalysisPromptWithContext(
+        string fileName,
+        int imageCount,
+        string retrievedContext)
+    {
+        return $"""
+        Please analyze the invoice document provided, which contains both text content and {imageCount} image(s).
+
+        Document: {fileName}
+        Analysis mode: Mixed (native PDF with embedded images and scanned pages)
+
+        Retrieved Text Context:
+        {retrievedContext}
+
+        You also have {imageCount} invoice image(s) provided directly.
+
+        Extraction Instructions:
+        1. First, examine the provided images to identify key invoice fields
+        2. Use the retrieved text context above to supplement image analysis
         3. Combine information from both sources for complete accuracy
 
         Extract all invoice information:

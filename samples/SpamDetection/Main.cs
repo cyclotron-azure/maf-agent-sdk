@@ -25,9 +25,11 @@ public class Main(
         var cancellationToken = _applicationLifetime.ApplicationStopping;
         var mode = NormalizeMode(Configuration["Workflow:Mode"] ?? "both");
         var spamProvider = Configuration["Workflow:SpamProvider"]?.ToLowerInvariant() ?? "azure";
+        var invoiceProvider = Configuration["Workflow:InvoiceProvider"]?.ToLowerInvariant() ?? "azure";
 
         _logger.LogInformation("Workflow mode: {Mode}", mode);
         _logger.LogInformation("Spam detection provider: {Provider}", spamProvider == "ollama" ? "Ollama (Local)" : "Azure AI Foundry");
+        _logger.LogInformation("Invoice extraction provider: {Provider}", invoiceProvider == "ollama" ? "Ollama (Local)" : "Azure AI Foundry");
 
         return mode.ToLowerInvariant() switch
         {

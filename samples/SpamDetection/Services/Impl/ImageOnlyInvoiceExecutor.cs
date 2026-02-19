@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Services;
 using SpamDetection.Models;
 using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
@@ -9,24 +10,24 @@ namespace SpamDetection.Services.Impl;
 
 /// <summary>
 /// Executor for processing image-only PDF invoices.
-/// Extracts images and sends them directly to the vision model via DataContent.
+/// Supports both Azure (vector store for compliance) and Ollama (direct image processing).
 /// </summary>
 public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> logger)
 {
     private readonly ILogger<ImageOnlyInvoiceExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
-    /// Executes image-only invoice extraction.
+    /// Executes image-only invoice extraction using the specified provider strategy.
     /// </summary>
     public async Task<InvoiceExtractionResult> ExecuteAsync(
         Stream pdfContent,
         string fileName,
-        IAgentFactory agentFactory,
+        IInvoiceProviderStrategy strategy,
         IPdfImageExtractor pdfImageExtractor,
         IVectorStoreManager vectorStoreManager,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Executing ImageOnlyInvoiceExecutor for file: {FileName}", fileName);
+        _logger.LogInformation("Executing ImageOnlyInvoiceExecutor for file: {FileName} using provider: {Provider}", fileName, strategy.ProviderKey);
 
         var result = new InvoiceExtractionResult
         {
@@ -49,8 +50,61 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
                 return result;
             }
 
+            if (strategy.UsesVectorStore)
+            {
+                result = await ExecuteAzureAsync(
+                    fileName,
+                    extractedImages,
+                    strategy,
+                    vectorStoreManager,
+                    cancellationToken);
+            }
+            else
+            {
+                result = await ExecuteOllamaAsync(
+                    fileName,
+                    extractedImages,
+                    strategy,
+                    cancellationToken);
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in ImageOnlyInvoiceExecutor");
+            result.Action = "error";
+            throw;
+        }
+        finally
+        {
+            // Cleanup
+            _logger.LogInformation("Cleaning up agent resources...");
+            await strategy.AgentFactory.CleanupAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Azure execution path: create vector store and use file_search with images.
+    /// </summary>
+    private async Task<InvoiceExtractionResult> ExecuteAzureAsync(
+        string fileName,
+        ExtractedPdfImage[] extractedImages,
+        IInvoiceProviderStrategy strategy,
+        IVectorStoreManager vectorStoreManager,
+        CancellationToken cancellationToken)
+    {
+        var result = new InvoiceExtractionResult
+        {
+            InvoiceData = new InvoiceData(),
+            ContentType = "ImageOnly"
+        };
+
+        try
+        {
+            var providerName = strategy.AgentFactory.AgentDefinition.Provider;
+
             // Create a vector store to satisfy file_search tool configuration even for image-only PDFs
-            var providerName = agentFactory.AgentDefinition.Provider;
             _logger.LogInformation("Creating vector store for image-only invoice...");
 
             var vectorStoreId = await vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
@@ -87,12 +141,12 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
 
             // Step 3: Create agent with vector store (required for configured tools)
             _logger.LogInformation("Creating invoice extraction agent for image analysis...");
-            await agentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
-            result.MutableAgentIds.Add(agentFactory.Agent?.Id ?? "unknown");
+            await strategy.AgentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
+            result.MutableAgentIds.Add(strategy.AgentFactory.Agent?.Id ?? "unknown");
 
             // Step 4: Run agent with image-containing message
             _logger.LogInformation("Running agent to analyze invoice images...");
-            var response = await agentFactory.RunAgentWithPollingAsync(
+            var response = await strategy.AgentFactory.RunAgentWithPollingAsync(
                 messages: [chatMessage],
                 cancellationToken: cancellationToken);
 
@@ -110,15 +164,80 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in ImageOnlyInvoiceExecutor");
+            _logger.LogError(ex, "Error in Azure execution path");
             result.Action = "error";
             throw;
         }
-        finally
+    }
+
+    /// <summary>
+    /// Ollama execution path: process images directly without vector store.
+    /// </summary>
+    private async Task<InvoiceExtractionResult> ExecuteOllamaAsync(
+        string fileName,
+        ExtractedPdfImage[] extractedImages,
+        IInvoiceProviderStrategy strategy,
+        CancellationToken cancellationToken)
+    {
+        var result = new InvoiceExtractionResult
         {
-            // Step 6: Cleanup
-            _logger.LogInformation("Cleaning up agent resources...");
-            await agentFactory.CleanupAsync(cancellationToken);
+            InvoiceData = new InvoiceData(),
+            ContentType = "ImageOnly"
+        };
+
+        try
+        {
+            // Step 2: Create ChatMessage with image content (no vector store needed)
+            _logger.LogInformation("Creating chat message with {Count} image(s) for Ollama...", extractedImages.Length);
+
+            var contentItems = new List<AIContent>();
+
+            // Add text prompt
+            var userPrompt = GenerateImageAnalysisPrompt(fileName);
+            contentItems.Add(new TextContent(userPrompt));
+
+            // Add each image as DataContent
+            foreach (var image in extractedImages)
+            {
+                _logger.LogDebug(
+                    "Adding image to message: {ImageName}, Size: {Size} bytes, Format: {MimeType}",
+                    image.ImageName,
+                    image.ImageBytes.Length,
+                    image.MimeType);
+
+                contentItems.Add(new DataContent(image.ImageBytes, image.MimeType));
+            }
+
+            var chatMessage = new ChatMessage(ChatRole.User, contentItems);
+
+            // Step 3: Create agent WITHOUT vector store (Ollama doesn't support Azure file_search)
+            _logger.LogInformation("Creating invoice extraction agent without vector store...");
+            await strategy.AgentFactory.CreateAgentAsync(cancellationToken);
+            result.MutableAgentIds.Add(strategy.AgentFactory.Agent?.Id ?? "unknown");
+
+            // Step 4: Run agent with image-containing message
+            _logger.LogInformation("Running agent to analyze invoice images with Ollama...");
+            var response = await strategy.AgentFactory.RunAgentWithPollingAsync(
+                messages: [chatMessage],
+                cancellationToken: cancellationToken);
+
+            var responseText = response.Messages?.LastOrDefault()?.Text ?? string.Empty;
+            result.AgentResponse = responseText;
+
+            _logger.LogInformation("Agent response received. Response length: {Length} characters", responseText.Length);
+
+            // Step 5: Parse JSON response into InvoiceData
+            result.InvoiceData = ParseInvoiceDataFromJson(responseText);
+
+            _logger.LogInformation("Invoice data extracted successfully from Ollama");
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in Ollama execution path");
+            result.Action = "error";
+            throw;
         }
     }
 
@@ -194,3 +313,4 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
         }
     }
 }
+

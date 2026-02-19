@@ -66,8 +66,13 @@ public static class SpamDetectionServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddInvoiceExtractionServices(this IServiceCollection services)
     {
-        // Register keyed agent factory for invoice_extractor
-        services.AddKeyedAgentFactories("invoice_extractor");
+        // Register keyed agent factories for both Azure and Ollama invoice extractors
+        services.AddKeyedAgentFactories("invoice_extractor");          // Azure AI Foundry
+        services.AddKeyedAgentFactories("invoice_extractor_ollama");   // Ollama local
+
+        // Register provider strategies (Azure uses vector stores, Ollama uses local retrieval)
+        services.AddScoped<IInvoiceProviderStrategy, AzureInvoiceProviderStrategy>();
+        services.AddScoped<IInvoiceProviderStrategy, OllamaInvoiceProviderStrategy>();
 
         // Register the three executors as transient services
         services.AddTransient<TextBasedInvoiceExecutor>();
@@ -80,3 +85,4 @@ public static class SpamDetectionServiceCollectionExtensions
         return services;
     }
 }
+

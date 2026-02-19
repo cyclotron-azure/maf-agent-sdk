@@ -429,6 +429,108 @@ public class OllamaVectorStoreManager(
     }
 
     /// <summary>
+    /// Queries the vector store for semantically similar chunks using cosine similarity.
+    /// Generates an embedding for the query and returns the top-K chunks.
+    /// </summary>
+    /// <param name="providerName">Name of the model provider to use (e.g., "ollama").</param>
+    /// <param name="vectorStoreId">The vector store ID to query.</param>
+    /// <param name="query">The query text to embed and search for.</param>
+    /// <param name="topK">The maximum number of similar chunks to return.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A list of (chunkId, text) tuples from the top-K similar documents.</returns>
+    public async Task<IReadOnlyList<(string ChunkId, string Text)>> QuerySimilarChunksAsync(
+        string providerName,
+        string vectorStoreId,
+        string query,
+        int topK = 5,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var providerConfig = _configFactory(providerName) ?? throw new VectorStoreConfigurationException(
+                    $"Provider configuration not found for: {providerName}",
+                    providerName);
+
+            _logger.LogDebug(
+                "Querying Ollama vector store {VectorStoreId} for top {TopK} chunks with query: {Query}",
+                vectorStoreId,
+                topK,
+                query);
+
+            // Check if store exists first (outside async embedding)
+            lock (_lock)
+            {
+                if (!_vectorStores.TryGetValue(vectorStoreId, out var store))
+                {
+                    _logger.LogWarning("Vector store not found: {VectorStoreId}", vectorStoreId);
+                    return Array.Empty<(string, string)>();
+                }
+
+                if (store.Documents.Count == 0)
+                {
+                    _logger.LogDebug("Vector store is empty: {VectorStoreId}", vectorStoreId);
+                    return Array.Empty<(string, string)>();
+                }
+            }
+
+            // Generate embedding for query asynchronously (outside lock)
+            var queryEmbedding = await GenerateEmbeddingAsync(
+                new OllamaApiClient(new Uri(providerConfig.Endpoint?.TrimEnd('/') ?? "http://localhost:11434"),
+                    providerConfig.DeploymentName ?? "nomic-embed-text"),
+                providerConfig,
+                query,
+                cancellationToken);
+
+            if (queryEmbedding == null || queryEmbedding.Length == 0)
+            {
+                _logger.LogWarning("Failed to generate embedding for query");
+                return Array.Empty<(string, string)>();
+            }
+
+            // Now perform similarity search within lock
+            lock (_lock)
+            {
+                if (!_vectorStores.TryGetValue(vectorStoreId, out var store))
+                {
+                    _logger.LogWarning("Vector store not found after embedding generation: {VectorStoreId}", vectorStoreId);
+                    return Array.Empty<(string, string)>();
+                }
+
+                // Calculate cosine similarity with all documents
+                var similarities = store.Documents
+                    .Select(doc => (
+                        ChunkId: doc.ChunkId,
+                        Text: doc.Text,
+                        Similarity: CosineSimilarity(queryEmbedding, doc.Embedding)))
+                    .OrderByDescending(x => x.Similarity)
+                    .Take(topK)
+                    .ToList();
+
+                _logger.LogDebug(
+                    "Found {Count} similar chunks for query in vector store {VectorStoreId}",
+                    similarities.Count,
+                    vectorStoreId);
+
+                return similarities
+                    .Select(x => (x.ChunkId, x.Text))
+                    .ToList()
+                    .AsReadOnly();
+            }
+        }
+        catch (VectorStoreException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var message = $"Failed to query Ollama vector store {vectorStoreId}";
+            _logger.LogError(ex, message);
+            _telemetry.RecordError(providerName, ex.GetType().Name);
+            throw new VectorStoreIndexingException(message, ex, providerName);
+        }
+    }
+
+    /// <summary>
     /// Determines the document format type from the file name.
     /// </summary>
     private static string GetFormatType(string fileName)
@@ -443,6 +545,37 @@ public class OllamaVectorStoreManager(
             "csv" => "csv",
             _ => "other"
         };
+    }
+
+    /// <summary>
+    /// Calculates cosine similarity between two embedding vectors.
+    /// </summary>
+    /// <param name="a">First embedding vector.</param>
+    /// <param name="b">Second embedding vector.</param>
+    /// <returns>Cosine similarity score between -1 and 1, where 1 is perfect similarity.</returns>
+    private static float CosineSimilarity(float[] a, float[] b)
+    {
+        if (a.Length != b.Length)
+            return 0f;
+
+        float dotProduct = 0;
+        float magnitudeA = 0;
+        float magnitudeB = 0;
+
+        for (int i = 0; i < a.Length; i++)
+        {
+            dotProduct += a[i] * b[i];
+            magnitudeA += a[i] * a[i];
+            magnitudeB += b[i] * b[i];
+        }
+
+        magnitudeA = (float)Math.Sqrt(magnitudeA);
+        magnitudeB = (float)Math.Sqrt(magnitudeB);
+
+        if (magnitudeA == 0 || magnitudeB == 0)
+            return 0f;
+
+        return dotProduct / (magnitudeA * magnitudeB);
     }
 
     /// <summary>
@@ -471,3 +604,4 @@ public class OllamaVectorStoreManager(
         public required DateTime CreatedAt { get; set; }
     }
 }
+
