@@ -1,6 +1,4 @@
-using Cyclotron.Maf.AgentSdk.Agents;
 using SpamDetection.Models;
-using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace SpamDetection.Services.Impl;
 
@@ -10,12 +8,13 @@ namespace SpamDetection.Services.Impl;
 /// </summary>
 public sealed class SpamWorkflow(
     ILogger<SpamWorkflow> logger,
-    [FromKeyedServices("spam_detector")] IAgentFactory spamDetectorFactory,
-    IVectorStoreManager vectorStoreManager) : ISpamWorkflow
+    IConfiguration configuration,
+    IEnumerable<ISpamProviderStrategy> providerStrategies) : ISpamWorkflow
 {
     private readonly ILogger<SpamWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IAgentFactory _spamDetectorFactory = spamDetectorFactory ?? throw new ArgumentNullException(nameof(spamDetectorFactory));
-    private readonly IVectorStoreManager _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
+    private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly IReadOnlyDictionary<string, ISpamProviderStrategy> _providerStrategies =
+        BuildProviderStrategies(providerStrategies);
 
     /// <summary>
     /// Sample messages to test spam detection.
@@ -40,14 +39,23 @@ public sealed class SpamWorkflow(
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Spam Detection Workflow...");
+        ISpamProviderStrategy? strategy = null;
 
         try
         {
-            // Create a vector store with spam detection examples
-            var vectorStoreId = await CreateSpamExamplesVectorStoreAsync(cancellationToken);
+            strategy = ResolveProviderStrategy();
+            _logger.LogInformation("Spam detection provider: {Provider}", strategy.ProviderKey);
 
-            // Create the spam detection agent
-            await _spamDetectorFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
+            var vectorStoreId = await strategy.PrepareVectorStoreAsync(cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(vectorStoreId))
+            {
+                await strategy.AgentFactory.CreateAgentAsync(cancellationToken);
+            }
+            else
+            {
+                await strategy.AgentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
+            }
 
             _logger.LogInformation("Spam Detection Agent created successfully");
             _logger.LogInformation("Testing {Count} sample messages...", TestMessages.Count);
@@ -107,9 +115,11 @@ public sealed class SpamWorkflow(
         }
         finally
         {
-            // Cleanup agent resources
-            await _spamDetectorFactory.CleanupAsync(cancellationToken);
-            _logger.LogInformation("Cleanup completed");
+            if (strategy is not null)
+            {
+                await strategy.AgentFactory.CleanupAsync(cancellationToken);
+                _logger.LogInformation("Cleanup completed");
+            }
         }
     }
 
@@ -119,10 +129,11 @@ public sealed class SpamWorkflow(
     public async Task<SpamClassificationResult> ClassifyMessageAsync(string messageContent, CancellationToken cancellationToken)
     {
         var context = new { message = messageContent };
+        var strategy = ResolveProviderStrategy();
 
-        var userMessage = _spamDetectorFactory.CreateUserMessage(context);
+        var userMessage = strategy.AgentFactory.CreateUserMessage(context);
 
-        var response = await _spamDetectorFactory.RunAgentWithPollingAsync(
+        var response = await strategy.AgentFactory.RunAgentWithPollingAsync(
             messages: [userMessage],
             cancellationToken: cancellationToken);
 
@@ -130,92 +141,6 @@ public sealed class SpamWorkflow(
         var responseText = response.Messages?.LastOrDefault()?.Text ?? string.Empty;
 
         return ParseClassificationResponse(responseText);
-    }
-
-    /// <summary>
-    /// Creates a vector store with spam detection training examples.
-    /// </summary>
-    private async Task<string> CreateSpamExamplesVectorStoreAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Creating vector store with spam examples...");
-
-        var providerName = _spamDetectorFactory.AgentDefinition.Provider;
-
-        // Get or create a shared vector store for spam detection training data
-        var vectorStoreId = await _vectorStoreManager.GetOrCreateSharedVectorStoreAsync(
-            providerName,
-            key: "spam-detection-examples",
-            purpose: "Spam detection training examples",
-            name: "SpamDetectionExamples",
-            cancellationToken);
-
-        // Create a training document with spam examples
-        var trainingContent = GenerateTrainingDocument();
-
-        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(trainingContent));
-
-        await _vectorStoreManager.AddFileToVectorStoreAsync(
-            providerName,
-            vectorStoreId,
-            stream,
-            "spam_training_examples.md",
-            SimpleChunkingAsync,
-            cancellationToken);
-
-        _logger.LogInformation("Vector store created with ID: {VectorStoreId}", vectorStoreId);
-
-        return vectorStoreId;
-    }
-
-    /// <summary>
-    /// Generates a training document with spam detection examples and guidelines.
-    /// </summary>
-    private static string GenerateTrainingDocument()
-    {
-        return """
-            # Spam Detection Training Examples
-
-            ## Common Spam Indicators
-
-            ### Financial Scams
-            - Messages promising large sums of money
-            - "You've won" or "Congratulations" with no context
-            - Requests for personal financial information
-            - Urgent calls to action regarding money
-
-            ### Phishing Attempts
-            - Suspicious links (shortened URLs, misspelled domains)
-            - Urgent account verification requests
-            - Messages impersonating known companies
-            - Threats of account suspension
-
-            ### Marketing Spam
-            - Unsolicited product promotions
-            - "Limited time offers" with excessive urgency
-            - Work-from-home schemes
-            - Weight loss or health product promotions
-
-            ## Examples of Spam Messages
-
-            1. "Congratulations! You've won $1,000,000 in our lottery!"
-            2. "URGENT: Verify your account now or face suspension!"
-            3. "Make money fast! $5000/day working from home!"
-            4. "Click here for exclusive deals you won't believe!"
-            5. "Your package delivery failed. Click to reschedule."
-
-            ## Examples of Legitimate Messages
-
-            1. "Hi, can we schedule a meeting for next week?"
-            2. "Please review the attached document when you have time."
-            3. "Thanks for your help with the project yesterday."
-            4. "The code review looks good, approved!"
-            5. "Reminder: Team standup at 10am tomorrow."
-
-            ## Classification Guidelines
-
-            - **SPAM**: Messages with deceptive intent, unsolicited promotions, or phishing attempts
-            - **NOT_SPAM**: Legitimate business communications, personal messages, or expected notifications
-            """;
     }
 
     /// <summary>
@@ -267,20 +192,39 @@ public sealed class SpamWorkflow(
     /// </summary>
     private sealed record SampleMessage(string Content, string ExpectedLabel);
 
-    /// <summary>
-    /// Simple fixed-size chunking strategy for markdown documents.
-    /// </summary>
-    private static async IAsyncEnumerable<(string Text, string ChunkId)> SimpleChunkingAsync(
-        Stream stream,
-        string fileName)
+    private ISpamProviderStrategy ResolveProviderStrategy()
     {
-        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
-        var text = await reader.ReadToEndAsync();
-        var chunkSize = 1000;
-        for (int i = 0; i < text.Length; i += chunkSize)
+        var provider = _configuration["Workflow:SpamProvider"]?.ToLowerInvariant() ?? "azure";
+
+        if (_providerStrategies.TryGetValue(provider, out var strategy))
         {
-            var chunkText = text.Substring(i, Math.Min(chunkSize, text.Length - i));
-            yield return (chunkText, $"{fileName}#{i / chunkSize}");
+            return strategy;
         }
+
+        if (_providerStrategies.TryGetValue("azure", out var azureStrategy))
+        {
+            return azureStrategy;
+        }
+
+        return _providerStrategies.Values.First();
+    }
+
+    private static IReadOnlyDictionary<string, ISpamProviderStrategy> BuildProviderStrategies(
+        IEnumerable<ISpamProviderStrategy> providerStrategies)
+    {
+        if (providerStrategies is null)
+        {
+            throw new ArgumentNullException(nameof(providerStrategies));
+        }
+
+        var strategies = providerStrategies.ToList();
+        if (strategies.Count == 0)
+        {
+            throw new ArgumentException("At least one spam provider strategy must be registered.", nameof(providerStrategies));
+        }
+
+        return strategies.ToDictionary(
+            strategy => strategy.ProviderKey,
+            StringComparer.OrdinalIgnoreCase);
     }
 }

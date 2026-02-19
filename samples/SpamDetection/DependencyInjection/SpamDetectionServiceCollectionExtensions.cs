@@ -49,23 +49,12 @@ public static class SpamDetectionServiceCollectionExtensions
         services.AddKeyedAgentFactories("spam_detector");          // Azure AI Foundry
         services.AddKeyedAgentFactories("spam_detector_ollama");   // Ollama local
 
-        // Register both spam workflow services
-        services.AddScoped<SpamWorkflow>();         // Azure workflow (with vector stores)
-        services.AddScoped<OllamaSpamWorkflow>();   // Ollama workflow (no vector stores)
+        // Register provider strategies (Azure uses vector stores, Ollama does not)
+        services.AddScoped<ISpamProviderStrategy, AzureSpamProviderStrategy>();
+        services.AddScoped<ISpamProviderStrategy, OllamaSpamProviderStrategy>();
 
-        // Register a factory to choose the right spam workflow based on configuration
-        services.AddScoped<ISpamWorkflow>(sp =>
-        {
-            var config = sp.GetRequiredService<IConfiguration>();
-            var provider = config["Workflow:SpamProvider"]?.ToLowerInvariant() ?? "azure";
-
-            return provider switch
-            {
-                "ollama" => sp.GetRequiredService<OllamaSpamWorkflow>(),
-                "azure" => sp.GetRequiredService<SpamWorkflow>(),
-                _ => sp.GetRequiredService<SpamWorkflow>() // Default to Azure
-            };
-        });
+        // Register a single workflow that selects the provider strategy via configuration
+        services.AddScoped<ISpamWorkflow, SpamWorkflow>();
 
         return services;
     }
