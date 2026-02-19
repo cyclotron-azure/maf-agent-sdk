@@ -90,14 +90,18 @@ public static class VectorStoreServiceCollectionExtensions
         services.AddScoped(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<OllamaVectorStoreManager>>();
-            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
             var indexingOptions = sp.GetRequiredService<IOptions<VectorStoreIndexingOptions>>();
             var telemetry = sp.GetRequiredService<VectorStoreTelemetry>();
+            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
             // Create a factory that gets the provider config at method invocation time using a fresh scope
+            // This prevents ObjectDisposedException when the original scope is disposed
             Func<string, VectorStoreProviderConfig> configFactory = providerName =>
             {
-                var modelProviderOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
+                using var scope = scopeFactory.CreateScope();
+                var scopedSp = scope.ServiceProvider;
+
+                var modelProviderOptions = scopedSp.GetRequiredService<IOptions<ModelProviderOptions>>();
                 var providerDef = modelProviderOptions.Value.Providers[providerName];
 
                 return new VectorStoreProviderConfig(

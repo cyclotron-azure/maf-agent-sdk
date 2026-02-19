@@ -485,4 +485,20 @@ public class AzureVectorStoreManager(
             _ => "other"
         };
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Not supported for Azure - Azure uses file_search tool which handles retrieval internally.
+    /// </remarks>
+    public Task<IReadOnlyList<(string ChunkId, string Text)>> QuerySimilarChunksAsync(
+        string providerName,
+        string vectorStoreId,
+        string query,
+        int topK = 5,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning("QuerySimilarChunksAsync is not supported for Azure AI Foundry vector stores");
+        return Task.FromResult<IReadOnlyList<(string ChunkId, string Text)>>(
+            new List<(string, string)>() as IReadOnlyList<(string, string)>);
+    }
 }

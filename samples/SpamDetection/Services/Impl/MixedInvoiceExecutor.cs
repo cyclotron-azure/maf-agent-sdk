@@ -325,37 +325,31 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
                 topK,
                 vectorStoreId);
 
-            // The vector store manager is expected to have a QuerySimilarChunksAsync method for Ollama
-            if (vectorStoreManager is Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl.OllamaVectorStoreManager ollamaManager)
+            // Query the vector store for similar chunks
+            var chunks = await vectorStoreManager.QuerySimilarChunksAsync(
+                providerName,
+                vectorStoreId,
+                query,
+                topK,
+                cancellationToken);
+
+            if (chunks.Count == 0)
             {
-                var chunks = await ollamaManager.QuerySimilarChunksAsync(
-                    providerName,
-                    vectorStoreId,
-                    query,
-                    topK,
-                    cancellationToken);
-
-                if (chunks.Count == 0)
-                {
-                    _logger.LogWarning("No chunks retrieved from vector store");
-                    return "No document context available.";
-                }
-
-                var contextBuilder = new System.Text.StringBuilder();
-                contextBuilder.AppendLine("Retrieved document context:");
-                contextBuilder.AppendLine("---");
-                foreach (var (chunkId, text) in chunks)
-                {
-                    contextBuilder.AppendLine($"[{chunkId}] {text}");
-                    contextBuilder.AppendLine();
-                }
-                contextBuilder.AppendLine("---");
-
-                return contextBuilder.ToString();
+                _logger.LogWarning("No chunks retrieved from vector store");
+                return "No document context available.";
             }
 
-            _logger.LogWarning("Vector store manager does not support querying");
-            return "No document context available.";
+            var contextBuilder = new System.Text.StringBuilder();
+            contextBuilder.AppendLine("Retrieved document context:");
+            contextBuilder.AppendLine("---");
+            foreach (var (chunkId, text) in chunks)
+            {
+                contextBuilder.AppendLine($"[{chunkId}] {text}");
+                contextBuilder.AppendLine();
+            }
+            contextBuilder.AppendLine("---");
+
+            return contextBuilder.ToString();
         }
         catch (Exception ex)
         {

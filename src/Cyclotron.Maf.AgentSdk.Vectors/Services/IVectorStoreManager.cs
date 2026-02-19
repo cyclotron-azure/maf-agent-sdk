@@ -79,4 +79,24 @@ public interface IVectorStoreManager
         IEnumerable<(Stream Content, string FileName)> files,
         Func<Stream, string, IAsyncEnumerable<(string Text, string ChunkId)>> chunkingDelegate,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Queries the vector store for chunks similar to the provided query using semantic search.
+    /// Only supported for local vector store providers like Ollama.
+    /// </summary>
+    /// <param name="providerName">Name of the model provider to use (e.g., "ollama_local").</param>
+    /// <param name="vectorStoreId">The unique identifier of the vector store to query.</param>
+    /// <param name="query">The query text to find similar chunks for.</param>
+    /// <param name="topK">The number of most similar chunks to return.</param>
+    /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+    /// <returns>
+    /// A task that represents the asynchronous operation.
+    /// The task result contains a list of tuples with chunk IDs and their text content.
+    /// </returns>
+    Task<IReadOnlyList<(string ChunkId, string Text)>> QuerySimilarChunksAsync(
+        string providerName,
+        string vectorStoreId,
+        string query,
+        int topK = 5,
+        CancellationToken cancellationToken = default);
 }

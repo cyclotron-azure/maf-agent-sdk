@@ -93,4 +93,16 @@ internal class VectorStoreManagerAdapter(
         return GetManager(providerName)
             .AddFilesToVectorStoreAsync(providerName, vectorStoreId, files, chunkingDelegate, cancellationToken);
     }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<(string ChunkId, string Text)>> QuerySimilarChunksAsync(
+        string providerName,
+        string vectorStoreId,
+        string query,
+        int topK = 5,
+        CancellationToken cancellationToken = default)
+    {
+        return GetManager(providerName)
+            .QuerySimilarChunksAsync(providerName, vectorStoreId, query, topK, cancellationToken);
+    }
 }
