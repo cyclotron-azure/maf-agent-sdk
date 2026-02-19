@@ -315,7 +315,7 @@ public class AgentFactory : IAgentFactory
             providerName,
             provider,
             null,
-            Array.Empty<AITool>(),
+            [],
             instructions,
             _promptService.GetAgentNamePrefix(_agentKey),
             _agentDefinition.Version);

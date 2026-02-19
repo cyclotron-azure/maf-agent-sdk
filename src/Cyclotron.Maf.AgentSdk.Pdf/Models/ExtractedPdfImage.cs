@@ -40,7 +40,7 @@ public class ExtractedPdfImage
     /// Gets or sets the raw binary image data (bytes).
     /// Use this for direct passing to vision models via DataContent.
     /// </summary>
-    public byte[] ImageBytes { get; set; } = Array.Empty<byte>();
+    public byte[] ImageBytes { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the base64-encoded image data.

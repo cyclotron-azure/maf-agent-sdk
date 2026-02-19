@@ -228,7 +228,7 @@ public class PdfPigContentAnalyzerTests : IDisposable
     {
         // Arrange
         var analyzer = CreateAnalyzer();
-        using var stream = new MemoryStream(Array.Empty<byte>());
+        using var stream = new MemoryStream([]);
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -262,7 +262,7 @@ public class PdfPigContentAnalyzerTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => analyzer.AnalyzeFromBytesAsync(Array.Empty<byte>(), "empty.pdf"));
+            () => analyzer.AnalyzeFromBytesAsync([], "empty.pdf"));
     }
 
     #endregion

@@ -50,7 +50,7 @@ public class PdfPigImageExtractor(
     {
         if (!IsExtractionEnabled(Path.GetFileName(pdfFilePath)))
         {
-            return Array.Empty<ExtractedPdfImage>();
+            return [];
         }
 
         if (!File.Exists(pdfFilePath))
@@ -80,7 +80,7 @@ public class PdfPigImageExtractor(
     {
         if (!IsExtractionEnabled(fileName))
         {
-            return Array.Empty<ExtractedPdfImage>();
+            return [];
         }
 
         try
@@ -120,7 +120,7 @@ public class PdfPigImageExtractor(
     {
         if (!IsExtractionEnabled(fileName))
         {
-            return Array.Empty<ExtractedPdfImage>();
+            return [];
         }
 
         using var stream = new MemoryStream(pdfBytes);
@@ -135,7 +135,7 @@ public class PdfPigImageExtractor(
     {
         if (!IsExtractionEnabled(Path.GetFileName(pdfFilePath)))
         {
-            return Array.Empty<ExtractedPdfImage>();
+            return [];
         }
 
         if (!File.Exists(pdfFilePath))
@@ -541,7 +541,7 @@ public class PdfPigImageExtractor(
             return true;
         }
 
-        imageBytes = Array.Empty<byte>();
+        imageBytes = [];
         format = ModelImageFormat.Png;
         mimeType = "image/png";
         return false;
@@ -567,7 +567,7 @@ public class PdfPigImageExtractor(
     #pragma warning disable CA1416 // System.Drawing is used when explicitly enabled for Unix.
     private static bool TryEncodePng(ReadOnlySpan<byte> rgbBytes, int width, int height, out byte[] pngBytes)
     {
-        pngBytes = Array.Empty<byte>();
+        pngBytes = [];
 
         if (width <= 0 || height <= 0)
         {
