@@ -181,6 +181,7 @@ public class AgentFactory : IAgentFactory
                 cancellationToken: ct);
 
             // Poll until the response is complete
+            #pragma warning disable MEAI001
             while (agentResponse.ContinuationToken is { } token)
             {
                 // Wait before polling again
@@ -195,6 +196,7 @@ public class AgentFactory : IAgentFactory
 
                 agentResponse = await Agent.RunAsync(Session, options, cancellationToken: ct);
             }
+            #pragma warning restore MEAI001
 
             return agentResponse;
         }, cancellationToken);
@@ -214,10 +216,12 @@ public class AgentFactory : IAgentFactory
     private static bool IsEmptyResponse(AgentResponse response)
     {
         // If there's a continuation token, the response is not considered empty (still processing)
+        #pragma warning disable MEAI001
         if (response.ContinuationToken != null)
         {
             return false;
         }
+        #pragma warning restore MEAI001
 
         // Check if response has no messages or all messages have empty text
         return response.Messages != null &&
