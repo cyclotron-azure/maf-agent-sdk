@@ -179,7 +179,15 @@ agents:
         "recommendation": string
       }
 
-      CRITICAL: Return ONLY the JSON object. No additional text, markdown, code fences, or explanations.
+      CRITICAL FORMATTING RULES:
+      - Return ONLY raw JSON starting with { and ending with }
+      - DO NOT wrap in ```json or ``` or any markdown
+      - DO NOT add explanatory text before or after the JSON
+      - DO NOT use code fences or formatting of any kind
+      - Start your response immediately with the opening brace {
+
+      Example of CORRECT response format:
+      {"is_spam":true,"confidence":0.95,"reason":"Phishing attempt","spam_indicators":"Urgent language","recommendation":"Delete"}
 
       Be accurate and consistent in your classifications. When uncertain, err on the side of caution but note your uncertainty.
 

@@ -148,6 +148,9 @@ public sealed class SpamWorkflow(
     /// </summary>
     private static SpamClassificationResult ParseClassificationResponse(string response)
     {
+        // Strip markdown code fences if present (defensive measure in case LLM doesn't follow instructions)
+        response = StripMarkdownCodeFences(response);
+
         // Simple parsing - in production, you'd want structured output
         var lowerResponse = response.ToLowerInvariant();
 
@@ -177,6 +180,45 @@ public sealed class SpamWorkflow(
         var reason = response.Length > 100 ? response[..100] + "..." : response;
 
         return new SpamClassificationResult(classification, confidence, reason);
+    }
+
+    /// <summary>
+    /// Strips markdown code fences from text if present.
+    /// Handles both ```json and ``` fences.
+    /// </summary>
+    /// <param name="text">The text that may contain markdown code fences.</param>
+    /// <returns>The text with code fences removed.</returns>
+    private static string StripMarkdownCodeFences(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        text = text.Trim();
+
+        // Check if text starts with ``` (with optional language identifier like json, xml, etc.)
+        if (text.StartsWith("```"))
+        {
+            // Find the end of the first line (which contains the opening fence and optional language)
+            var firstLineEnd = text.IndexOf('\n');
+            if (firstLineEnd > 0)
+            {
+                // Remove the first line
+                text = text.Substring(firstLineEnd + 1);
+            }
+
+            // Remove trailing ``` if present
+            if (text.TrimEnd().EndsWith("```"))
+            {
+                var lastFenceIndex = text.LastIndexOf("```");
+                text = text.Substring(0, lastFenceIndex);
+            }
+
+            text = text.Trim();
+        }
+
+        return text;
     }
 
     /// <summary>
