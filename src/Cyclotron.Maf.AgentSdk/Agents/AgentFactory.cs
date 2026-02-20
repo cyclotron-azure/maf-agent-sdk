@@ -291,6 +291,9 @@ public class AgentFactory : IAgentFactory
                     $"Agent '{_agentKey}' returned an empty response. Cannot deserialize to {typeof(T).Name}.");
             }
 
+            // Strip markdown code fences if present (e.g., ```json ... ```)
+            responseText = StripMarkdownCodeFences(responseText);
+
             _logger.LogDebug(
                 "Deserializing structured response for {AgentKey} into type '{TargetType}'",
                 _agentKey,
@@ -318,6 +321,45 @@ public class AgentFactory : IAgentFactory
             throw new InvalidOperationException(
                 $"Failed to deserialize agent response into {typeof(T).Name}: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Strips markdown code fences from text if present.
+    /// Handles both ```json and ``` fences.
+    /// </summary>
+    /// <param name="text">The text that may contain markdown code fences.</param>
+    /// <returns>The text with code fences removed.</returns>
+    private static string StripMarkdownCodeFences(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        text = text.Trim();
+
+        // Check if text starts with ``` (with optional language identifier like json, xml, etc.)
+        if (text.StartsWith("```"))
+        {
+            // Find the end of the first line (which contains the opening fence and optional language)
+            var firstLineEnd = text.IndexOf('\n');
+            if (firstLineEnd > 0)
+            {
+                // Remove the first line
+                text = text.Substring(firstLineEnd + 1);
+            }
+
+            // Remove trailing ``` if present
+            if (text.TrimEnd().EndsWith("```"))
+            {
+                var lastFenceIndex = text.LastIndexOf("```");
+                text = text.Substring(0, lastFenceIndex);
+            }
+
+            text = text.Trim();
+        }
+
+        return text;
     }
 
     /// <inheritdoc/>

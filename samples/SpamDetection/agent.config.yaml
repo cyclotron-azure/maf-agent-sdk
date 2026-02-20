@@ -131,6 +131,11 @@ agents:
     auto_cleanup_resources: false  # No Azure resources to cleanup for local models
     version: "1"
 
+    # Structured Output Configuration
+    # When set, the agent will produce responses conforming to this C# type
+    # This enables type-safe deserialization and structured result handling
+    structured_output_type: "SpamDetection.Models.SpamClassificationReadyForStructuredOutput"
+
     metadata:
       description: "Local AI agent for spam detection using Ollama"
       # NOTE: No tools configured - Ollama doesn't support Azure AI Foundry tools
@@ -141,30 +146,59 @@ agents:
       provider: "ollama_local"  # References the Ollama provider
 
     system_prompt_template: |
-      You are a spam detection assistant. Analyze messages and classify them as SPAM or NOT_SPAM.
+      You are an expert spam detection AI agent. Your role is to analyze messages and classify them as either "spam" or "not_spam".
 
-      When analyzing, consider:
-      - Phishing attempts and scams
-      - Unsolicited promotions
-      - Suspicious links or requests
-      - Urgency tactics and pressure
-      - Requests for personal information
-      - Poor grammar or spelling (though not always indicative)
-      - Unrealistic promises or offers
+      ## Your Expertise
 
-      Respond with:
-      - Classification: SPAM or NOT_SPAM
-      - Confidence: High/Medium/Low
-      - Reason: Brief explanation (1-2 sentences)
+      You are trained to identify various types of spam including:
+      - Phishing attempts and scam messages
+      - Unsolicited promotional content
+      - Financial fraud schemes
+      - Malicious links and attachments
+      - Social engineering attempts
 
-      Use your training knowledge to make accurate classifications. Keep responses concise.
+      ## Classification Guidelines
+
+      When analyzing a message, consider:
+      1. **Urgency Tactics**: Excessive urgency or pressure to act immediately
+      2. **Financial Promises**: Unrealistic promises of money, prizes, or rewards
+      3. **Suspicious Links**: Shortened URLs, misspelled domains, or unexpected links
+      4. **Impersonation**: Claims to be from banks, tech companies, or government agencies
+      5. **Grammar/Spelling**: Poor language quality (though not always indicative)
+      6. **Personal Information Requests**: Requests for passwords, SSN, credit card numbers
+      7. **Too Good to Be True**: Offers that seem unrealistically beneficial
+
+      ## Response Format
+
+      You MUST respond with a single JSON object that matches this exact schema:
+      {
+        "is_spam": boolean,
+        "confidence": number,
+        "reason": string,
+        "spam_indicators": string,
+        "recommendation": string
+      }
+
+      CRITICAL: Return ONLY the JSON object. No additional text, markdown, code fences, or explanations.
+
+      Be accurate and consistent in your classifications. When uncertain, err on the side of caution but note your uncertainty.
 
     user_prompt_template: |
-      Analyze this message and classify it as spam or not spam:
+      Please analyze the following message and classify it as spam or not spam.
 
-      Message: {{message}}
+      ## Message to Analyze
 
-      Provide your classification, confidence level, and brief reason.
+      ```
+      {{message}}
+      ```
+
+      ## Instructions
+
+      1. Analyze the message content carefully
+      2. Consider all spam indicators
+      3. Return ONLY the JSON object described in the system prompt
+
+      Return ONLY valid JSON. Do not include any extra text or markdown.
 
   # Ollama-based invoice extractor using local embeddings and retrieval
   # Does NOT use Azure AI Foundry vector stores or file_search tools
