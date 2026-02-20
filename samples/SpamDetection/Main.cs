@@ -5,17 +5,20 @@ namespace SpamDetection;
 /// <summary>
 /// Main entry point for the spam detection sample.
 /// Demonstrates using the AgentSdk to classify messages as spam or not spam.
+/// Supports both traditional text parsing and structured output workflows.
 /// </summary>
 public class Main(
     IHostApplicationLifetime applicationLifetime,
     IConfiguration configuration,
     ILogger<Main> logger,
     ISpamWorkflow spamWorkflow,
+    ISpamWorkflowStructuredOutput spamWorkflowStructuredOutput,
     IInvoiceExtractionWorkflow invoiceExtractionWorkflow) : IMain
 {
     private readonly ILogger<Main> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly IHostApplicationLifetime _applicationLifetime = applicationLifetime ?? throw new ArgumentNullException(nameof(applicationLifetime));
     private readonly ISpamWorkflow _spamWorkflow = spamWorkflow ?? throw new ArgumentNullException(nameof(spamWorkflow));
+    private readonly ISpamWorkflowStructuredOutput _spamWorkflowStructuredOutput = spamWorkflowStructuredOutput ?? throw new ArgumentNullException(nameof(spamWorkflowStructuredOutput));
     private readonly IInvoiceExtractionWorkflow _invoiceExtractionWorkflow = invoiceExtractionWorkflow ?? throw new ArgumentNullException(nameof(invoiceExtractionWorkflow));
 
     public IConfiguration Configuration { get; set; } = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -34,9 +37,11 @@ public class Main(
         return mode.ToLowerInvariant() switch
         {
             "spam" => await _spamWorkflow.RunAsync(cancellationToken),
+            "spam-structured" => await _spamWorkflowStructuredOutput.RunAsync(cancellationToken),
             "invoice" => await RunInvoiceAsync(cancellationToken),
             "both" => await RunBothAsync(cancellationToken),
-            _ => throw new InvalidOperationException($"Unknown Workflow:Mode '{mode}'. Use spam, invoice, or both.")
+            "both-structured" => await RunBothStructuredAsync(cancellationToken),
+            _ => throw new InvalidOperationException($"Unknown Workflow:Mode '{mode}'. Use spam, spam-structured, invoice, both, or both-structured.")
         };
     }
 
@@ -50,6 +55,8 @@ public class Main(
             "invoices" => "invoice",
             "spam-only" => "spam",
             "invoice-only" => "invoice",
+            "structured" => "spam-structured",
+            "spam-structured" => "spam-structured",
             _ => normalized
         };
     }
@@ -57,6 +64,17 @@ public class Main(
     private async Task<int> RunBothAsync(CancellationToken cancellationToken)
     {
         var spamResult = await _spamWorkflow.RunAsync(cancellationToken);
+        if (spamResult != 0)
+        {
+            return spamResult;
+        }
+
+        return await RunInvoiceAsync(cancellationToken);
+    }
+
+    private async Task<int> RunBothStructuredAsync(CancellationToken cancellationToken)
+    {
+        var spamResult = await _spamWorkflowStructuredOutput.RunAsync(cancellationToken);
         if (spamResult != 0)
         {
             return spamResult;

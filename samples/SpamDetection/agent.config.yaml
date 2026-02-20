@@ -44,12 +44,17 @@ pdf_conversion:
 
 # Agent Configuration
 agents:
-  spam_detector_agent:
+  spam_detector:
     type: "spam_detector"
     enabled: true
     auto_delete: true
     auto_cleanup_resources: true
     version: "1"
+
+    # Structured Output Configuration
+    # When set, the agent will produce responses conforming to this C# type
+    # This enables type-safe deserialization and structured result handling
+    structured_output_type: "SpamDetection.Models.SpamClassificationReadyForStructuredOutput"
 
     metadata:
       description: "AI agent for detecting spam messages"
@@ -84,10 +89,16 @@ agents:
 
       ## Response Format
 
-      For each message, provide:
-      1. **Classification**: Either "SPAM" or "NOT_SPAM"
-      2. **Confidence**: Your confidence level (high, medium, low)
-      3. **Reasoning**: Brief explanation of why you classified it this way
+      You MUST respond with a single JSON object that matches this schema:
+      {
+        "is_spam": boolean,
+        "confidence": number,  // 0.0 to 1.0
+        "reason": string,
+        "spam_indicators": string,
+        "recommendation": string
+      }
+
+      Do not include any extra text, markdown, or code fences.
 
       Be accurate and consistent in your classifications. When uncertain, err on the side of caution but note your uncertainty.
 
@@ -106,12 +117,9 @@ agents:
 
       1. Analyze the message content carefully
       2. Consider all spam indicators
-      3. Provide your classification with reasoning
+      3. Return ONLY the JSON object described in the system prompt
 
-      Respond with:
-      - Classification: SPAM or NOT_SPAM
-      - Confidence: High/Medium/Low
-      - Reason: Brief explanation
+      Return ONLY valid JSON. Do not include any extra text or markdown.
 
   # Ollama-based spam detector example
   # Uses local open-source models for privacy-first spam detection

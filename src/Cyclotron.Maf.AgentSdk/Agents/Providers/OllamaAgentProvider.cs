@@ -24,7 +24,8 @@ internal sealed class OllamaAgentProvider(ILogger<OllamaAgentProvider> logger) :
     public AgentProviderCapabilities Capabilities { get; } = new(
         SupportsVectorStore: false,
         SupportsAgentDeletion: false,
-        SupportsSessionDeletion: false);
+        SupportsSessionDeletion: false,
+        SupportsStructuredOutput: false);
 
     /// <inheritdoc/>
     public async Task<AgentProviderResult> CreateAgentAsync(

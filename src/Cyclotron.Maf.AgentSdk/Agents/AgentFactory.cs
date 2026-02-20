@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
+using System.Text.Json;
 using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.Agents;
@@ -225,6 +226,97 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <inheritdoc/>
+    public async Task<T> RunAgentWithPollingAsync<T>(
+        IList<ChatMessage> messages,
+        int pollingIntervalSeconds = 2,
+        int maxRetries = 10,
+        int retryDelaySeconds = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (_agentDefinition.StructuredOutputType == null)
+        {
+            throw new InvalidOperationException(
+                $"Agent '{_agentKey}' is not configured for structured output. " +
+                "Set 'structured_output_type' in agent.config.yaml to use RunAgentWithPollingAsync<T>().");
+        }
+
+        _logger.LogDebug(
+            "Running {AgentKey} agent with structured output type '{StructuredOutputType}'",
+            _agentKey,
+            _agentDefinition.StructuredOutputType);
+
+        // Run the agent and get the base response
+        var response = await RunAgentWithPollingAsync(messages, pollingIntervalSeconds, maxRetries, retryDelaySeconds, cancellationToken);
+
+        // Deserialize and return the typed result
+        return DeserializeStructuredResponse<T>(response);
+    }
+
+    /// <inheritdoc/>
+    public async Task<T> RunAgentWithPollingAsync<T>(
+        string userPrompt,
+        int pollingIntervalSeconds = 2,
+        int maxRetries = 10,
+        int retryDelaySeconds = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(userPrompt))
+        {
+            throw new ArgumentException("User prompt cannot be null or empty", nameof(userPrompt));
+        }
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, userPrompt) };
+        return await RunAgentWithPollingAsync<T>(messages, pollingIntervalSeconds, maxRetries, retryDelaySeconds, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deserializes the agent response text into the specified structured type.
+    /// </summary>
+    /// <typeparam name="T">The type to deserialize into.</typeparam>
+    /// <param name="response">The base agent response with JSON text.</param>
+    /// <returns>The deserialized result of type T.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if deserialization fails.</exception>
+    private T DeserializeStructuredResponse<T>(AgentResponse response)
+    {
+        try
+        {
+            var responseText = response.Text;
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                throw new InvalidOperationException(
+                    $"Agent '{_agentKey}' returned an empty response. Cannot deserialize to {typeof(T).Name}.");
+            }
+
+            _logger.LogDebug(
+                "Deserializing structured response for {AgentKey} into type '{TargetType}'",
+                _agentKey,
+                typeof(T).FullName);
+
+            var result = JsonSerializer.Deserialize<T>(responseText, JsonSerializerOptions.Web)
+                ?? throw new InvalidOperationException(
+                    $"Deserialization of response into {typeof(T).Name} resulted in null.");
+
+            _logger.LogInformation(
+                "Successfully deserialized structured response for {AgentKey} into type '{TargetType}'",
+                _agentKey,
+                typeof(T).FullName);
+
+            return result;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to deserialize structured response for {AgentKey} into type '{TargetType}'. Response text: {ResponseText}",
+                _agentKey,
+                typeof(T).FullName,
+                response.Text);
+            throw new InvalidOperationException(
+                $"Failed to deserialize agent response into {typeof(T).Name}: {ex.Message}", ex);
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<AIAgent> CreateAgentAsync(
         string vectorStoreId,
         CancellationToken cancellationToken = default)
@@ -264,6 +356,9 @@ public class AgentFactory : IAgentFactory
         // Configure tools based on agent metadata configuration
         var tools = BuildToolConfiguration(vectorStoreId);
 
+        // Resolve structured output configuration if specified
+        var structuredOutput = ResolveStructuredOutput();
+
         var creationRequest = new AgentProviderCreationRequest(
             _agentKey,
             providerName,
@@ -272,7 +367,8 @@ public class AgentFactory : IAgentFactory
             tools,
             instructions,
             _promptService.GetAgentNamePrefix(_agentKey),
-            _agentDefinition.Version);
+            _agentDefinition.Version,
+            structuredOutput);
 
         var providerResult = await providerImplementation
             .CreateAgentAsync(creationRequest, cancellationToken)
@@ -310,6 +406,9 @@ public class AgentFactory : IAgentFactory
         // No tools configuration for agents without vector stores (e.g., Ollama)
         // (BuildToolConfiguration returns List<AITool>, but we don't call it here)
 
+        // Resolve structured output configuration if specified
+        var structuredOutput = ResolveStructuredOutput();
+
         var creationRequest = new AgentProviderCreationRequest(
             _agentKey,
             providerName,
@@ -318,7 +417,8 @@ public class AgentFactory : IAgentFactory
             [],
             instructions,
             _promptService.GetAgentNamePrefix(_agentKey),
-            _agentDefinition.Version);
+            _agentDefinition.Version,
+            structuredOutput);
 
         var providerResult = await providerImplementation
             .CreateAgentAsync(creationRequest, cancellationToken)
@@ -563,6 +663,41 @@ public class AgentFactory : IAgentFactory
         }
 
         return tools;
+    }
+
+    private StructuredOutputConfiguration? ResolveStructuredOutput()
+    {
+        if (string.IsNullOrWhiteSpace(_agentDefinition.StructuredOutputType))
+        {
+            return null;
+        }
+
+        try
+        {
+            _logger.LogDebug(
+                "Resolving structured output type '{StructuredOutputType}' for {AgentKey}",
+                _agentDefinition.StructuredOutputType,
+                _agentKey);
+
+            var config = StructuredOutputConfiguration.FromTypeName(_agentDefinition.StructuredOutputType);
+
+            _logger.LogInformation(
+                "Resolved structured output type '{StructuredOutputType}' (CLR Type: {ClrType}) for {AgentKey}",
+                _agentDefinition.StructuredOutputType,
+                config.OutputType.FullName,
+                _agentKey);
+
+            return config;
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to resolve structured output type '{StructuredOutputType}' for {AgentKey}",
+                _agentDefinition.StructuredOutputType,
+                _agentKey);
+            throw;
+        }
     }
 
     private void ValidateProviderReference()

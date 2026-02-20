@@ -10,7 +10,8 @@ namespace Cyclotron.Maf.AgentSdk.Agents.Providers;
 public sealed record AgentProviderCapabilities(
     bool SupportsVectorStore,
     bool SupportsAgentDeletion,
-    bool SupportsSessionDeletion);
+    bool SupportsSessionDeletion,
+    bool SupportsStructuredOutput = true);
 
 /// <summary>
 /// Input required to create an agent through a provider.
@@ -23,7 +24,8 @@ public sealed record AgentProviderCreationRequest(
     IReadOnlyList<AITool> Tools,
     string Instructions,
     string NamePrefix,
-    string? Version);
+    string? Version,
+    StructuredOutputConfiguration? StructuredOutput = null);
 
 /// <summary>
 /// Result of creating an agent through a provider.
@@ -71,6 +73,12 @@ public interface IAgentProvider
     /// <summary>
     /// Creates an agent for the specified provider.
     /// </summary>
+    /// <remarks>
+    /// If <see cref="AgentProviderCreationRequest.StructuredOutput"/> is specified
+    /// and <see cref="AgentProviderCapabilities.SupportsStructuredOutput"/> is true,
+    /// the provider will configure the agent to produce responses conforming to the
+    /// specified C# type using automatic JSON schema generation.
+    /// </remarks>
     /// <param name="request">The provider creation request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The provider-specific agent creation result.</returns>

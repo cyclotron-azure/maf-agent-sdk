@@ -53,8 +53,12 @@ public static class SpamDetectionServiceCollectionExtensions
         services.AddScoped<ISpamProviderStrategy, AzureSpamProviderStrategy>();
         services.AddScoped<ISpamProviderStrategy, OllamaSpamProviderStrategy>();
 
-        // Register a single workflow that selects the provider strategy via configuration
+        // Register standard workflow that selects the provider strategy via configuration
         services.AddScoped<ISpamWorkflow, SpamWorkflow>();
+
+        // Register structured output workflow that demonstrates type-safe agent responses
+        // This uses the new RunAgentWithPollingAsync<T>() generic method for type-safe results
+        services.AddScoped<ISpamWorkflowStructuredOutput, SpamWorkflowStructuredOutput>();
 
         return services;
     }

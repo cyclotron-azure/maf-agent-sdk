@@ -2,8 +2,10 @@ using Azure.AI.Projects;
 using Azure.AI.Projects.OpenAI;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using OpenAI.Responses;
+using System.Reflection;
 
 namespace Cyclotron.Maf.AgentSdk.Agents.Providers;
 
@@ -30,7 +32,8 @@ internal sealed class AzureAgentProvider(
     public AgentProviderCapabilities Capabilities { get; } = new(
         SupportsVectorStore: true,
         SupportsAgentDeletion: true,
-        SupportsSessionDeletion: false);
+        SupportsSessionDeletion: false,
+        SupportsStructuredOutput: true);
 
     /// <inheritdoc/>
     public async Task<AgentProviderResult> CreateAgentAsync(
@@ -81,6 +84,12 @@ internal sealed class AzureAgentProvider(
                 {
                     promptDefinition.Tools.Add(tool);
                 }
+            }
+
+            // Configure structured output if specified
+            if (request.StructuredOutput != null)
+            {
+                ConfigureStructuredOutput(promptDefinition, request);
             }
 
             var versionOptions = new AgentVersionCreationOptions(promptDefinition);
@@ -189,5 +198,116 @@ internal sealed class AzureAgentProvider(
         agentName = parts[0];
         agentVersion = parts[1];
         return !string.IsNullOrWhiteSpace(agentName) && !string.IsNullOrWhiteSpace(agentVersion);
+    }
+
+    /// <summary>
+    /// Configures structured output for the agent by setting up the response format
+    /// to match the specified C# type.
+    /// </summary>
+    /// <param name="promptDefinition">The prompt agent definition to configure.</param>
+    /// <param name="request">The agent creation request containing structured output configuration.</param>
+    private void ConfigureStructuredOutput(
+        PromptAgentDefinition promptDefinition,
+        AgentProviderCreationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request.StructuredOutput, nameof(request.StructuredOutput));
+
+        try
+        {
+            var outputType = request.StructuredOutput.OutputType;
+
+            _logger.LogDebug(
+                "Configuring structured output for {AgentKey} agent with type '{OutputType}'",
+                request.AgentKey,
+                outputType.FullName);
+
+            // Use reflection to call ChatResponseFormat.ForJsonSchema<T> with the dynamic type
+            // Try the parameterless signature first, then try with parameters if available
+            var methodInfo = typeof(ChatResponseFormat)
+                .GetMethods()
+                .FirstOrDefault(m =>
+                    m.Name == "ForJsonSchema" &&
+                    m.IsGenericMethodDefinition &&
+                    m.GetGenericArguments().Length == 1);
+
+            if (methodInfo == null)
+            {
+                _logger.LogWarning(
+                    "Cannot find ChatResponseFormat.ForJsonSchema<T> method. Ensure Microsoft.Extensions.AI is properly referenced. " +
+                    "Structured output configuration for type '{OutputType}' will not be applied to {AgentKey}.",
+                    outputType.FullName,
+                    request.AgentKey);
+                return;
+            }
+
+            var genericMethod = methodInfo.MakeGenericMethod(outputType);
+            var parameters = genericMethod.GetParameters();
+            object?[] args;
+
+            if (parameters.Length == 0)
+            {
+                args = [];
+            }
+            else if (parameters.All(parameter => parameter.IsOptional))
+            {
+                args = parameters.Select(_ => Type.Missing).ToArray();
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "ChatResponseFormat.ForJsonSchema<{OutputType}> requires non-optional parameters. " +
+                    "Structured output configuration for type '{OutputType}' will not be applied to {AgentKey}.",
+                    outputType.FullName,
+                    outputType.FullName,
+                    request.AgentKey);
+                return;
+            }
+
+            var responseFormat = genericMethod.Invoke(null, args) as ChatResponseFormat;
+
+            if (responseFormat == null)
+            {
+                _logger.LogWarning(
+                    "Could not invoke ChatResponseFormat.ForJsonSchema<{OutputType}>(). " +
+                    "The method signature may have changed in the latest Microsoft.Extensions.AI version. " +
+                    "Structured output configuration for type '{OutputType}' will not be applied to {AgentKey}.",
+                    outputType.FullName,
+                    outputType.FullName,
+                    request.AgentKey);
+                return;
+            }
+
+            // Attempt to set ResponseFormat property via reflection
+            // This supports various SDK versions that may have this property
+            var property = typeof(PromptAgentDefinition).GetProperty("ResponseFormat");
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(promptDefinition, responseFormat);
+
+                _logger.LogInformation(
+                    "Configured structured output for {AgentKey} agent with response format for type '{OutputType}'",
+                    request.AgentKey,
+                    outputType.FullName);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "PromptAgentDefinition does not expose a ResponseFormat property. " +
+                    "Structured output configuration for type '{OutputType}' may not be applied to {AgentKey}. " +
+                    "Ensure the Azure.AI.Projects SDK version supports structured output.",
+                    outputType.FullName,
+                    request.AgentKey);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to configure structured output for {AgentKey} agent with type '{OutputType}'. " +
+                "This is often due to SDK version compatibility. Continuing without structured output configuration.",
+                request.AgentKey,
+                request.StructuredOutput?.OutputType?.FullName ?? "(unknown)");
+            // Don't rethrow - allow agent creation to continue without structured output
+        }
     }
 }

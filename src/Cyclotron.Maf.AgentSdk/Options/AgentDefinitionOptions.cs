@@ -94,4 +94,45 @@ public class AgentDefinitionOptions
     /// Gets or sets the desired agent version. Optional; if not set, the service version is used.
     /// </summary>
     public string? Version { get; set; }
+
+    /// <summary>
+    /// Gets or sets the fully qualified type name for structured output configuration.
+    /// When specified, the agent will be configured to produce responses conforming to this C# type.
+    /// Example: "MyNamespace.PersonInfo" or "MyProject.Models.ResponseDTO"
+    /// Only one output type per agent is supported.
+    /// </summary>
+    /// <remarks>
+    /// The type must be a public class or record with public properties. The framework will
+    /// automatically generate a JSON schema from this type and configure the agent's response
+    /// format accordingly.
+    ///
+    /// Example C# type definition:
+    /// <code>
+    /// using System.ComponentModel;
+    /// using System.Text.Json.Serialization;
+    ///
+    /// [Description("Information about a person")]
+    /// public class PersonInfo
+    /// {
+    ///     [JsonPropertyName("name")]
+    ///     [Description("Full name")]
+    ///     public string? Name { get; set; }
+    ///
+    ///     [JsonPropertyName("age")]
+    ///     [Description("Age in years")]
+    ///     public int? Age { get; set; }
+    /// }
+    /// </code>
+    ///
+    /// Example YAML configuration:
+    /// <code>
+    /// agents:
+    ///   person_info_extractor:
+    ///     type: "extraction"
+    ///     provider: "azure_foundry"
+    ///     structured_output_type: "MyProject.Models.PersonInfo"
+    ///     system_prompt_template: "Extract person information..."
+    /// </code>
+    /// </remarks>
+    public string? StructuredOutputType { get; set; }
 }

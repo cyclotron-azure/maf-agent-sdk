@@ -68,7 +68,8 @@ public static class AgentSdkServiceCollectionExtensions
                             Enabled = agentSection.GetValue("enabled", true),
                             Version = agentSection.GetValue<string?>("version"),
                             SystemPromptTemplate = agentSection.GetValue<string>("system_prompt_template"),
-                            UserPromptTemplate = agentSection.GetValue<string>("user_prompt_template")
+                            UserPromptTemplate = agentSection.GetValue<string>("user_prompt_template"),
+                            StructuredOutputType = agentSection.GetValue<string?>("structured_output_type")
                         };
 
                         // Bind Metadata section
