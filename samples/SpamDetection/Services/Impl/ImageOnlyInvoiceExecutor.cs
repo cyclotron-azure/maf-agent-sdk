@@ -12,9 +12,12 @@ namespace SpamDetection.Services.Impl;
 /// Executor for processing image-only PDF invoices.
 /// Supports both Azure (vector store for compliance) and Ollama (direct image processing).
 /// </summary>
-public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> logger)
+public sealed class ImageOnlyInvoiceExecutor(
+    ILogger<ImageOnlyInvoiceExecutor> logger,
+    IPromptRenderingService promptService)
 {
     private readonly ILogger<ImageOnlyInvoiceExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IPromptRenderingService _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
 
     /// <summary>
     /// Executes image-only invoice extraction using the specified provider strategy.
@@ -121,8 +124,13 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
 
             var contentItems = new List<AIContent>();
 
-            // Add text prompt
-            var userPrompt = GenerateImageAnalysisPrompt(fileName);
+            // Add text prompt using template
+            var context = new
+            {
+                documentName = fileName,
+                analysisMode = "ImageOnly"
+            };
+            var userPrompt = _promptService.RenderUserPrompt(strategy.AgentFactory.AgentKey, context);
             contentItems.Add(new TextContent(userPrompt));
 
             // Add each image as DataContent
@@ -192,8 +200,13 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
 
             var contentItems = new List<AIContent>();
 
-            // Add text prompt
-            var userPrompt = GenerateImageAnalysisPrompt(fileName);
+            // Add text prompt using template
+            var context = new
+            {
+                documentName = fileName,
+                analysisMode = "ImageOnly"
+            };
+            var userPrompt = _promptService.RenderUserPrompt(strategy.AgentFactory.AgentKey, context);
             contentItems.Add(new TextContent(userPrompt));
 
             // Add each image as DataContent
@@ -239,27 +252,6 @@ public sealed class ImageOnlyInvoiceExecutor(ILogger<ImageOnlyInvoiceExecutor> l
             result.Action = "error";
             throw;
         }
-    }
-
-    /// <summary>
-    /// Generates the prompt for image-based invoice analysis.
-    /// </summary>
-    private static string GenerateImageAnalysisPrompt(string fileName)
-    {
-        return $"""
-        Please analyze the invoice image(s) provided and extract all invoice information.
-
-        Document: {fileName}
-        Analysis mode: ImageOnly (scanned or image-based PDF)
-
-        Carefully examine each image to identify:
-        - Invoice number and dates
-        - Vendor and customer information
-        - Line items with quantities and prices
-        - Totals and payment information
-
-        Return ONLY valid JSON matching the required schema. Do not include any explanation or additional text.
-        """;
     }
 
     /// <summary>

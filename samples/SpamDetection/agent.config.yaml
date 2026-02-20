@@ -243,11 +243,16 @@ agents:
 
       ## Extraction Instructions
 
-      1. Carefully examine all content in the document
-      2. Extract all identifiable invoice fields
-      3. Handle both native PDFs and scanned documents
-      4. If text context is provided above, use it to supplement image analysis
-      5. For mixed documents, combine text context with visual analysis
+      1. Carefully examine all content in the document (text, images, or both)
+      2. Extract all identifiable invoice fields from any available source
+      3. Handle native PDFs, scanned documents, and mixed content
+      {{#if retrievedContent}}
+      4. Use the retrieved text context above to supplement image analysis
+      5. Combine information from all sources for complete accuracy
+      {{else}}
+      4. Use available methods (direct analysis, local indexing) as appropriate
+      5. For documents with both text and images, combine information from all sources
+      {{/if}}
 
       ## Output Requirements
 
@@ -334,11 +339,11 @@ agents:
 
       ## Extraction Instructions
 
-      1. Carefully examine all content in the document
-      2. Extract all identifiable invoice fields
-      3. Handle both native PDFs and scanned documents
-      4. If using document search tools, search for: invoice number, dates, amounts, vendor information
-      5. If analyzing images directly, use OCR understanding to identify fields
+      1. Carefully examine all content in the document (text, images, or both)
+      2. Extract all identifiable invoice fields from any available source
+      3. Handle native PDFs, scanned documents, and mixed content
+      4. Use available tools (file_search) and direct image analysis as appropriate
+      5. For documents with both text and images, combine information from all sources
 
       ## Output Requirements
 

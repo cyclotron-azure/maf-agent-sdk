@@ -12,9 +12,12 @@ namespace SpamDetection.Services.Impl;
 /// Executor for processing mixed PDF invoices (containing both text and images).
 /// Supports both Azure (vector store + file_search) and Ollama (local retrieval + images).
 /// </summary>
-public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
+public sealed class MixedInvoiceExecutor(
+    ILogger<MixedInvoiceExecutor> logger,
+    IPromptRenderingService promptService)
 {
     private readonly ILogger<MixedInvoiceExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IPromptRenderingService _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
 
     /// <summary>
     /// Executes mixed invoice extraction using the specified provider strategy.
@@ -143,8 +146,13 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
 
             var contentItems = new List<AIContent>();
 
-            // Generate and add text prompt
-            var userPrompt = GenerateMixedAnalysisPrompt(fileName, extractedImages.Length);
+            // Generate and add text prompt using template
+            var context = new
+            {
+                documentName = fileName,
+                analysisMode = "Mixed"
+            };
+            var userPrompt = _promptService.RenderUserPrompt(strategy.AgentFactory.AgentKey, context);
             contentItems.Add(new TextContent(userPrompt));
 
             // Add each image as DataContent
@@ -166,15 +174,7 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
             await strategy.AgentFactory.CreateAgentAsync(vectorStoreId, cancellationToken);
             result.MutableAgentIds.Add(strategy.AgentFactory.Agent?.Id ?? "unknown");
 
-            // Step 6: Create user message context (this won't be used since we already have chatMessage, but for completeness)
-            var context = new
-            {
-                documentName = fileName,
-                analysisMode = "Mixed",
-                imageCount = extractedImages.Length
-            };
-
-            // Step 7: Run agent with message containing both images and prompt
+            // Step 6: Run agent with message containing both images and prompt
             _logger.LogInformation("Running agent to extract invoice data from mixed content...");
             var response = await strategy.AgentFactory.RunAgentWithPollingAsync(
                 messages: [chatMessage],
@@ -185,7 +185,7 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
 
             _logger.LogInformation("Agent response received. Response length: {Length} characters", responseText.Length);
 
-            // Step 8: Parse JSON response into InvoiceData
+            // Step 7: Parse JSON response into InvoiceData
             result.InvoiceData = ParseInvoiceDataFromJson(responseText);
 
             _logger.LogInformation("Invoice data extracted successfully from mixed content");
@@ -256,14 +256,20 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
 
             var contentItems = new List<AIContent>();
 
-            // Generate and add text prompt with retrieved context
+            // Generate and add text prompt with retrieved context using template
             var retrievedContext = await RetrieveContextAsync(
                 vectorStoreId,
                 providerName,
                 vectorStoreManager,
                 cancellationToken);
 
-            var userPrompt = GenerateMixedAnalysisPromptWithContext(fileName, extractedImages.Length, retrievedContext);
+            var context = new
+            {
+                documentName = fileName,
+                analysisMode = "Mixed",
+                retrievedContent = retrievedContext
+            };
+            var userPrompt = _promptService.RenderUserPrompt(strategy.AgentFactory.AgentKey, context);
             contentItems.Add(new TextContent(userPrompt));
 
             // Add each image as DataContent
@@ -356,70 +362,6 @@ public sealed class MixedInvoiceExecutor(ILogger<MixedInvoiceExecutor> logger)
             _logger.LogWarning(ex, "Failed to retrieve context from vector store; will continue without context");
             return "Document context retrieval failed.";
         }
-    }
-
-    /// <summary>
-    /// Generates the prompt for mixed invoice analysis (text + images).
-    /// </summary>
-    private static string GenerateMixedAnalysisPrompt(string fileName, int imageCount)
-    {
-        return $"""
-        Please analyze the invoice document provided, which contains both text content and {imageCount} image(s).
-
-        Document: {fileName}
-        Analysis mode: Mixed (native PDF with embedded images and scanned pages)
-
-        You have access to:
-        1. Text content via document search tools (use file_search to retrieve text portions)
-        2. {imageCount} invoice image(s) provided directly
-
-        Extraction Instructions:
-        1. First, examine the provided images to identify key invoice fields
-        2. Use document search to retrieve supporting text information (line items, payment terms, etc.)
-        3. Combine information from both sources for complete accuracy
-
-        Extract all invoice information:
-        - Invoice number, dates, and vendor information
-        - Line items with quantities and prices
-        - Totals, taxes, and payment information
-        - Any special terms or notes
-
-        Return ONLY valid JSON matching the required schema. Do not include any explanation or additional text.
-        """;
-    }
-
-    /// <summary>
-    /// Generates the prompt for mixed invoice analysis with retrieved context (Ollama).
-    /// </summary>
-    private static string GenerateMixedAnalysisPromptWithContext(
-        string fileName,
-        int imageCount,
-        string retrievedContext)
-    {
-        return $"""
-        Please analyze the invoice document provided, which contains both text content and {imageCount} image(s).
-
-        Document: {fileName}
-        Analysis mode: Mixed (native PDF with embedded images and scanned pages)
-
-        Retrieved Text Context:
-        {retrievedContext}
-
-        You also have {imageCount} invoice image(s) provided directly.
-
-        Extraction Instructions:
-        1. First, examine the provided images to identify key invoice fields
-        2. Use the retrieved text context above to supplement image analysis
-        3. Combine information from both sources for complete accuracy
-
-        Extract all invoice information:
-        - Invoice number, dates, and vendor information
-        - Line items with quantities and prices
-        - Totals, taxes, and payment information
-        - Any special terms or notes
-
-        Return ONLY valid JSON matching the required schema. Do not include any explanation or additional text.
-        """;
     }
 
     /// <summary>
