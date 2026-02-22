@@ -135,4 +135,22 @@ public class AgentDefinitionOptions
     /// </code>
     /// </remarks>
     public string? StructuredOutputType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the sampling temperature for model responses (controls randomness).
+    /// Valid range: 0.0 to 2.0. Lower values (e.g., 0.2) produce more deterministic responses.
+    /// Higher values (e.g., 0.8) produce more creative/random responses.
+    /// When specified, overrides the provider-level temperature setting for this agent.
+    /// Null means use the provider's temperature setting or the provider's default.
+    /// </summary>
+    public float? Temperature { get; set; }
+
+    /// <summary>
+    /// Gets or sets the nucleus sampling parameter (Top P).
+    /// Valid range: 0.0 to 1.0. Controls diversity of responses by limiting token selection to top-probability tokens.
+    /// Typically used as an alternative to Temperature.
+    /// When specified, overrides the provider-level TopP setting for this agent.
+    /// Null means use the provider's TopP setting or the provider's default.
+    /// </summary>
+    public float? TopP { get; set; }
 }

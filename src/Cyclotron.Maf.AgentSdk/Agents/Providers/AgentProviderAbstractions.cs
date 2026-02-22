@@ -25,7 +25,9 @@ public sealed record AgentProviderCreationRequest(
     string Instructions,
     string NamePrefix,
     string? Version,
-    StructuredOutputConfiguration? StructuredOutput = null);
+    StructuredOutputConfiguration? StructuredOutput = null,
+    float? Temperature = null,
+    float? TopP = null);
 
 /// <summary>
 /// Result of creating an agent through a provider.

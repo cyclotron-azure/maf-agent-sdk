@@ -10,6 +10,9 @@ providers:
     api_version: "2024-12-01-preview"
     timeout_seconds: 300
     max_retries: 3
+    # Optional: Set default temperature and top_p for all agents using this provider
+    # temperature: 0.7    # Controls randomness: 0.0 (deterministic) to 2.0 (creative), default varies by model
+    # top_p: 0.95        # Nucleus sampling: 0.0 to 1.0, controls diversity, default varies by model
 
   # Ollama local provider example
   # Demonstrates using open-source models running locally
@@ -19,6 +22,9 @@ providers:
     deployment_name: "{OLLAMA_MODEL}"
     timeout_seconds: 120
     max_retries: 2
+    # Optional: Set default temperature and top_p for all agents using this provider
+    # temperature: 0.8    # For more creative responses
+    # top_p: 0.90        # For more diverse token selection
 
 # PDF Content Analysis Configuration
 # Controls how PDF files are analyzed to detect content type (text-based, image-only, or mixed)
@@ -50,6 +56,9 @@ agents:
     auto_delete: true
     auto_cleanup_resources: true
     version: "1"
+    # Optional: Override provider-level temperature and top_p for this agent
+    # temperature: 0.3    # For deterministic, consistent spam decisions
+    # top_p: 0.8         # Lower diversity for focused classification
 
     metadata:
       description: "AI agent for detecting spam messages"

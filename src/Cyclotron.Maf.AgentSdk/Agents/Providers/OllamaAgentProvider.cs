@@ -70,6 +70,20 @@ internal sealed class OllamaAgentProvider(ILogger<OllamaAgentProvider> logger) :
             }
         }
 
+        // Configure thermodynamic parameters if specified
+        // Note: OllamaSharp's OllamaApiClient and ChatClientAgent don't expose direct properties for
+        // Temperature and TopP at agent creation time. These are typically configured per-request in ChatOptions.
+        // We log them here for reference and they can be used in the chat request options during execution.
+        if (request.Temperature.HasValue || request.TopP.HasValue)
+        {
+            _logger.LogInformation(
+                "Thermodynamic parameters configured for {AgentKey} agent: Temperature={Temperature}, TopP={TopP}. " +
+                "Note: These should be applied in ChatOptions when making chat requests.",
+                request.AgentKey,
+                request.Temperature?.ToString("F2") ?? "null",
+                request.TopP?.ToString("F2") ?? "null");
+        }
+
         IChatClient chatClient = ollamaClient;
         var agentName = $"{request.NamePrefix}-ollama";
         AIAgent agent = new ChatClientAgent(

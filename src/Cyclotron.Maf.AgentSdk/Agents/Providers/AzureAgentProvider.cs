@@ -92,6 +92,9 @@ internal sealed class AzureAgentProvider(
                 ConfigureStructuredOutput(promptDefinition, request);
             }
 
+            // Configure thermodynamic parameters (temperature and top_p) if specified
+            ConfigureThermodynamicParameters(promptDefinition, request);
+
             var versionOptions = new AgentVersionCreationOptions(promptDefinition);
             AgentVersion createdAgentVersion = await projectClient.Agents
                 .CreateAgentVersionAsync(agentName, versionOptions, cancellationToken)
@@ -308,6 +311,100 @@ internal sealed class AzureAgentProvider(
                 request.AgentKey,
                 request.StructuredOutput?.OutputType?.FullName ?? "(unknown)");
             // Don't rethrow - allow agent creation to continue without structured output
+        }
+    }
+
+    /// <summary>
+    /// Configures thermodynamic parameters (temperature and top_p) for the agent
+    /// by setting them on the PromptAgentDefinition if the properties are available.
+    /// </summary>
+    /// <param name="promptDefinition">The prompt agent definition to configure.</param>
+    /// <param name="request">The agent creation request containing thermodynamic parameters.</param>
+    /// <remarks>
+    /// This method attempts to set Temperature and TopP properties using reflection.
+    /// If the Azure.AI.Projects SDK does not expose these properties, a warning is logged
+    /// and the agent is created without these parameters. This allows graceful degradation
+    /// for SDK versions that don't yet support temperature/top_p configuration.
+    /// </remarks>
+    private void ConfigureThermodynamicParameters(
+        PromptAgentDefinition promptDefinition,
+        AgentProviderCreationRequest request)
+    {
+        // If neither temperature nor top_p are specified, nothing to configure
+        if (!request.Temperature.HasValue && !request.TopP.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            _logger.LogDebug(
+                "Configuring thermodynamic parameters for {AgentKey} agent: Temperature={Temperature}, TopP={TopP}",
+                request.AgentKey,
+                request.Temperature?.ToString("F2") ?? "null",
+                request.TopP?.ToString("F2") ?? "null");
+
+            var temperatureSet = false;
+            var topPSet = false;
+
+            // Attempt to set Temperature property via reflection
+            if (request.Temperature.HasValue)
+            {
+                var temperatureProperty = typeof(PromptAgentDefinition).GetProperty("Temperature");
+                if (temperatureProperty != null && temperatureProperty.CanWrite)
+                {
+                    temperatureProperty.SetValue(promptDefinition, request.Temperature.Value);
+                    temperatureSet = true;
+
+                    _logger.LogDebug(
+                        "Set Temperature property to {Temperature} for {AgentKey} agent",
+                        request.Temperature.Value,
+                        request.AgentKey);
+                }
+            }
+
+            // Attempt to set TopP property via reflection
+            if (request.TopP.HasValue)
+            {
+                var topPProperty = typeof(PromptAgentDefinition).GetProperty("TopP");
+                if (topPProperty != null && topPProperty.CanWrite)
+                {
+                    topPProperty.SetValue(promptDefinition, request.TopP.Value);
+                    topPSet = true;
+
+                    _logger.LogDebug(
+                        "Set TopP property to {TopP} for {AgentKey} agent",
+                        request.TopP.Value,
+                        request.AgentKey);
+                }
+            }
+
+            // Log warning if any parameters could not be set
+            if ((request.Temperature.HasValue && !temperatureSet) || (request.TopP.HasValue && !topPSet))
+            {
+                _logger.LogWarning(
+                    "PromptAgentDefinition does not expose Temperature/TopP properties. " +
+                    "Thermodynamic parameters for {AgentKey} agent may not be applied. " +
+                    "Ensure the Azure.AI.Projects SDK version supports these parameters.",
+                    request.AgentKey);
+            }
+            else if (temperatureSet || topPSet)
+            {
+                _logger.LogInformation(
+                    "Configured thermodynamic parameters for {AgentKey} agent: Temperature={Temperature}, TopP={TopP}",
+                    request.AgentKey,
+                    request.Temperature?.ToString("F2") ?? "null",
+                    request.TopP?.ToString("F2") ?? "null");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to configure thermodynamic parameters for {AgentKey} agent. " +
+                "This may be due to SDK version compatibility. Continuing without thermodynamic parameter configuration.",
+                request.AgentKey);
+            // Don't rethrow - allow agent creation to continue without thermodynamic parameters
         }
     }
 }

@@ -69,7 +69,9 @@ public static class AgentSdkServiceCollectionExtensions
                             Version = agentSection.GetValue<string?>("version"),
                             SystemPromptTemplate = agentSection.GetValue<string>("system_prompt_template"),
                             UserPromptTemplate = agentSection.GetValue<string>("user_prompt_template"),
-                            StructuredOutputType = agentSection.GetValue<string?>("structured_output_type")
+                            StructuredOutputType = agentSection.GetValue<string?>("structured_output_type"),
+                            Temperature = agentSection.GetValue<float?>("temperature"),
+                            TopP = agentSection.GetValue<float?>("top_p")
                         };
 
                         // Bind Metadata section
@@ -88,6 +90,36 @@ public static class AgentSdkServiceCollectionExtensions
                         if (frameworkSection.Exists())
                         {
                             agentDef.Provider = frameworkSection.GetValue<string>("provider") ?? string.Empty;
+                        }
+
+                        // Validate temperature and top_p parameters
+                        try
+                        {
+                            if (agentDef.Temperature.HasValue)
+                            {
+                                if (agentDef.Temperature < 0.0f || agentDef.Temperature > 2.0f)
+                                {
+                                    throw new ArgumentException(
+                                        $"Temperature must be between 0.0 and 2.0, but got {agentDef.Temperature}",
+                                        nameof(agentDef.Temperature));
+                                }
+                            }
+
+                            if (agentDef.TopP.HasValue)
+                            {
+                                if (agentDef.TopP < 0.0f || agentDef.TopP > 1.0f)
+                                {
+                                    throw new ArgumentException(
+                                        $"TopP must be between 0.0 and 1.0, but got {agentDef.TopP}",
+                                        nameof(agentDef.TopP));
+                                }
+                            }
+                        }
+                        catch (ArgumentException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Agent '{agentSection.Key}' has invalid thermodynamic parameters. {ex.Message}",
+                                ex);
                         }
 
                         agents[agentSection.Key] = agentDef;
@@ -162,7 +194,9 @@ public static class AgentSdkServiceCollectionExtensions
                             ApiVersion = substitution.SubstituteNullable(providerSection.GetValue<string>("api_version")),
                             ApiKey = substitution.SubstituteNullable(providerSection.GetValue<string>("api_key")),
                             TimeoutSeconds = providerSection.GetValue("timeout_seconds", 300),
-                            MaxRetries = providerSection.GetValue("max_retries", 3)
+                            MaxRetries = providerSection.GetValue("max_retries", 3),
+                            Temperature = providerSection.GetValue<float?>("temperature"),
+                            TopP = providerSection.GetValue<float?>("top_p")
                         };
 
                         // Validate provider configuration
@@ -172,6 +206,18 @@ public static class AgentSdkServiceCollectionExtensions
                                 $"Provider '{providerSection.Key}' is not properly configured. " +
                                 $"Type: {providerDef.Type}, Endpoint: {providerDef.Endpoint}, DeploymentName: {providerDef.DeploymentName}. " +
                                 $"Ensure all required fields are present and correctly formatted.");
+                        }
+
+                        // Validate temperature and top_p parameters
+                        try
+                        {
+                            providerDef.ValidateThermodynamicParameters();
+                        }
+                        catch (ArgumentException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Provider '{providerSection.Key}' has invalid thermodynamic parameters. {ex.Message}",
+                                ex);
                         }
 
                         providers[providerSection.Key] = providerDef;

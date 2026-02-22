@@ -183,6 +183,8 @@ var result = await workflow.ExecuteAsync<OutputType>(input, cancellationToken);
 | `api_version` | string | API version | `2024-12-01-preview` |
 | `timeout_seconds` | int | Request timeout | `300` |
 | `max_retries` | int | Maximum retry attempts | `3` |
+| `temperature` | float | Sampling temperature (0.0-2.0) | - |
+| `top_p` | float | Nucleus sampling (0.0-1.0) | - |
 
 #### Agent Definition Options
 
@@ -194,6 +196,8 @@ var result = await workflow.ExecuteAsync<OutputType>(input, cancellationToken);
 | `auto_cleanup_resources` | bool | Delete vector store after use | `false` |
 | `system_prompt_template` | string | Handlebars template for system prompt | - |
 | `user_prompt_template` | string | Handlebars template for user prompt | - |
+| `temperature` | float | Overrides provider temperature (0.0-2.0) | - |
+| `top_p` | float | Overrides provider Top P (0.0-1.0) | - |
 
 #### Agent Metadata Options
 

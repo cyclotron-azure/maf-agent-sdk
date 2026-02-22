@@ -45,6 +45,8 @@ providers:
     type: "azure_foundry"
     endpoint: "${PROJECT_ENDPOINT}"
     deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
+    temperature: 0.7
+    top_p: 0.95
 
 agents:
   my_agent:
@@ -52,6 +54,8 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: true
+    temperature: 0.3
+    top_p: 0.8
     metadata:
       description: "My AI agent"
       tools:

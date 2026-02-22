@@ -437,6 +437,8 @@ ACCURACY: 10/10 (100%)
 | `enabled` | Whether the agent is active | `true` |
 | `auto_delete` | Delete agent and session after use | `true` |
 | `auto_cleanup_resources` | Delete vector store after use | `true` |
+| `temperature` | Overrides provider temperature (0.0-2.0) | - |
+| `top_p` | Overrides provider Top P (0.0-1.0) | - |
 
 ### Agent Metadata Options
 
@@ -456,6 +458,8 @@ ACCURACY: 10/10 (100%)
 | `api_version` | API version (default: 2024-12-01-preview) |
 | `timeout_seconds` | Request timeout (default: 300) |
 | `max_retries` | Maximum retry attempts (default: 3) |
+| `temperature` | Sampling temperature (0.0-2.0) |
+| `top_p` | Nucleus sampling (0.0-1.0) |
 
 **Ollama (Local):**
 
@@ -465,6 +469,8 @@ ACCURACY: 10/10 (100%)
 | `deployment_name` | Model name (e.g., llama3.2:latest, mistral:latest) |
 | `timeout_seconds` | Request timeout (default: 120 for local inference) |
 | `max_retries` | Maximum retry attempts (default: 2) |
+| `temperature` | Sampling temperature (0.0-2.0) |
+| `top_p` | Nucleus sampling (0.0-1.0) |
 
 ## Microsoft Learn Resources
 

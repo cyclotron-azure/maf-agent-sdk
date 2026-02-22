@@ -400,6 +400,9 @@ public class AgentFactory : IAgentFactory
         // Resolve structured output configuration if specified
         var structuredOutput = ResolveStructuredOutput();
 
+        // Resolve temperature and top_p parameters (agent-level overrides provider-level)
+        var (temperature, topP) = ResolveThermodynamicParameters();
+
         var creationRequest = new AgentProviderCreationRequest(
             _agentKey,
             providerName,
@@ -409,7 +412,9 @@ public class AgentFactory : IAgentFactory
             instructions,
             _promptService.GetAgentNamePrefix(_agentKey),
             _agentDefinition.Version,
-            structuredOutput);
+            structuredOutput,
+            temperature,
+            topP);
 
         var providerResult = await providerImplementation
             .CreateAgentAsync(creationRequest, cancellationToken)
@@ -450,6 +455,9 @@ public class AgentFactory : IAgentFactory
         // Resolve structured output configuration if specified
         var structuredOutput = ResolveStructuredOutput();
 
+        // Resolve temperature and top_p parameters (agent-level overrides provider-level)
+        var (temperature, topP) = ResolveThermodynamicParameters();
+
         var creationRequest = new AgentProviderCreationRequest(
             _agentKey,
             providerName,
@@ -459,7 +467,9 @@ public class AgentFactory : IAgentFactory
             instructions,
             _promptService.GetAgentNamePrefix(_agentKey),
             _agentDefinition.Version,
-            structuredOutput);
+            structuredOutput,
+            temperature,
+            topP);
 
         var providerResult = await providerImplementation
             .CreateAgentAsync(creationRequest, cancellationToken)
@@ -739,6 +749,24 @@ public class AgentFactory : IAgentFactory
                 _agentKey);
             throw;
         }
+    }
+
+    private (float? Temperature, float? TopP) ResolveThermodynamicParameters()
+    {
+        // Agent-level settings override provider-level settings
+        var temperature = _agentDefinition.Temperature ?? _providerOptions.Providers[_agentDefinition.Provider].Temperature;
+        var topP = _agentDefinition.TopP ?? _providerOptions.Providers[_agentDefinition.Provider].TopP;
+
+        if (temperature.HasValue || topP.HasValue)
+        {
+            _logger.LogDebug(
+                "Resolved thermodynamic parameters for {AgentKey}: Temperature={Temperature}, TopP={TopP}",
+                _agentKey,
+                temperature?.ToString("F2") ?? "null",
+                topP?.ToString("F2") ?? "null");
+        }
+
+        return (temperature, topP);
     }
 
     private void ValidateProviderReference()

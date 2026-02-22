@@ -116,4 +116,51 @@ public class ModelProviderDefinitionOptions
     /// Returns ReasoningModel if specified, otherwise returns the effective model.
     /// </summary>
     public string GetReasoningModel() => ReasoningModel ?? GetEffectiveModel();
+
+    /// <summary>
+    /// Gets or sets the sampling temperature for model responses (controls randomness).
+    /// Valid range: 0.0 to 2.0. Lower values (e.g., 0.2) produce more deterministic responses.
+    /// Higher values (e.g., 0.8) produce more creative/random responses.
+    /// Null means use the provider's default.
+    /// </summary>
+    public float? Temperature { get; set; }
+
+    /// <summary>
+    /// Gets or sets the nucleus sampling parameter (Top P).
+    /// Valid range: 0.0 to 1.0. Controls diversity of responses by limiting token selection to top-probability tokens.
+    /// Typically used as an alternative to Temperature.
+    /// Null means use the provider's default.
+    /// </summary>
+    public float? TopP { get; set; }
+
+    /// <summary>
+    /// Validates that Temperature and TopP parameters are within acceptable ranges.
+    /// Throws ArgumentException if values are out of range.
+    /// </summary>
+    /// <remarks>
+    /// Temperature: 0.0 to 2.0
+    /// TopP: 0.0 to 1.0
+    /// </remarks>
+    public void ValidateThermodynamicParameters()
+    {
+        if (Temperature.HasValue)
+        {
+            if (Temperature < 0.0f || Temperature > 2.0f)
+            {
+                throw new ArgumentException(
+                    $"Temperature must be between 0.0 and 2.0, but got {Temperature}",
+                    nameof(Temperature));
+            }
+        }
+
+        if (TopP.HasValue)
+        {
+            if (TopP < 0.0f || TopP > 1.0f)
+            {
+                throw new ArgumentException(
+                    $"TopP must be between 0.0 and 1.0, but got {TopP}",
+                    nameof(TopP));
+            }
+        }
+    }
 }
