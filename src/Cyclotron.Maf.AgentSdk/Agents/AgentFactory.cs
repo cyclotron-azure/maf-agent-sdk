@@ -2,6 +2,7 @@ using Cyclotron.Maf.AgentSdk.Agents.Providers;
 using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Middleware;
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Microsoft.Agents.AI;
@@ -230,34 +231,27 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <inheritdoc/>
-    public async Task<T> RunAgentWithPollingAsync<T>(
+    public async Task<IStructuredOutputAgentResponse<T>> RunAgentWithPollingAsync<T>(
         IList<ChatMessage> messages,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
         int retryDelaySeconds = 20,
         CancellationToken cancellationToken = default)
     {
-        if (_agentDefinition.StructuredOutputType == null)
-        {
-            throw new InvalidOperationException(
-                $"Agent '{_agentKey}' is not configured for structured output. " +
-                "Set 'structured_output_type' in agent.config.yaml to use RunAgentWithPollingAsync<T>().");
-        }
-
         _logger.LogDebug(
-            "Running {AgentKey} agent with structured output type '{StructuredOutputType}'",
+            "Running {AgentKey} agent with structured output deserialization to type '{TargetType}'",
             _agentKey,
-            _agentDefinition.StructuredOutputType);
+            typeof(T).FullName);
 
         // Run the agent and get the base response
         var response = await RunAgentWithPollingAsync(messages, pollingIntervalSeconds, maxRetries, retryDelaySeconds, cancellationToken);
 
-        // Deserialize and return the typed result
+        // Deserialize and return the typed result wrapped with original response
         return DeserializeStructuredResponse<T>(response);
     }
 
     /// <inheritdoc/>
-    public async Task<T> RunAgentWithPollingAsync<T>(
+    public async Task<IStructuredOutputAgentResponse<T>> RunAgentWithPollingAsync<T>(
         string userPrompt,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
@@ -274,13 +268,14 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <summary>
-    /// Deserializes the agent response text into the specified structured type.
+    /// Deserializes the agent response text into a structured output response wrapper.
+    /// Preserves the original response while also providing the deserialized typed result.
     /// </summary>
     /// <typeparam name="T">The type to deserialize into.</typeparam>
     /// <param name="response">The base agent response with JSON text.</param>
-    /// <returns>The deserialized result of type T.</returns>
+    /// <returns>A structured output response containing both the deserialized result and original response.</returns>
     /// <exception cref="InvalidOperationException">Thrown if deserialization fails.</exception>
-    private T DeserializeStructuredResponse<T>(AgentResponse response)
+    private IStructuredOutputAgentResponse<T> DeserializeStructuredResponse<T>(AgentResponse response)
     {
         try
         {
@@ -308,7 +303,7 @@ public class AgentFactory : IAgentFactory
                 _agentKey,
                 typeof(T).FullName);
 
-            return result;
+            return new StructuredOutputAgentResponse<T>(result, response);
         }
         catch (JsonException ex)
         {

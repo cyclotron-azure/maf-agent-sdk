@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Models;
 using SpamDetection.Models;
 
 namespace SpamDetection.Services;
@@ -24,16 +25,15 @@ public interface ISpamWorkflowStructuredOutput
 
     /// <summary>
     /// Classifies a message as spam or not spam using structured output.
-    /// Returns a strongly-typed SpamClassificationReadyForStructuredOutput object
-    /// with confidence scores and detailed classification information.
+    /// Returns a structured output response with confidence scores and detailed classification information.
     /// </summary>
     /// <param name="messageContent">The message content to classify.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>
-    /// A task representing the asynchronous operation, returning a structured
-    /// classification result with confidence and spam indicators.
+    /// A task representing the asynchronous operation, returning a structured output response
+    /// containing the classification result and original agent response metadata.
     /// </returns>
-    Task<SpamClassificationReadyForStructuredOutput> ClassifyMessageStructuredAsync(
+    Task<IStructuredOutputAgentResponse<SpamClassificationReadyForStructuredOutput>> ClassifyMessageStructuredAsync(
         string messageContent,
         CancellationToken cancellationToken);
 }

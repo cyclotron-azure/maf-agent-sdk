@@ -51,11 +51,6 @@ agents:
     auto_cleanup_resources: true
     version: "1"
 
-    # Structured Output Configuration
-    # When set, the agent will produce responses conforming to this C# type
-    # This enables type-safe deserialization and structured result handling
-    structured_output_type: "SpamDetection.Models.SpamClassificationReadyForStructuredOutput"
-
     metadata:
       description: "AI agent for detecting spam messages"
       tools:
@@ -130,11 +125,6 @@ agents:
     auto_delete: true
     auto_cleanup_resources: false  # No Azure resources to cleanup for local models
     version: "1"
-
-    # Structured Output Configuration
-    # When set, the agent will produce responses conforming to this C# type
-    # This enables type-safe deserialization and structured result handling
-    structured_output_type: "SpamDetection.Models.SpamClassificationReadyForStructuredOutput"
 
     metadata:
       description: "Local AI agent for spam detection using Ollama"

@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Models;
 using SpamDetection.Models;
 
 namespace SpamDetection.Services.Impl;
@@ -77,7 +78,8 @@ public sealed class SpamWorkflowStructuredOutput(
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var result = await ClassifyMessageStructuredAsync(message.Content, cancellationToken);
+                var response = await ClassifyMessageStructuredAsync(message.Content, cancellationToken);
+                var result = response.StructuredOutput;
 
                 // Map structured output IsSpam to expected label
                 var predicted = result.IsSpam ? "spam" : "not_spam";
@@ -135,15 +137,14 @@ public sealed class SpamWorkflowStructuredOutput(
 
     /// <summary>
     /// Classifies a message as spam or not spam using structured output.
-    /// Returns a strongly-typed result instead of parsing text responses.
+    /// Returns a structured output response wrapper containing both the classification result and agent metadata.
     /// </summary>
     /// <remarks>
-    /// This method demonstrates the new generic RunAgentWithPollingAsync method capability,
-    /// which automatically deserializes the agent response into the structured output type
-    /// defined in the agent.config.yaml (SpamClassificationReadyForStructuredOutput).
-    /// This eliminates the need for manual response parsing and provides type safety.
+    /// This method demonstrates the generic RunAgentWithPollingAsync capability with a generic type parameter,
+    /// which automatically deserializes the agent response into the specified type.
+    /// The type is inferred from the generic parameter - no configuration needed.
     /// </remarks>
-    public async Task<SpamClassificationReadyForStructuredOutput> ClassifyMessageStructuredAsync(
+    public async Task<IStructuredOutputAgentResponse<SpamClassificationReadyForStructuredOutput>> ClassifyMessageStructuredAsync(
         string messageContent,
         CancellationToken cancellationToken)
     {
@@ -152,13 +153,13 @@ public sealed class SpamWorkflowStructuredOutput(
 
         var userMessage = strategy.AgentFactory.CreateUserMessage(context);
 
-        // Use the new generic method for structured output
-        // The agent factory automatically deserializes the response into the configured type
-        var result = await strategy.AgentFactory.RunAgentWithPollingAsync<SpamClassificationReadyForStructuredOutput>(
+        // Use the generic method for structured output
+        // Type is explicit here - no configuration needed
+        var response = await strategy.AgentFactory.RunAgentWithPollingAsync<SpamClassificationReadyForStructuredOutput>(
             messages: [userMessage],
             cancellationToken: cancellationToken);
 
-        return result;
+        return response;
     }
 
     /// <summary>

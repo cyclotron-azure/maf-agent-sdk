@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Options;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -86,8 +87,8 @@ public interface IAgentFactory
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Runs the agent with structured output, returning a typed response.
-    /// The agent must be configured with a structured output type in agent.config.yaml.
+    /// Runs the agent with structured output, returning a wrapper containing both the deserialized result and original response.
+    /// Automatically deserializes the JSON response to the specified type T without requiring configuration.
     /// </summary>
     /// <typeparam name="T">The type to deserialize the structured response into.</typeparam>
     /// <param name="messages">Messages to send to the agent.</param>
@@ -95,9 +96,8 @@ public interface IAgentFactory
     /// <param name="maxRetries">Maximum number of retries for empty responses (default: 3).</param>
     /// <param name="retryDelaySeconds">Initial delay between retries in seconds (default: 5, uses exponential backoff).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The deserialized structured result of type T.</returns>
-    /// <exception cref="InvalidOperationException">Thrown if no structured output type is configured for this agent.</exception>
-    Task<T> RunAgentWithPollingAsync<T>(
+    /// <returns>A structured output response containing the deserialized result and original agent response metadata.</returns>
+    Task<IStructuredOutputAgentResponse<T>> RunAgentWithPollingAsync<T>(
         IList<ChatMessage> messages,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
@@ -105,7 +105,7 @@ public interface IAgentFactory
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Runs the agent with structured output using a text prompt.
+    /// Runs the agent with structured output using a text prompt, returning a wrapper containing both the deserialized result and original response.
     /// Convenience method that wraps the text in a ChatMessage before sending to the agent.
     /// </summary>
     /// <typeparam name="T">The type to deserialize the structured response into.</typeparam>
@@ -114,9 +114,8 @@ public interface IAgentFactory
     /// <param name="maxRetries">Maximum number of retries for empty responses (default: 3).</param>
     /// <param name="retryDelaySeconds">Initial delay between retries in seconds (default: 5, uses exponential backoff).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The deserialized structured result of type T.</returns>
-    /// <exception cref="InvalidOperationException">Thrown if no structured output type is configured for this agent.</exception>
-    Task<T> RunAgentWithPollingAsync<T>(
+    /// <returns>A structured output response containing the deserialized result and original agent response metadata.</returns>
+    Task<IStructuredOutputAgentResponse<T>> RunAgentWithPollingAsync<T>(
         string userPrompt,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
