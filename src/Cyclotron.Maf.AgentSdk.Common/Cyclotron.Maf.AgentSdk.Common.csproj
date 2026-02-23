@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.AI.Projects" />
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="OllamaSharp" />
   </ItemGroup>
 
   <!-- Microsoft.Extensions Packages for data annotations -->

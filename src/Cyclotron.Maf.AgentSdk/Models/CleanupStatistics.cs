@@ -27,16 +27,6 @@ public record CleanupStatistics
     public int VectorStoresFailedToDelete { get; init; }
 
     /// <summary>
-    /// Gets the number of threads successfully deleted.
-    /// </summary>
-    public int ThreadsDeleted { get; init; }
-
-    /// <summary>
-    /// Gets the number of threads that failed to delete.
-    /// </summary>
-    public int ThreadsFailedToDelete { get; init; }
-
-    /// <summary>
     /// Gets the number of agents successfully deleted.
     /// </summary>
     public int AgentsDeleted { get; init; }
@@ -49,10 +39,10 @@ public record CleanupStatistics
     /// <summary>
     /// Gets the total number of resources successfully deleted across all types.
     /// </summary>
-    public int TotalDeleted => FilesDeleted + VectorStoresDeleted + ThreadsDeleted + AgentsDeleted;
+    public int TotalDeleted => FilesDeleted + VectorStoresDeleted + AgentsDeleted;
 
     /// <summary>
     /// Gets the total number of resources that failed to delete across all types.
     /// </summary>
-    public int TotalFailed => FilesFailedToDelete + VectorStoresFailedToDelete + ThreadsFailedToDelete + AgentsFailedToDelete;
+    public int TotalFailed => FilesFailedToDelete + VectorStoresFailedToDelete + AgentsFailedToDelete;
 }

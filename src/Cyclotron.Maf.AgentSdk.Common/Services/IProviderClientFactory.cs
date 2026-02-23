@@ -1,5 +1,3 @@
-using Azure.AI.Projects;
-
 namespace Cyclotron.Maf.AgentSdk.Common.Services;
 
 /// <summary>
@@ -11,7 +9,7 @@ namespace Cyclotron.Maf.AgentSdk.Common.Services;
 /// <para>
 /// This factory creates new client instances per request to avoid state sharing across parallel processing.
 /// Provider configurations are loaded from the <c>providers:</c> section in agent.config.yaml.
-/// Returns <see cref="AIProjectClient"/> instances for Azure providers and compatible clients for local providers.
+/// Returns <see cref="IProviderClient"/> instances with typed accessors for provider-specific clients.
 /// </para>
 /// <para>
 /// Supported authentication methods:
@@ -25,12 +23,12 @@ namespace Cyclotron.Maf.AgentSdk.Common.Services;
 public interface IProviderClientFactory
 {
     /// <summary>
-    /// Gets an <see cref="AIProjectClient"/> instance configured for the specified provider.
+    /// Gets an <see cref="IProviderClient"/> instance configured for the specified provider.
     /// Creates a new client instance per call to avoid state sharing.
     /// </summary>
     /// <param name="providerName">The provider key from the <c>providers:</c> section in agent.config.yaml.</param>
-    /// <returns>A configured <see cref="AIProjectClient"/> for the specified provider.</returns>
+    /// <returns>A configured <see cref="IProviderClient"/> for the specified provider.</returns>
     /// <exception cref="ArgumentException">Thrown when <paramref name="providerName"/> is null or empty.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the specified provider is not found or has invalid configuration.</exception>
-    AIProjectClient GetClient(string providerName);
+    IProviderClient GetClient(string providerName);
 }

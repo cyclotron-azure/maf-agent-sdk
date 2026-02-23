@@ -217,7 +217,7 @@ public class ProviderClientFactoryTests
             .WithMessage("*configuration is invalid*");
     }
 
-    [Fact(DisplayName = "GetClient should create client for valid azure_foundry provider")]
+    [Fact(DisplayName = "GetClient should create provider client for valid azure_foundry provider")]
     public void GetClient_ValidAzureFoundryProvider_CreatesClient()
     {
         // Arrange
@@ -240,9 +240,11 @@ public class ProviderClientFactoryTests
 
         // Assert
         client.Should().NotBeNull();
+        client.TryGetAzureClient(out var projectClient).Should().BeTrue();
+        projectClient.Should().NotBeNull();
     }
 
-    [Fact(DisplayName = "GetClient should create client for valid azure_openai provider with API key")]
+    [Fact(DisplayName = "GetClient should create provider client for valid azure_openai provider with API key")]
     public void GetClient_ValidAzureOpenAIProvider_CreatesClient()
     {
         // Arrange
@@ -266,9 +268,11 @@ public class ProviderClientFactoryTests
 
         // Assert
         client.Should().NotBeNull();
+        client.TryGetAzureClient(out var projectClient).Should().BeTrue();
+        projectClient.Should().NotBeNull();
     }
 
-    [Fact(DisplayName = "GetClient should create new client instance per call")]
+    [Fact(DisplayName = "GetClient should create new provider client instance per call")]
     public void GetClient_MultipleCalls_ReturnsNewInstances()
     {
         // Arrange
@@ -320,8 +324,8 @@ public class ProviderClientFactoryTests
 
     #region Ollama Provider Tests
 
-    [Fact(DisplayName = "GetClient should throw NotImplementedException for Ollama provider")]
-    public void GetClient_OllamaProvider_ThrowsNotImplementedException()
+    [Fact(DisplayName = "GetClient should create provider client for Ollama provider")]
+    public void GetClient_OllamaProvider_CreatesClient()
     {
         // Arrange
         var providers = new Dictionary<string, ModelProviderDefinitionOptions>
@@ -339,11 +343,38 @@ public class ProviderClientFactoryTests
             CreateProviderOptions(providers));
 
         // Act
-        var act = () => factory.GetClient("ollama_local");
+        var client = factory.GetClient("ollama_local");
 
         // Assert
-        act.Should().Throw<NotImplementedException>()
-            .WithMessage("*Local provider 'ollama' support is configured but not yet implemented*");
+        client.Should().NotBeNull();
+        client.TryGetOllamaClient(out var ollamaClient).Should().BeTrue();
+        ollamaClient.Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "Ollama provider should not return Azure client")]
+    public void GetClient_OllamaProvider_DoesNotReturnAzureClient()
+    {
+        // Arrange
+        var providers = new Dictionary<string, ModelProviderDefinitionOptions>
+        {
+            ["ollama_local"] = new ModelProviderDefinitionOptions
+            {
+                Type = "ollama",
+                Endpoint = "http://localhost:11434",
+                DeploymentName = "llama3"
+            }
+        };
+
+        var factory = new ProviderClientFactory(
+            _mockLogger.Object,
+            CreateProviderOptions(providers));
+
+        // Act
+        var client = factory.GetClient("ollama_local");
+
+        // Assert
+        client.TryGetAzureClient(out var projectClient).Should().BeFalse();
+        projectClient.Should().BeNull();
     }
 
     [Fact(DisplayName = "Ollama provider configuration should be valid")]

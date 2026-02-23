@@ -5,6 +5,7 @@ using Azure.Core;
 using Azure.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OllamaSharp;
 
 namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 
@@ -34,7 +35,7 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 }
 
 /// <summary>
-/// Factory for creating <see cref="AIProjectClient"/> instances with provider-specific authentication.
+/// Factory for creating provider clients with provider-specific authentication.
 /// Supports multiple providers (Azure AI Foundry, Azure OpenAI, Ollama) with different endpoints and authentication methods.
 /// Creates new client instances per scope to avoid state sharing in parallel processing.
 /// </summary>
@@ -48,8 +49,7 @@ internal class AzureKeyCredentialAdapter(string apiKey) : TokenCredential
 /// </list>
 /// </para>
 /// <para>
-/// The factory returns <see cref="AIProjectClient"/> instances from Azure.AI.Projects V2 API for Azure providers
-/// and compatible clients for local providers.
+/// The factory returns <see cref="IProviderClient"/> instances with typed accessors for provider-specific clients.
 /// </para>
 /// </remarks>
 public class ProviderClientFactory : IProviderClientFactory
@@ -81,7 +81,7 @@ public class ProviderClientFactory : IProviderClientFactory
     }
 
     /// <inheritdoc/>
-    public AIProjectClient GetClient(string providerName)
+    public IProviderClient GetClient(string providerName)
     {
         if (string.IsNullOrWhiteSpace(providerName))
         {
@@ -92,7 +92,7 @@ public class ProviderClientFactory : IProviderClientFactory
         return CreateClient(providerName);
     }
 
-    private AIProjectClient CreateClient(string providerName)
+    private IProviderClient CreateClient(string providerName)
     {
         if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
         {
@@ -108,12 +108,18 @@ public class ProviderClientFactory : IProviderClientFactory
                 $"Type: {provider.Type}, Endpoint: {provider.Endpoint}, DeploymentName: {provider.DeploymentName}");
         }
 
-        // Check for local providers (Ollama) - these are handled separately in AgentFactory
         if (provider.IsLocalProvider())
         {
-            throw new NotImplementedException(
-                $"Local provider '{provider.Type}' support is configured but not yet implemented in ProviderClientFactory. " +
-                $"Ollama providers should be handled separately in AgentFactory.CreateOllamaAgentAsync().");
+            _logger.LogInformation(
+                "Creating Ollama client for provider '{ProviderName}' (Type: {ProviderType}, Endpoint: {Endpoint}, Model: {Model})",
+                providerName,
+                provider.Type,
+                provider.Endpoint,
+                provider.GetEffectiveModel());
+
+            var endpoint = provider.Endpoint.TrimEnd('/');
+            var ollamaClient = new OllamaApiClient(new Uri(endpoint), provider.GetEffectiveModel());
+            return new OllamaProviderClient(providerName, provider.Type, ollamaClient);
         }
 
         _logger.LogInformation(
@@ -125,7 +131,8 @@ public class ProviderClientFactory : IProviderClientFactory
         // Create credential based on provider type and configuration
         TokenCredential credential = CreateCredential(provider);
 
-        return new AIProjectClient(new Uri(provider.Endpoint), credential);
+        var projectClient = new AIProjectClient(new Uri(provider.Endpoint), credential);
+        return new AzureProviderClient(providerName, provider.Type, projectClient);
     }
 
     private TokenCredential CreateCredential(ModelProviderDefinitionOptions provider)
@@ -147,5 +154,53 @@ public class ProviderClientFactory : IProviderClientFactory
             provider.Type);
 
         return new DefaultAzureCredential();
+    }
+
+    private sealed class AzureProviderClient(
+        string providerName,
+        string providerType,
+        AIProjectClient client) : IProviderClient
+    {
+        private readonly AIProjectClient _client = client ?? throw new ArgumentNullException(nameof(client));
+
+        public string ProviderName { get; } = providerName ?? throw new ArgumentNullException(nameof(providerName));
+
+        public string ProviderType { get; } = providerType ?? throw new ArgumentNullException(nameof(providerType));
+
+        public bool TryGetAzureClient(out AIProjectClient? client)
+        {
+            client = _client;
+            return true;
+        }
+
+        public bool TryGetOllamaClient(out OllamaApiClient? client)
+        {
+            client = null;
+            return false;
+        }
+    }
+
+    private sealed class OllamaProviderClient(
+        string providerName,
+        string providerType,
+        OllamaApiClient client) : IProviderClient
+    {
+        private readonly OllamaApiClient _client = client ?? throw new ArgumentNullException(nameof(client));
+
+        public string ProviderName { get; } = providerName ?? throw new ArgumentNullException(nameof(providerName));
+
+        public string ProviderType { get; } = providerType ?? throw new ArgumentNullException(nameof(providerType));
+
+        public bool TryGetAzureClient(out AIProjectClient? client)
+        {
+            client = null;
+            return false;
+        }
+
+        public bool TryGetOllamaClient(out OllamaApiClient? client)
+        {
+            client = _client;
+            return true;
+        }
     }
 }

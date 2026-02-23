@@ -1,20 +1,23 @@
+using Cyclotron.Maf.AgentSdk.Common.Services;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using OllamaSharp;
 
 namespace Cyclotron.Maf.AgentSdk.Agents.Providers;
 
 /// <summary>
 /// Provider implementation for Ollama local models.
 /// </summary>
-internal sealed class OllamaAgentProvider(ILogger<OllamaAgentProvider> logger) : IAgentProvider
+internal sealed class OllamaAgentProvider(
+    IProviderClientFactory clientFactory,
+    ILogger<OllamaAgentProvider> logger) : IAgentProvider
 {
     private static readonly IReadOnlyCollection<string> SupportedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "ollama"
     };
 
+    private readonly IProviderClientFactory _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     private readonly ILogger<OllamaAgentProvider> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc/>
@@ -52,8 +55,12 @@ internal sealed class OllamaAgentProvider(ILogger<OllamaAgentProvider> logger) :
             modelName,
             request.Provider.EnableReasoningMode);
 
-        // Create OllamaApiClient using OllamaSharp SDK
-        var ollamaClient = new OllamaApiClient(new Uri(endpoint), modelName);
+        var providerClient = _clientFactory.GetClient(request.ProviderName);
+        if (!providerClient.TryGetOllamaClient(out var ollamaClient) || ollamaClient == null)
+        {
+            throw new InvalidOperationException(
+                $"Provider '{request.ProviderName}' does not support Ollama agent operations.");
+        }
 
         // Configure reasoning mode if enabled
         if (request.Provider.EnableReasoningMode)

@@ -63,7 +63,14 @@ public static class VectorStoreServiceCollectionExtensions
 
                 // Get IProviderClientFactory from the scoped service provider
                 var factory = scopedSp.GetRequiredService<IProviderClientFactory>();
-                return factory.GetClient(providerName);
+                var providerClient = factory.GetClient(providerName);
+                if (!providerClient.TryGetAzureClient(out var projectClient) || projectClient == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Provider '{providerName}' does not support Azure vector store operations.");
+                }
+
+                return projectClient;
             };
 
             // Create a factory that gets the provider config at method invocation time using a fresh scope

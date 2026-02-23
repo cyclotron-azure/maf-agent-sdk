@@ -70,19 +70,6 @@ public interface IAIFoundryCleanupService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Cleans up all threads in Azure AI Foundry for the specified provider.
-    /// </summary>
-    /// <param name="providerName">Name of the model provider to use (e.g., "azure_foundry").</param>
-    /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
-    /// <returns>
-    /// A task that represents the asynchronous operation.
-    /// The task result contains statistics about threads deleted and any failures.
-    /// </returns>
-    Task<CleanupStatistics> CleanupThreadsAsync(
-        string providerName,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Cleans up agents in Azure AI Foundry, excluding protected agents.
     /// Protected agents are identified by a predefined list of agent names.
     /// </summary>

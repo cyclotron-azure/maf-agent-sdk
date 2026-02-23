@@ -60,7 +60,12 @@ internal sealed class AzureAgentProvider(
                 request.ProviderName,
                 request.Provider.GetEffectiveModel());
 
-            var projectClient = _clientFactory.GetClient(request.ProviderName);
+            var providerClient = _clientFactory.GetClient(request.ProviderName);
+            if (!providerClient.TryGetAzureClient(out var projectClient) || projectClient == null)
+            {
+                throw new InvalidOperationException(
+                    $"Provider '{request.ProviderName}' does not support Azure agent operations.");
+            }
 
             _logger.LogDebug(
                 "Creating {AgentKey} agent with configured version: {ConfiguredVersion}",
@@ -132,7 +137,12 @@ internal sealed class AzureAgentProvider(
     {
         ArgumentNullException.ThrowIfNull(request, nameof(request));
 
-        var projectClient = _clientFactory.GetClient(request.ProviderName);
+        var providerClient = _clientFactory.GetClient(request.ProviderName);
+        if (!providerClient.TryGetAzureClient(out var projectClient) || projectClient == null)
+        {
+            throw new InvalidOperationException(
+                $"Provider '{request.ProviderName}' does not support Azure agent deletion.");
+        }
 
         if (TryParseAgentId(request.Agent.Id, out var agentName, out var agentVersion))
         {

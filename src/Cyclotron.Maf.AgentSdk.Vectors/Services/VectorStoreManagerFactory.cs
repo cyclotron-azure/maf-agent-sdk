@@ -34,6 +34,7 @@ public class VectorStoreManagerFactory(
         IVectorStoreManager manager = providerType switch
         {
             "azure_foundry" => _azureManager,
+            "azure_openai" => _azureManager,
             "ollama" => _ollamaManager,
             _ => throw new Exceptions.VectorStoreConfigurationException(
                 $"Vector store provider type '{providerType}' not supported or not yet implemented",

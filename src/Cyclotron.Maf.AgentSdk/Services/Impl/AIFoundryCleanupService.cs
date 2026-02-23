@@ -58,7 +58,6 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
 
         var filesStats = await CleanupFilesAsync(providerName, cancellationToken);
         var vectorStoresStats = await CleanupVectorStoresAsync(providerName, protectedMetadataKey, cancellationToken);
-        var threadsStats = await CleanupThreadsAsync(providerName, cancellationToken);
         var agentsStats = await CleanupAgentsAsync(providerName, cancellationToken);
 
         var totalStats = new CleanupStatistics
@@ -67,8 +66,6 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
             FilesFailedToDelete = filesStats.FilesFailedToDelete,
             VectorStoresDeleted = vectorStoresStats.VectorStoresDeleted,
             VectorStoresFailedToDelete = vectorStoresStats.VectorStoresFailedToDelete,
-            ThreadsDeleted = threadsStats.ThreadsDeleted,
-            ThreadsFailedToDelete = threadsStats.ThreadsFailedToDelete,
             AgentsDeleted = agentsStats.AgentsDeleted,
             AgentsFailedToDelete = agentsStats.AgentsFailedToDelete
         };
@@ -76,15 +73,13 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
         _logger.LogInformation(
             "Cleanup completed: {TotalDeleted} resources deleted, {TotalFailed} failed " +
             "(Files: {FilesDeleted}/{FilesFailedToDelete}, VectorStores: {VectorStoresDeleted}/{VectorStoresFailedToDelete}, " +
-            "Threads: {ThreadsDeleted}/{ThreadsFailedToDelete}, Agents: {AgentsDeleted}/{AgentsFailedToDelete})",
+            "Agents: {AgentsDeleted}/{AgentsFailedToDelete})",
             totalStats.TotalDeleted,
             totalStats.TotalFailed,
             totalStats.FilesDeleted,
             totalStats.FilesFailedToDelete,
             totalStats.VectorStoresDeleted,
             totalStats.VectorStoresFailedToDelete,
-            totalStats.ThreadsDeleted,
-            totalStats.ThreadsFailedToDelete,
             totalStats.AgentsDeleted,
             totalStats.AgentsFailedToDelete);
 
@@ -98,7 +93,7 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry files for provider '{ProviderName}'", providerName);
 
-        var projectClient = _clientFactory.GetClient(providerName);
+        var projectClient = GetAzureClientOrThrow(providerName, "file cleanup");
         var openAIClient = projectClient.GetProjectOpenAIClient();
         var fileClient = openAIClient.GetOpenAIFileClient();
         int deleted = 0;
@@ -148,7 +143,7 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
             fileIdList.Count,
             providerName);
 
-        var projectClient = _clientFactory.GetClient(providerName);
+        var projectClient = GetAzureClientOrThrow(providerName, "file deletion");
         var openAIClient = projectClient.GetProjectOpenAIClient();
         var fileClient = openAIClient.GetOpenAIFileClient();
         int deleted = 0;
@@ -188,7 +183,7 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry vector stores for provider '{ProviderName}' (protected key: {ProtectedKey})", providerName, protectedMetadataKey ?? "none");
-        var projectClient = _clientFactory.GetClient(providerName);
+        var projectClient = GetAzureClientOrThrow(providerName, "vector store cleanup");
         var openAIClient = projectClient.GetProjectOpenAIClient();
         var vectorStoreClient = openAIClient.GetVectorStoreClient();
         int deleted = 0;
@@ -237,34 +232,12 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
     }
 
     /// <inheritdoc/>
-    public async Task<CleanupStatistics> CleanupThreadsAsync(
-        string providerName,
-        CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Cleaning up Azure AI Foundry threads for provider '{ProviderName}'", providerName);
-        var projectClient = _clientFactory.GetClient(providerName);
-
-        // Note: V2 API uses conversations, not threads. The AIProjectClient doesn't expose
-        // a direct way to list and delete all threads/conversations via OpenAI client.
-        // This would need to be done via the Agents API which is not exposed in the same way.
-        // For now, log that this operation is not supported in V2 API.
-
-        _logger.LogWarning("Thread cleanup is not directly supported in V2 API. Threads are managed through agent conversations.");
-
-        return new CleanupStatistics
-        {
-            ThreadsDeleted = 0,
-            ThreadsFailedToDelete = 0
-        };
-    }
-
-    /// <inheritdoc/>
     public async Task<CleanupStatistics> CleanupAgentsAsync(
         string providerName,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Cleaning up Azure AI Foundry agents for provider '{ProviderName}' (excluding protected agents)", providerName);
-        var projectClient = _clientFactory.GetClient(providerName);
+        var projectClient = GetAzureClientOrThrow(providerName, "agent cleanup");
         int deleted = 0;
         int failed = 0;
 
@@ -306,5 +279,17 @@ public class AIFoundryCleanupService : IAIFoundryCleanupService
             AgentsDeleted = deleted,
             AgentsFailedToDelete = failed
         };
+    }
+
+    private AIProjectClient GetAzureClientOrThrow(string providerName, string operation)
+    {
+        var providerClient = _clientFactory.GetClient(providerName);
+        if (!providerClient.TryGetAzureClient(out var projectClient) || projectClient == null)
+        {
+            throw new InvalidOperationException(
+                $"Provider '{providerName}' does not support Azure AI Foundry {operation}.");
+        }
+
+        return projectClient;
     }
 }

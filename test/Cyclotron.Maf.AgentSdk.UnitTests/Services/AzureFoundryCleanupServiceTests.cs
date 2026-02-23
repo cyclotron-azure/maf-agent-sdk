@@ -88,8 +88,7 @@ public class AzureFoundryCleanupServiceTests
         stats.FilesFailedToDelete.Should().Be(0);
         stats.VectorStoresDeleted.Should().Be(0);
         stats.VectorStoresFailedToDelete.Should().Be(0);
-        stats.ThreadsDeleted.Should().Be(0);
-        stats.ThreadsFailedToDelete.Should().Be(0);
+
         stats.AgentsDeleted.Should().Be(0);
         stats.AgentsFailedToDelete.Should().Be(0);
     }
@@ -102,12 +101,11 @@ public class AzureFoundryCleanupServiceTests
         {
             FilesDeleted = 5,
             VectorStoresDeleted = 3,
-            ThreadsDeleted = 7,
             AgentsDeleted = 2
         };
 
         // Act & Assert
-        stats.TotalDeleted.Should().Be(17);
+        stats.TotalDeleted.Should().Be(10);
     }
 
     [Fact(DisplayName = "CleanupStatistics TotalFailed should calculate correctly")]
@@ -118,12 +116,11 @@ public class AzureFoundryCleanupServiceTests
         {
             FilesFailedToDelete = 1,
             VectorStoresFailedToDelete = 2,
-            ThreadsFailedToDelete = 3,
             AgentsFailedToDelete = 4
         };
 
         // Act & Assert
-        stats.TotalFailed.Should().Be(10);
+        stats.TotalFailed.Should().Be(7);
     }
 
     [Fact(DisplayName = "CleanupStatistics should allow setting all properties")]
@@ -136,8 +133,6 @@ public class AzureFoundryCleanupServiceTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 5,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 20,
-            ThreadsFailedToDelete = 3,
             AgentsDeleted = 8,
             AgentsFailedToDelete = 4
         };
@@ -147,12 +142,10 @@ public class AzureFoundryCleanupServiceTests
         stats.FilesFailedToDelete.Should().Be(2);
         stats.VectorStoresDeleted.Should().Be(5);
         stats.VectorStoresFailedToDelete.Should().Be(1);
-        stats.ThreadsDeleted.Should().Be(20);
-        stats.ThreadsFailedToDelete.Should().Be(3);
         stats.AgentsDeleted.Should().Be(8);
         stats.AgentsFailedToDelete.Should().Be(4);
-        stats.TotalDeleted.Should().Be(43);
-        stats.TotalFailed.Should().Be(10);
+        stats.TotalDeleted.Should().Be(23);
+        stats.TotalFailed.Should().Be(7);
     }
 
     [Fact(DisplayName = "CleanupStatistics with zero values should have zero totals")]
@@ -165,8 +158,6 @@ public class AzureFoundryCleanupServiceTests
             FilesFailedToDelete = 0,
             VectorStoresDeleted = 0,
             VectorStoresFailedToDelete = 0,
-            ThreadsDeleted = 0,
-            ThreadsFailedToDelete = 0,
             AgentsDeleted = 0,
             AgentsFailedToDelete = 0
         };
@@ -526,71 +517,6 @@ public class AzureFoundryCleanupServiceTests
 
     #endregion
 
-    #region CleanupThreadsAsync Tests
-
-    [Fact(DisplayName = "CleanupThreadsAsync should call GetClient with provider name")]
-    public async Task CleanupThreadsAsync_ValidProvider_CallsGetClient()
-    {
-        // Arrange
-        var service = new AIFoundryCleanupService(
-            _mockClientFactory.Object,
-            _mockLogger.Object);
-
-        _mockClientFactory.Setup(x => x.GetClient("azure_foundry"))
-            .Throws(new InvalidOperationException("GetClient called correctly"));
-
-        // Act
-        var act = () => service.CleanupThreadsAsync("azure_foundry");
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*GetClient called correctly*");
-    }
-
-    [Fact(DisplayName = "CleanupThreadsAsync should accept cancellation token")]
-    public async Task CleanupThreadsAsync_CancellationToken_AcceptsToken()
-    {
-        // Arrange
-        var service = new AIFoundryCleanupService(
-            _mockClientFactory.Object,
-            _mockLogger.Object);
-
-        using var cts = new CancellationTokenSource();
-
-        _mockClientFactory.Setup(x => x.GetClient(It.IsAny<string>()))
-            .Throws(new OperationCanceledException());
-
-        // Act
-        var act = () => service.CleanupThreadsAsync("azure_foundry", cts.Token);
-
-        // Assert
-        await act.Should().ThrowAsync<OperationCanceledException>();
-    }
-
-    [Theory(DisplayName = "CleanupThreadsAsync should accept various provider names")]
-    [InlineData("azure_foundry")]
-    [InlineData("openai")]
-    [InlineData("custom_provider")]
-    [InlineData("provider-with-dashes")]
-    public async Task CleanupThreadsAsync_VariousProviderNames_CallsCorrectProvider(string providerName)
-    {
-        // Arrange
-        var service = new AIFoundryCleanupService(
-            _mockClientFactory.Object,
-            _mockLogger.Object);
-
-        _mockClientFactory.Setup(x => x.GetClient(providerName))
-            .Throws(new InvalidOperationException($"Called with {providerName}"));
-
-        // Act
-        var act = () => service.CleanupThreadsAsync(providerName);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage($"*Called with {providerName}*");
-    }
-
-    #endregion
 
     #region CleanupAgentsAsync Tests
 
