@@ -5,7 +5,8 @@ namespace Cyclotron.Maf.AgentSdk.Agents.Providers;
 
 /// <summary>
 /// Default resolver for provider implementations based on provider type.
-/// Creates a service scope when resolving providers to allow dependency on scoped services like IProviderClientFactory.
+/// Creates a service scope to resolve scoped IAgentProvider instances and their scoped IProviderClientFactory dependencies.
+/// The returned provider maintains a reference to its scoped factory for use throughout its lifetime.
 /// </summary>
 internal sealed class AgentProviderResolver(IServiceProvider serviceProvider) : IAgentProviderResolver
 {
@@ -21,8 +22,10 @@ internal sealed class AgentProviderResolver(IServiceProvider serviceProvider) : 
             throw new InvalidOperationException("Provider type is required for agent creation.");
         }
 
-        // Create a scope to resolve scoped dependencies (like IProviderClientFactory)
-        // This allows transient providers to safely depend on scoped services
+        // Create a scope to resolve scoped IAgentProvider instances.
+        // Since providers are scoped and depend on scoped IProviderClientFactory,
+        // we create a scope that lives as long as the provider is used (which is immediately).
+        // The provider maintains a reference to its scoped factory throughout its lifetime.
         using var scope = _serviceProvider.CreateScope();
         var providers = scope.ServiceProvider.GetServices<IAgentProvider>();
         var match = providers.FirstOrDefault(

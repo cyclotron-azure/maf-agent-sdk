@@ -133,6 +133,33 @@ public void RenderSystemPrompt_WithValidAgentKey_ReturnsRenderedTemplate()
 
 ## Important Patterns
 
+### Dependency Injection Lifetime Strategy
+
+**Provider Scope Safety**:
+- `IAgentProvider` implementations (Azure, Ollama) are registered as **Scoped**
+- `IAgentProviderResolver` is registered as **Scoped**
+- `IProviderClientFactory` (their dependency) is registered as **Scoped**
+
+**Why Scoped?**
+Providers store and use `IProviderClientFactory` throughout their lifetime (e.g., in `CreateAgentAsync()`, `DeleteAgentAsync()`).
+Making them scoped ensures they live in the same scope as their factory dependency, preventing scope lifetime violations.
+
+**How It Works**:
+```
+AgentFactory (Scoped)
+  → IAgentProviderResolver.Resolve() (Scoped)
+    → Creates nested scope to instantiate scoped providers
+    → Provider maintains reference to its scoped factory
+    → Provider is immediately used and remains valid
+    → Scope disposed after provider creation, but factory reference lives on
+```
+
+**Key Point**: The nested scope in `AgentProviderResolver.Resolve()` is intentional. It's required to resolve scoped services
+from the root provider, but safe because the returned provider instance keeps its scoped factory alive for its entire usage lifetime.
+
+**For Consumers**: No action needed—`AgentFactory` is already scoped via keyed DI (`AddKeyedScoped<IAgentFactory>`),
+so scope hierarchy is automatically correct.
+
 ### Environment Variable Substitution
 
 Values in `agent.config.yaml` support `${VAR_NAME}` syntax for environment variables, resolved by `IConfigurationValueSubstitution`.

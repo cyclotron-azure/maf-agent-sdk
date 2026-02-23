@@ -39,7 +39,7 @@ public class DocumentWorkflowServiceExtensionsTests
         service.Should().BeOfType<ProviderClientFactory>();
     }
 
-    [Fact(DisplayName = "AddDocumentWorkflowServices should register IAgentProviderResolver as singleton")]
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register IAgentProviderResolver as scoped")]
     public void AddDocumentWorkflowServices_RegistersAgentProviderResolver()
     {
         // Arrange
@@ -53,7 +53,9 @@ public class DocumentWorkflowServiceExtensionsTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        var service = serviceProvider.GetService<IAgentProviderResolver>();
+        // Scoped service must be resolved from a scope
+        using var scope = serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetService<IAgentProviderResolver>();
         service.Should().NotBeNull();
         service.Should().BeOfType<AgentProviderResolver>();
     }
@@ -72,7 +74,9 @@ public class DocumentWorkflowServiceExtensionsTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        var providers = serviceProvider.GetServices<IAgentProvider>().ToArray();
+        // Scoped service must be resolved from a scope
+        using var scope = serviceProvider.CreateScope();
+        var providers = scope.ServiceProvider.GetServices<IAgentProvider>().ToArray();
         providers.Should().NotBeEmpty();
         providers.Should().Contain(provider => provider is AzureAgentProvider);
         providers.Should().Contain(provider => provider is OllamaAgentProvider);

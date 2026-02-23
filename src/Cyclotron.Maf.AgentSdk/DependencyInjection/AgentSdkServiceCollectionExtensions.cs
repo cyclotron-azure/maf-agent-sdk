@@ -236,8 +236,8 @@ public static class AgentSdkServiceCollectionExtensions
 
     /// <summary>
     /// Registers agent provider resolver and provider implementations.
-    /// Providers are registered as Transient to allow safe dependency on scoped <see cref="IProviderClientFactory"/>.
-    /// The resolver is registered as Singleton for optimal performance since it's stateless.
+    /// Providers are registered as Scoped to safely maintain references to scoped <see cref="IProviderClientFactory"/>.
+    /// The resolver is registered as Scoped to ensure scope-safe resolution and access to its dependencies.
     /// </summary>
     /// <param name="services">The service collection to add services to.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -245,26 +245,30 @@ public static class AgentSdkServiceCollectionExtensions
     /// <para>
     /// This method registers:
     /// <list type="bullet">
-    /// <item><description><see cref="IAgentProvider"/> implementations (Azure, Ollama) as Transient services</description></item>
-    /// <item><description><see cref="IAgentProviderResolver"/> as a Singleton service</description></item>
+    /// <item><description><see cref="IAgentProvider"/> implementations (Azure, Ollama) as Scoped services</description></item>
+    /// <item><description><see cref="IAgentProviderResolver"/> as a Scoped service</description></item>
     /// </list>
     /// </para>
     /// <para>
-    /// The Transient lifetime for providers ensures they can safely depend on scoped services like
-    /// <see cref="IProviderClientFactory"/>, preventing lifetime scope violations.
-    /// The Singleton lifetime for the resolver is appropriate because it's stateless and thread-safe.
+    /// The Scoped lifetime for providers ensures they live in the same scope as their scoped <see cref="IProviderClientFactory"/> dependency
+    /// and can safely maintain references to it throughout their lifetime (e.g., used in CreateAgentAsync, DeleteAgentAsync).
+    /// The Scoped lifetime for the resolver ensures it can safely access scoped dependencies like <see cref="IProviderClientFactory"/>
+    /// without violating DI scope rules. Since AgentFactory (the consumer) is also scoped, this creates a consistent
+    /// scope-safe hierarchy where the resolver, providers, and their dependencies all live in the same scope.
     /// </para>
     /// </remarks>
     public static IServiceCollection AddAgentProviderResolver(this IServiceCollection services)
     {
-        // Register provider implementations as Transient
-        // This allows them to safely depend on scoped IProviderClientFactory
-        services.AddTransient<IAgentProvider, AzureAgentProvider>();
-        services.AddTransient<IAgentProvider, OllamaAgentProvider>();
+        // Register provider implementations as Scoped
+        // Scoped lifetime ensures they live in the same scope as their scoped IProviderClientFactory dependency.
+        // Providers store the factory reference and use it throughout their lifetime (e.g., in CreateAgentAsync, DeleteAgentAsync).
+        services.AddScoped<IAgentProvider, AzureAgentProvider>();
+        services.AddScoped<IAgentProvider, OllamaAgentProvider>();
 
-        // Register provider resolver as Singleton
-        // The resolver is stateless and thread-safe, so Singleton lifetime is optimal
-        services.AddSingleton<IAgentProviderResolver, AgentProviderResolver>();
+        // Register provider resolver as Scoped
+        // Scoped lifetime ensures providers can safely access scoped dependencies like IProviderClientFactory
+        // AgentFactory (the consumer) is also scoped, creating a scope-safe hierarchy
+        services.AddScoped<IAgentProviderResolver, AgentProviderResolver>();
 
         return services;
     }
