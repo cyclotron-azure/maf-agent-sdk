@@ -108,15 +108,14 @@ public class SemanticDocumentChunker(
             }
             else if (chunks.Count > 0)
             {
-                // Append to previous chunk if too small
-                var lastChunkId = GenerateChunkId(fileName, chunkIndex - 1);
-                // Note: In a real implementation, you might want to re-yield the merged chunk
-                // For now, we accept some data loss for very small final chunks
+                // Streaming design prevents re-yielding merged chunks; yield to avoid data loss.
                 _logger.LogDebug(
-                    "Final chunk too small ({Size} < {MinSize}) for document {FileName}, appending to previous chunk",
+                    "Final chunk too small ({Size} < {MinSize}) for document {FileName}, yielding anyway to avoid data loss",
                     finalChunk.Length,
                     _options.MinChunkSize,
                     fileName);
+
+                yield return (finalChunk, GenerateChunkId(fileName, chunkIndex));
             }
         }
 

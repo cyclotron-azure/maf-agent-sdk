@@ -192,4 +192,32 @@ public class SemanticDocumentChunkerTests
         Assert.NotEmpty(chunks);
         // Should combine sentences to meet minimum size
     }
+
+    [Fact(DisplayName = "ChunkAsync should yield small final chunk to avoid data loss")]
+    public async Task ChunkAsync_FinalChunkBelowMinSize_YieldsFinalChunk()
+    {
+        // Arrange
+        var options = MsOptions.Create(new SemanticChunkingOptions
+        {
+            TargetChunkSize = 30,
+            MinChunkSize = 20,
+            OverlapSize = 5,
+            PreserveFormatting = true
+        });
+        var chunker = new SemanticDocumentChunker(_mockLogger.Object, options);
+        var text = "This is sentence one. This is sentence two. End.";
+
+        // Act
+        var chunks = new List<(string Text, string ChunkId)>();
+        await foreach (var chunk in chunker.ChunkAsync(text, "test.txt", CancellationToken.None))
+        {
+            chunks.Add(chunk);
+        }
+
+        // Assert
+        Assert.True(chunks.Count >= 2, "Expected multiple chunks to be emitted");
+        Assert.True(chunks[^1].Text.Length < options.Value.MinChunkSize, "Final chunk should be below MinChunkSize");
+        Assert.Equal("test.txt#0", chunks[0].ChunkId);
+        Assert.Equal($"test.txt#{chunks.Count - 1}", chunks[^1].ChunkId);
+    }
 }
