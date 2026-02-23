@@ -245,7 +245,8 @@ deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
     "MaxWaitAttempts": 60,
     "InitialWaitDelayMs": 2000,
     "UseExponentialBackoff": true,
-    "MaxWaitDelayMs": 30000
+    "MaxWaitDelayMs": 30000,
+    "TotalTimeoutMs": 0
   }
 }
 ```

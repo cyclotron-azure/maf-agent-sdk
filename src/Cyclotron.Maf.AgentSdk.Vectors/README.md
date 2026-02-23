@@ -49,10 +49,11 @@ builder.Services.AddVectorStoreServices(options =>
 ```yaml
 # appsettings.json or agent.config.yaml
 VectorStoreIndexing:
-  MaxPollingAttempts: 60
-  InitialDelaySeconds: 2
-  MaxDelaySeconds: 30
-  BackoffMultiplier: 1.5
+    MaxWaitAttempts: 60
+    InitialWaitDelayMs: 2000
+    UseExponentialBackoff: true
+    MaxWaitDelayMs: 30000
+    TotalTimeoutMs: 0
 ```
 
 ### 4. Use Vector Store Manager
@@ -106,10 +107,11 @@ Controls the polling behavior when waiting for files to be indexed in the vector
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `MaxPollingAttempts` | int | 60 | Maximum number of polling attempts before timeout |
-| `InitialDelaySeconds` | double | 2.0 | Initial delay in seconds between polling attempts |
-| `MaxDelaySeconds` | double | 30.0 | Maximum delay in seconds (caps exponential backoff) |
-| `BackoffMultiplier` | double | 1.5 | Multiplier for exponential backoff |
+| `MaxWaitAttempts` | int | 60 | Maximum number of wait attempts before stopping |
+| `InitialWaitDelayMs` | int | 2000 | Initial delay in milliseconds between checks |
+| `UseExponentialBackoff` | bool | true | Enable exponential backoff for wait delays |
+| `MaxWaitDelayMs` | int | 30000 | Maximum delay in milliseconds between checks |
+| `TotalTimeoutMs` | int | 0 | Total timeout in milliseconds; 0 disables total timeout |
 
 ## API Reference
 
