@@ -9,6 +9,7 @@ using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
 using Microsoft.Extensions.Options;
 using Azure.AI.Projects;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Cyclotron.Maf.AgentSdk.Vectors.Internal;
 
@@ -30,6 +31,103 @@ public static class VectorStoreServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddVectorStoreServices(
         this IServiceCollection services)
+    {
+        return services.AddVectorStoreServices(builder =>
+            builder.AddManager()
+                .AddChunking());
+    }
+
+    /// <summary>
+    /// Registers core vector store services with optional additions via a builder.
+    /// Use the builder to include manager and chunking services when needed.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <param name="configure">Builder callback to include optional registrations.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddVectorStoreServices(
+        this IServiceCollection services,
+        Action<VectorStoreServiceBuilder> configure)
+    {
+        AddVectorStoreCoreServices(services);
+
+        var builder = new VectorStoreServiceBuilder(services);
+        configure?.Invoke(builder);
+
+        if (builder.IncludeManager)
+        {
+            services.AddVectorStoreManagerService();
+        }
+
+        if (builder.IncludeChunking)
+        {
+            services.AddVectorStoreChunkingServices();
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers document chunking services.
+    /// Use this when you want DI-resolved chunkers available to consumers.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddVectorStoreChunkingServices(
+        this IServiceCollection services)
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IDocumentChunker, SemanticDocumentChunker>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IDocumentChunker, SimpleDocumentChunker>());
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the global IVectorStoreManager service with access to model provider configuration.
+    /// This is typically called from the main SDK's DI configuration where ModelProviderOptions is available.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddVectorStoreManagerService(
+        this IServiceCollection services)
+    {
+        services.AddScoped<IVectorStoreManager>(sp =>
+        {
+            var factory = sp.GetRequiredService<VectorStoreManagerFactory>();
+            var modelProviderOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
+            return new VectorStoreManagerAdapter(factory, modelProviderOptions);
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers and configures <see cref="VectorStoreIndexingOptions"/> using the <c>VectorStoreIndexing</c> section.
+    /// </summary>
+    /// <param name="services">The service collection to add services to.</param>
+    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddVectorStoreIndexingOptions(
+        this IServiceCollection services,
+        string? name = null)
+    {
+        name ??= string.Empty;
+
+        services.AddOptions<VectorStoreIndexingOptions>(name)
+            .Configure<IConfiguration>((options, configuration) =>
+            {
+                var section = configuration.GetSection(VectorStoreIndexingOptions.SectionName);
+                if (section.Exists())
+                {
+                    section.Bind(options);
+                }
+            })
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    private static void AddVectorStoreCoreServices(IServiceCollection services)
     {
         // Register configuration options
         services.AddVectorStoreIndexingOptions();
@@ -128,68 +226,34 @@ public static class VectorStoreServiceCollectionExtensions
 
         // Register factory for provider dispatch
         services.AddScoped<VectorStoreManagerFactory>();
+    }
+}
 
-        return services;
+/// <summary>
+/// Builder for optional vector store service registrations.
+/// </summary>
+public sealed class VectorStoreServiceBuilder
+{
+    internal VectorStoreServiceBuilder(IServiceCollection services)
+    {
+        Services = services;
     }
 
-    /// <summary>
-    /// Registers document chunking services.
-    /// Use this when you want DI-resolved chunkers available to consumers.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddVectorStoreChunkingServices(
-        this IServiceCollection services)
-    {
-        services.AddSingleton<IDocumentChunker, SemanticDocumentChunker>();
-        services.AddSingleton<IDocumentChunker, SimpleDocumentChunker>();
+    public IServiceCollection Services { get; }
 
-        return services;
+    internal bool IncludeManager { get; private set; }
+
+    internal bool IncludeChunking { get; private set; }
+
+    public VectorStoreServiceBuilder AddManager()
+    {
+        IncludeManager = true;
+        return this;
     }
 
-    /// <summary>
-    /// Adds the global IVectorStoreManager service with access to model provider configuration.
-    /// This is typically called from the main SDK's DI configuration where ModelProviderOptions is available.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddVectorStoreManagerService(
-        this IServiceCollection services)
+    public VectorStoreServiceBuilder AddChunking()
     {
-        services.AddScoped<IVectorStoreManager>(sp =>
-        {
-            var factory = sp.GetRequiredService<VectorStoreManagerFactory>();
-            var modelProviderOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
-            return new VectorStoreManagerAdapter(factory, modelProviderOptions);
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Registers and configures <see cref="VectorStoreIndexingOptions"/> using the <c>VectorStoreIndexing</c> section.
-    /// </summary>
-    /// <param name="services">The service collection to add services to.</param>
-    /// <param name="name">Optional name for the options instance. Defaults to the default options name.</param>
-    /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddVectorStoreIndexingOptions(
-        this IServiceCollection services,
-        string? name = null)
-    {
-        name ??= string.Empty;
-
-        services.AddOptions<VectorStoreIndexingOptions>(name)
-            .Configure<IConfiguration>((options, configuration) =>
-            {
-                var section = configuration.GetSection(VectorStoreIndexingOptions.SectionName);
-                if (section.Exists())
-                {
-                    section.Bind(options);
-                }
-            })
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
-        return services;
+        IncludeChunking = true;
+        return this;
     }
 }

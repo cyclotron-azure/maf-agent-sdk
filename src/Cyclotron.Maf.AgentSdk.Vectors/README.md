@@ -26,13 +26,23 @@ using Microsoft.Extensions.DependencyInjection;
 var builder = WebApplication.CreateBuilder(args);
 
 // Register vector store services (optional - only if you need vector store functionality)
+// Includes IVectorStoreManager and built-in chunkers by default.
 builder.Services.AddVectorStoreServices();
 
 // Register other AgentSdk services
 builder.Services.AddDocumentWorkflowServices();
 ```
 
-### 2. Configure Vector Store Indexing Options
+### 2. Optional: Customize Vector Store Registrations
+
+```csharp
+// Use a builder for optional registrations if you need a minimal surface.
+builder.Services.AddVectorStoreServices(options =>
+    options.AddManager()
+        .AddChunking());
+```
+
+### 3. Configure Vector Store Indexing Options
 
 **Configuration Path**:
 
@@ -45,7 +55,7 @@ VectorStoreIndexing:
   BackoffMultiplier: 1.5
 ```
 
-### 3. Use Vector Store Manager
+### 4. Use Vector Store Manager
 
 ```csharp
 public class DocumentProcessor

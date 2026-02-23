@@ -206,24 +206,11 @@ SemanticChunking:
 ### Dependency Injection Setup
 
 ```csharp
-services.AddVectorStoreServices(
-    // Azure client factory
-    sp => providerName => sp.GetRequiredService<IProviderClientFactory>()
-                            .GetClient(providerName),
-    // Provider config factory
-    sp =>
-    {
-        var modelProviderOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
-        return providerName =>
-        {
-            var providerDef = modelProviderOptions.Value.Providers[providerName];
-            return new VectorStoreProviderConfig(
-                providerName,
-                providerDef.Type,
-                providerDef.Endpoint,
-                providerDef.DeploymentName);
-        };
-    });
+// Registers core vector store services plus IVectorStoreManager and built-in chunkers.
+services.AddVectorStoreServices();
+
+// Optional: builder-style configuration for minimal registrations.
+// services.AddVectorStoreServices(options => options.AddManager().AddChunking());
 ```
 
 ## Usage Patterns
@@ -374,7 +361,7 @@ dotnet test --filter "FullyQualifiedName~.Vectors.UnitTests"
    - **Azure**: Parameter is ignored (server-side chunking used instead)
    - **Ollama**: Parameter is required and used for client-side chunking
 2. **VectorStoreManager removed** - use `AzureVectorStoreManager` directly or via factory
-3. **DI registration updated** - `AddVectorStoreServices` now requires both factories
+3. **DI registration updated** - `AddVectorStoreServices` now registers manager and chunkers by default
 4. **Azure chunking behavior changed** - Previously used client-side chunking (incorrect), now uses Azure's native server-side chunking
 
 **Migration steps:**
