@@ -176,7 +176,7 @@ public class PdfPigContentAnalyzerTests : IDisposable
         // Arrange
         var analyzer = CreateAnalyzer();
         var pdfPath = CreateTempPdf(PdfTestFixtures.CreateMinimalPdf());
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         // Act & Assert - cancellation gets wrapped in InvalidOperationException

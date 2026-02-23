@@ -159,7 +159,7 @@ public class ToolCallingMiddlewareDelegateTests
     public async Task ToolCallingMiddlewareDelegate_PropagatesCancellation()
     {
         // Arrange
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         ToolCallingMiddlewareDelegate middleware = (agent, context, next, ct) =>
