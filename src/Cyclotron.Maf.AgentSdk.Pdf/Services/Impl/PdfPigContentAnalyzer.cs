@@ -72,7 +72,9 @@ public class PdfPigContentAnalyzer(
             _logger.LogInformation("Analyzing PDF stream: {FileName}", fileName);
 
             // Save stream to temporary file since PdfPig expects file path
-            var tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}-{fileName}");
+            var safeFileName = Path.GetFileName(fileName);
+            var tempFileName = $"{Guid.NewGuid()}-{safeFileName}";
+            var tempFilePath = Path.Combine(Path.GetTempPath(), tempFileName);
             try
             {
                 using (var fileStream = File.Create(tempFilePath))

@@ -568,7 +568,8 @@ public class OllamaVectorStoreManager(
         magnitudeA = (float)Math.Sqrt(magnitudeA);
         magnitudeB = (float)Math.Sqrt(magnitudeB);
 
-        if (magnitudeA == 0 || magnitudeB == 0)
+        const float epsilon = 1e-6f;
+        if (Math.Abs(magnitudeA) <= epsilon || Math.Abs(magnitudeB) <= epsilon)
             return 0f;
 
         return dotProduct / (magnitudeA * magnitudeB);

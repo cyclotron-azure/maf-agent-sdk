@@ -423,12 +423,21 @@ public sealed class MixedInvoiceExecutor(
         string fileName)
     {
         using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
-        var text = await reader.ReadToEndAsync();
-        var chunkSize = 1000;
-        for (int i = 0; i < text.Length; i += chunkSize)
+        const int chunkSize = 1000;
+        var buffer = new char[chunkSize];
+        var chunkIndex = 0;
+
+        while (true)
         {
-            var chunkText = text.Substring(i, Math.Min(chunkSize, text.Length - i));
-            yield return (chunkText, $"{fileName}#{i / chunkSize}");
+            var charsRead = await reader.ReadAsync(buffer, 0, chunkSize).ConfigureAwait(false);
+            if (charsRead == 0)
+            {
+                yield break;
+            }
+
+            var chunkText = new string(buffer, 0, charsRead);
+            yield return (chunkText, $"{fileName}#{chunkIndex}");
+            chunkIndex++;
         }
     }
 }
