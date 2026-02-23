@@ -89,8 +89,7 @@ agents:
         - "file_search"            # Enable document search in vector stores
         - "code_interpreter"       # Enable Python code execution (optional)
 
-    framework_config:
-      provider: "azure_foundry"    # Reference to providers section
+    provider: "azure_foundry"      # Reference to providers section
 
     system_prompt_template: |
       You are a helpful assistant specialized in document analysis.
@@ -208,7 +207,7 @@ var result = await workflow.ExecuteAsync<OutputType>(input, cancellationToken);
 
 > **Note:** If no tools are configured, `file_search` is enabled by default when creating an agent with a vector store.
 
-#### Framework Config Options
+#### Provider Reference
 
 | Property | Type | Description | Default |
 |----------|------|-------------|---------|

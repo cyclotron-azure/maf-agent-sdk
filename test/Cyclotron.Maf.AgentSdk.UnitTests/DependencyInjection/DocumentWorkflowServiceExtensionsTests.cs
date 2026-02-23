@@ -313,9 +313,9 @@ public class DocumentWorkflowServiceExtensionsTests
             ["providers:azure_foundry:endpoint"] = "https://test.azure.com",
             ["providers:azure_foundry:deployment_name"] = "gpt-4",
             ["agents:classification_agent:type"] = "classification",
-            ["agents:classification_agent:framework_config:provider"] = "azure_foundry",
+            ["agents:classification_agent:provider"] = "azure_foundry",
             ["agents:extraction_agent:type"] = "extraction",
-            ["agents:extraction_agent:framework_config:provider"] = "azure_foundry"
+            ["agents:extraction_agent:provider"] = "azure_foundry"
         };
 
         return new ConfigurationBuilder()

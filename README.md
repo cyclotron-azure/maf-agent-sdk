@@ -61,8 +61,7 @@ agents:
       tools:
         - "file_search"        # Enable document search
         - "code_interpreter"   # Enable code execution (optional)
-    framework_config:
-      provider: "azure_foundry"
+    provider: "azure_foundry"
     system_prompt_template: |
       You are a helpful assistant.
     user_prompt_template: |

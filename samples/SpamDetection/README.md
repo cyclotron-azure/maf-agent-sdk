@@ -34,11 +34,13 @@ The sample creates AI agents that:
 ## Prerequisites
 
 ### For Azure AI Foundry (Default)
+
 1. **.NET 8.0 SDK** or later
 2. **Azure AI Foundry** project with a deployed model (e.g., GPT-4o, GPT-4o-mini)
 3. **Azure CLI** authenticated (`az login`)
 
 ### For Ollama (Local, Optional)
+
 1. **.NET 8.0 SDK** or later
 2. **Ollama** installed and running ([ollama.ai](https://ollama.ai))
 3. A downloaded model (e.g., `ollama pull llama3.2`)
@@ -110,18 +112,21 @@ This sample includes an example Ollama-based spam detector agent for **privacy-f
 | Resource Cleanup | ✅ Delete vector stores | N/A |
 
 **What this means:**
+
 - **Azure agent**: Uses vector store with training examples for context-aware classification
 - **Ollama agent**: Relies solely on the model's built-in knowledge from pre-training
 - **No document uploads**: Ollama agents can't search uploaded training documents
 - **No resource cleanup**: `auto_cleanup_resources: false` (no Azure resources exist)
 
 **When to use which:**
+
 - ✅ **Use Azure** when you need custom document search or training examples
 - ✅ **Use Ollama** for general classification using model's pre-trained knowledge
 
 ### Quick Start with Ollama
 
 1. **Install Ollama** (if not already installed):
+
    ```bash
    # macOS/Linux
    curl -fsSL https://ollama.ai/install.sh | sh
@@ -130,6 +135,7 @@ This sample includes an example Ollama-based spam detector agent for **privacy-f
    ```
 
 2. **Pull a model** (recommended models for spam detection):
+
    ```bash
    # Llama 3.2 (4GB) - Fast, good for classification
    ollama pull llama3.2:latest
@@ -141,17 +147,20 @@ This sample includes an example Ollama-based spam detector agent for **privacy-f
    ```
 
 3. **Verify Ollama is running**:
+
    ```bash
    curl http://localhost:11434/api/tags
    ```
 
 4. **Configure environment** (in `.env`):
+
    ```env
    OLLAMA_ENDPOINT=http://localhost:11434
    OLLAMA_MODEL=llama3.2:latest
    ```
 
 5. **Enable the Ollama agent** in `agent.config.yaml`:
+
    ```yaml
    agents:
      spam_detector_ollama:
@@ -159,11 +168,13 @@ This sample includes an example Ollama-based spam detector agent for **privacy-f
    ```
 
 6. **Run the sample with Ollama**:
+
    ```bash
    dotnet run --Workflow:Mode=spam --Workflow:SpamProvider=ollama
    ```
 
    Or set it in `appsettings.json`:
+
    ```json
    {
      "Workflow": {
@@ -196,11 +207,11 @@ agents:
       # NOTE: No tools section - Ollama doesn't support Azure AI Foundry tools
       # Vector stores (file_search) and code_interpreter are Azure-only
 
-    framework_config:
-      provider: "ollama_local"  # References the Ollama provider
+    provider: "ollama_local"  # References the Ollama provider
 ```
 
 **Key Differences from Azure:**
+
 - ❌ No `file_search` tool (vector stores are Azure-only)
 - ❌ No `code_interpreter` tool (Azure-only)
 - ✅ `auto_cleanup_resources: false` (no cloud resources to clean up)
@@ -221,6 +232,7 @@ agents:
 You can easily switch between providers using configuration:
 
 **Option 1: Command Line** (Recommended)
+
 ```bash
 # Use Azure (default):
 dotnet run --Workflow:Mode=spam
@@ -232,6 +244,7 @@ dotnet run --Workflow:Mode=spam --Workflow:SpamProvider=ollama
 **Option 2: Configuration File**
 
 In `appsettings.json` or `appsettings.Development.json`:
+
 ```json
 {
   "Workflow": {
@@ -242,6 +255,7 @@ In `appsettings.json` or `appsettings.Development.json`:
 ```
 
 **Option 3: Environment Variable**
+
 ```bash
 export Workflow__SpamProvider=ollama
 dotnet run --Workflow:Mode=spam
@@ -295,6 +309,7 @@ Understanding the differences helps you choose the right provider for your use c
 | **Best For** | Production, custom knowledge | Development, privacy, cost |
 
 **Key Takeaway:**
+
 - **Azure**: Best for production workloads needing custom document search and dynamic context
 - **Ollama**: Best for development, privacy-sensitive data, and cost-free experimentation
 
@@ -334,8 +349,7 @@ agents:
       tools:
         - "file_search"                   # Enables searching training documents
 
-    framework_config:
-      provider: "azure_foundry"           # Reference to providers section
+    provider: "azure_foundry"             # Reference to providers section
 
     system_prompt_template: |
       You are an expert spam detection AI agent...
@@ -370,6 +384,7 @@ agents:
 ```
 
 > **Important:**
+>
 > - Azure agents: Tools are supported. If no tools are configured, `file_search` is enabled by default when creating an agent with a vector store.
 > - Ollama agents: Do not configure tools - they are not supported and will be ignored.
 
@@ -465,7 +480,7 @@ ACCURACY: 10/10 (100%)
 
 | Option | Description |
 |--------|-------------|
-| `endpoint` | Ollama API endpoint (default: http://localhost:11434) |
+| `endpoint` | Ollama API endpoint (default: <http://localhost:11434>) |
 | `deployment_name` | Model name (e.g., llama3.2:latest, mistral:latest) |
 | `timeout_seconds` | Request timeout (default: 120 for local inference) |
 | `max_retries` | Maximum retry attempts (default: 2) |
@@ -569,17 +584,18 @@ Update the Telemetry section in `appsettings.json`:
 ### Common Issues
 
 1. **"Provider not found" error**
-   - Ensure the provider name in `framework_config.provider` matches a key in `providers:`
 
-2. **"Vector store file processing timeout"**
+- Ensure the provider name in `provider` matches a key in `providers:`
+
+1. **"Vector store file processing timeout"**
    - Increase timeout in vector store indexing options
    - Check Azure AI Foundry service health
 
-3. **"Agent run completed with null response"**
+2. **"Agent run completed with null response"**
    - Verify the model deployment is accessible
    - Check API rate limits
 
-4. **"Unknown tool" warning**
+3. **"Unknown tool" warning**
    - Check that tools in `metadata.tools` are spelled correctly
    - Supported tools: `file_search`, `code_interpreter`
 

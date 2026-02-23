@@ -162,14 +162,14 @@ public class AgentSdkServiceCollectionExtensionsTests
         agentDef.Metadata.Tools.Should().Contain("code_interpreter");
     }
 
-    [Fact(DisplayName = "AddAgentOptions should bind framework_config section")]
-    public void AddAgentOptions_WithFrameworkConfig_BindsAIFrameworkOptions()
+    [Fact(DisplayName = "AddAgentOptions should bind provider property")]
+    public void AddAgentOptions_WithProvider_BindsProvider()
     {
         // Arrange
         var configData = new Dictionary<string, string?>
         {
             ["agents:test_agent:type"] = "test",
-            ["agents:test_agent:framework_config:provider"] = "azure_foundry"
+            ["agents:test_agent:provider"] = "azure_foundry"
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)

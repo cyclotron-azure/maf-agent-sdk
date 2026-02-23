@@ -63,6 +63,7 @@ public static class AgentSdkServiceCollectionExtensions
                         var agentDef = new AgentDefinitionOptions
                         {
                             Type = agentSection.GetValue<string>("type") ?? string.Empty,
+                            Provider = agentSection.GetValue<string>("provider") ?? string.Empty,
                             AutoDelete = agentSection.GetValue("auto_delete", true),
                             AutoCleanupResources = agentSection.GetValue("auto_cleanup_resources", true),
                             Enabled = agentSection.GetValue("enabled", true),
@@ -83,13 +84,6 @@ public static class AgentSdkServiceCollectionExtensions
                                 Description = metadataSection.GetValue<string>("description") ?? string.Empty,
                                 Tools = metadataSection.GetSection("tools").Get<List<string>>() ?? []
                             };
-                        }
-
-                        // Bind Provider from framework_config section
-                        var frameworkSection = agentSection.GetSection("framework_config");
-                        if (frameworkSection.Exists())
-                        {
-                            agentDef.Provider = frameworkSection.GetValue<string>("provider") ?? string.Empty;
                         }
 
                         // Validate temperature and top_p parameters

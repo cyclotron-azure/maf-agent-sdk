@@ -65,8 +65,7 @@ agents:
       tools:
         - "file_search"
 
-    framework_config:
-      provider: "azure_foundry"
+    provider: "azure_foundry"
 
     system_prompt_template: |
       You are an expert spam detection AI agent. Your role is to analyze messages and classify them as either "spam" or "not_spam".
@@ -141,8 +140,7 @@ agents:
       # Vector stores (file_search) and code_interpreter are Azure-only features
       # Ollama agents rely on the model's pre-trained knowledge only
 
-    framework_config:
-      provider: "ollama_local"  # References the Ollama provider
+    provider: "ollama_local"  # References the Ollama provider
 
     system_prompt_template: |
       You are an expert spam detection AI agent. Your role is to analyze messages and classify them as either "spam" or "not_spam".
@@ -223,8 +221,7 @@ agents:
       # Vector stores (file_search) and code_interpreter are Azure-only features
       # Ollama agents use local vector store indexing and in-process retrieval
 
-    framework_config:
-      provider: "ollama_local"  # References the Ollama provider
+    provider: "ollama_local"  # References the Ollama provider
 
     system_prompt_template: |
       You are an expert invoice processing AI agent. Your role is to extract key financial and administrative information from invoices.
@@ -323,8 +320,7 @@ agents:
       tools:
         - "file_search"
 
-    framework_config:
-      provider: "azure_foundry"
+    provider: "azure_foundry"
 
     system_prompt_template: |
       You are an expert invoice processing AI agent. Your role is to extract key financial and administrative information from invoices.

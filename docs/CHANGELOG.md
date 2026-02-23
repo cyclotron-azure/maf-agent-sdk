@@ -56,17 +56,9 @@ Initial production release of Cyclotron.Maf.AgentSdk with comprehensive multi-pr
 
 #### Configuration Structure (BREAKING)
 
-- **Flattened agent configuration** - Removed `framework_config` nesting
+- **Flattened agent configuration** - Provider is now a direct agent property
 - `provider` is now a direct property of agent definitions
 - Simplified YAML structure improves readability
-
-**Before (pre-1.0):**
-```yaml
-agents:
-  my_agent:
-    framework_config:
-      provider: "azure_foundry"
-```
 
 **After (1.0.0):**
 ```yaml
@@ -145,14 +137,10 @@ var factory = new AgentFactory(
 
 #### Step 1: Update Configuration Files
 
-Update all `agent.config.yaml` files to remove `framework_config` nesting:
+Update all `agent.config.yaml` files to use the direct `provider` property:
 
 ```bash
 # Find and update agent configurations
-# Change from:
-#   framework_config:
-#     provider: "azure_foundry"
-# To:
 #   provider: "azure_foundry"
 ```
 
@@ -310,7 +298,7 @@ dotnet test
 #### From 0.x.x to 1.0.0
 
 1. Review breaking changes (configuration flattening, interface renames)
-2. Update `agent.config.yaml` files (remove `framework_config` nesting)
+2. Update `agent.config.yaml` files (use direct `provider` property)
 3. Update code references (property access, interface names)
 4. Register `IAgentProviderResolver` in DI
 5. Run tests and verify build

@@ -20,7 +20,7 @@ namespace Cyclotron.Maf.AgentSdk.Agents;
 /// <summary>
 /// Generic agent factory implementation that creates AI agents using <see cref="IPromptRenderingService"/> for instructions.
 /// Registered as a keyed service with different agent keys.
-/// Resolves model provider configuration from the agent's framework_config.provider reference.
+/// Resolves model provider configuration from the agent's provider reference.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -777,7 +777,7 @@ public class AgentFactory : IAgentFactory
         {
             throw new InvalidOperationException(
                 $"Agent '{_agentKey}' does not have a provider configured. " +
-                $"Please specify a provider reference in agent.config.yaml (1.0: use 'provider' property, not 'framework_config.provider').");
+                $"Please specify a provider reference in agent.config.yaml using the 'provider' property.");
         }
 
         if (!_providerOptions.Providers.ContainsKey(providerName))

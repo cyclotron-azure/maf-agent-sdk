@@ -406,7 +406,7 @@ public class AgentFactoryTests : IDisposable
             // Default definition uses empty provider string, which will fail
         };
 
-        // The default AgentDefinitionOptions has empty AIFrameworkOptions.Provider
+        // The default AgentDefinitionOptions has empty Provider
         // This will fail validation - testing that default is used but validation catches it
         var act = () => new AgentFactory(
             "unknown_agent",
@@ -1154,8 +1154,8 @@ public class AgentFactoryTests : IDisposable
         factory.AgentDefinition.Type.Should().Be("custom_classifier");
     }
 
-    [Fact(DisplayName = "AgentDefinition should return AIFrameworkOptions with correct Provider")]
-    public void AgentDefinition_AIFrameworkOptions_ReturnsCorrectProvider()
+    [Fact(DisplayName = "AgentDefinition should return Provider with correct value")]
+    public void AgentDefinition_Provider_ReturnsCorrectProvider()
     {
         // Arrange
         var agents = new Dictionary<string, AgentDefinitionOptions>
