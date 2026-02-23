@@ -121,6 +121,8 @@ jobs:
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore --configuration Release /p:Version=${{ steps.gitversion.outputs.version }}
 
       - name: Test
+        env:
+          GITHUB_ACTIONS: true
         run: dotnet test ${{ env.SOLUTION_PATH }} --no-build --configuration Release --verbosity normal
 
       - name: Pack

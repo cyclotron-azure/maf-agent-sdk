@@ -7,6 +7,7 @@ using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.VectorStore.Exceptions;
 using Cyclotron.Maf.AgentSdk.VectorStore.Services.Impl;
 using Cyclotron.Maf.AgentSdk.VectorStore.Telemetry;
+using Cyclotron.Maf.AgentSdk.Vectors.UnitTests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -88,7 +89,7 @@ public class OllamaVectorStoreManagerTests
         };
     }
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when logger is null")]
+    [OllamaFact(DisplayName = "Constructor should throw ArgumentNullException when logger is null")]
     public void Constructor_NullLogger_ThrowsArgumentNullException()
     {
         // Act & Assert
@@ -96,7 +97,7 @@ public class OllamaVectorStoreManagerTests
             new OllamaVectorStoreManager(null!, _indexingOptions, _mockTelemetry.Object, CreateConfigFactory()));
     }
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when indexingOptions is null")]
+    [OllamaFact(DisplayName = "Constructor should throw ArgumentNullException when indexingOptions is null")]
     public void Constructor_NullIndexingOptions_ThrowsArgumentNullException()
     {
         // Act & Assert
@@ -104,7 +105,7 @@ public class OllamaVectorStoreManagerTests
             new OllamaVectorStoreManager(_mockLogger.Object, null!, _mockTelemetry.Object, CreateConfigFactory()));
     }
 
-    [Fact(DisplayName = "GetOrCreateSharedVectorStoreAsync should create new vector store with valid ID")]
+    [OllamaFact(DisplayName = "GetOrCreateSharedVectorStoreAsync should create new vector store with valid ID")]
     public async Task GetOrCreateSharedVectorStoreAsync_ValidParameters_ReturnsVectorStoreId()
     {
         // Arrange
@@ -123,7 +124,7 @@ public class OllamaVectorStoreManagerTests
         Assert.NotEmpty(vectorStoreId);
     }
 
-    [Fact(DisplayName = "AddFileToVectorStoreAsync should process chunks and generate embeddings")]
+    [OllamaFact(DisplayName = "AddFileToVectorStoreAsync should process chunks and generate embeddings")]
     public async Task AddFileToVectorStoreAsync_ValidFile_ProcessesChunksSuccessfully()
     {
         // Arrange
@@ -168,7 +169,7 @@ public class OllamaVectorStoreManagerTests
         _mockTelemetry.Verify(t => t.RecordEmbeddingsGenerated(It.IsAny<string>(), It.IsAny<int>()), Times.AtLeastOnce());
     }
 
-    [Fact(DisplayName = "AddFileToVectorStoreAsync should throw VectorStoreIndexingException on embedding API failure", Skip = "Requires Ollama service running or HTTP mocking support")]
+    [OllamaFact(DisplayName = "AddFileToVectorStoreAsync should throw VectorStoreIndexingException on embedding API failure", Skip = "Requires Ollama service running or HTTP mocking support")]
     public async Task AddFileToVectorStoreAsync_EmbeddingApiFailure_ThrowsVectorStoreIndexingException()
     {
         // Arrange
@@ -203,7 +204,7 @@ public class OllamaVectorStoreManagerTests
                 CancellationToken.None));
     }
 
-    [Fact(DisplayName = "CleanupVectorStoreAsync should remove vector store from memory")]
+    [OllamaFact(DisplayName = "CleanupVectorStoreAsync should remove vector store from memory")]
     public async Task CleanupVectorStoreAsync_ExistingStore_RemovesSuccessfully()
     {
         // Arrange
@@ -217,7 +218,7 @@ public class OllamaVectorStoreManagerTests
         Assert.True(true);
     }
 
-    [Fact(DisplayName = "AddFilesToVectorStoreAsync should process multiple files in batch")]
+    [OllamaFact(DisplayName = "AddFilesToVectorStoreAsync should process multiple files in batch")]
     public async Task AddFilesToVectorStoreAsync_MultipleFiles_ProcessesAllSuccessfully()
     {
         // Arrange
