@@ -48,10 +48,6 @@ public class OllamaVectorStoreManager(
     {
         try
         {
-            // Validate provider configuration
-            var providerConfig = _configFactory(providerName) ?? throw new VectorStoreConfigurationException(
-                    $"Provider configuration not found for: {providerName}",
-                    providerName);
 
             // Create a new vector store ID
             var vectorStoreId = Guid.NewGuid().ToString();
@@ -160,7 +156,7 @@ public class OllamaVectorStoreManager(
             var fileIds = new List<string>();
 
             // Create OllamaApiClient for embeddings
-            var ollamaClient = CreateOllamaClient(providerConfig);
+            using var ollamaClient = CreateOllamaClient(providerConfig);
 
             // Process each chunk
             foreach (var (chunkText, chunkId) in chunks)
@@ -262,7 +258,7 @@ public class OllamaVectorStoreManager(
             var totalChunks = 0;
 
             // Create OllamaApiClient for embeddings
-            var ollamaClient = CreateOllamaClient(providerConfig);
+            using var ollamaClient = CreateOllamaClient(providerConfig);
 
             _logger.LogInformation("Processing multiple files for Ollama vector store {VectorStoreId}", vectorStoreId);
 
@@ -474,9 +470,9 @@ public class OllamaVectorStoreManager(
             }
 
             // Generate embedding for query asynchronously (outside lock)
+            using var ollamaClient = CreateOllamaClient(providerConfig);
             var queryEmbedding = await GenerateEmbeddingAsync(
-                new OllamaApiClient(new Uri(providerConfig.Endpoint?.TrimEnd('/') ?? "http://localhost:11434"),
-                    providerConfig.DeploymentName ?? "nomic-embed-text"),
+                ollamaClient,
                 providerConfig,
                 query,
                 cancellationToken);

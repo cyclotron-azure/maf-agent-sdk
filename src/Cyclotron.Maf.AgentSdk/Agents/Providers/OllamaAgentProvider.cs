@@ -106,7 +106,10 @@ internal sealed class OllamaAgentProvider(
             modelName);
 
         await Task.CompletedTask.ConfigureAwait(false);
-        return new AgentProviderResult(agent, null, null);
+        return new AgentProviderResult(agent, null, null)
+        {
+            ProviderClientDisposable = ollamaClient
+        };
     }
 
     /// <inheritdoc/>

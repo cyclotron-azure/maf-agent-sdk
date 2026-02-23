@@ -43,6 +43,7 @@ public class AgentFactory : IAgentFactory
     private readonly TelemetryOptions _telemetryOptions;
     private string? _createdAgentName;
     private string? _createdAgentVersion;
+    private IDisposable? _providerClientDisposable;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AgentFactory"/> class.
@@ -420,6 +421,7 @@ public class AgentFactory : IAgentFactory
             .CreateAgentAsync(creationRequest, cancellationToken)
             .ConfigureAwait(false);
 
+        _providerClientDisposable = providerResult.ProviderClientDisposable;
         _createdAgentName = providerResult.CreatedAgentName;
         _createdAgentVersion = providerResult.CreatedAgentVersion;
 
@@ -475,6 +477,7 @@ public class AgentFactory : IAgentFactory
             .CreateAgentAsync(creationRequest, cancellationToken)
             .ConfigureAwait(false);
 
+        _providerClientDisposable = providerResult.ProviderClientDisposable;
         _createdAgentName = providerResult.CreatedAgentName;
         _createdAgentVersion = providerResult.CreatedAgentVersion;
 
@@ -579,9 +582,16 @@ public class AgentFactory : IAgentFactory
         // Cleanup agent and session if AutoDelete is enabled
         if (_agentDefinition.AutoDelete)
         {
-            await DeleteSessionAsync(cancellationToken);
-            await DeleteAgentAsync(cancellationToken);
-            _logger.LogInformation("Cleaned up {AgentKey} agent and session", _agentKey);
+            try
+            {
+                await DeleteSessionAsync(cancellationToken);
+                await DeleteAgentAsync(cancellationToken);
+                _logger.LogInformation("Cleaned up {AgentKey} agent and session", _agentKey);
+            }
+            finally
+            {
+                DisposeProviderClient();
+            }
         }
         else
         {
@@ -634,6 +644,27 @@ public class AgentFactory : IAgentFactory
             _logger.LogInformation(
                 "Skipping {AgentKey} vector store cleanup (AutoCleanupResources=false)",
                 _agentKey);
+        }
+    }
+
+    private void DisposeProviderClient()
+    {
+        if (_providerClientDisposable == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _providerClientDisposable.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose provider client for {AgentKey}", _agentKey);
+        }
+        finally
+        {
+            _providerClientDisposable = null;
         }
     }
 

@@ -1,6 +1,7 @@
 using Cyclotron.Maf.AgentSdk.Common.Options;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using System;
 
 namespace Cyclotron.Maf.AgentSdk.Agents.Providers;
 
@@ -35,7 +36,13 @@ public sealed record AgentProviderCreationRequest(
 public sealed record AgentProviderResult(
     AIAgent Agent,
     string? CreatedAgentName,
-    string? CreatedAgentVersion);
+    string? CreatedAgentVersion)
+{
+    /// <summary>
+    /// Optional disposable handle for provider-owned resources tied to this agent.
+    /// </summary>
+    public IDisposable? ProviderClientDisposable { get; init; }
+}
 
 /// <summary>
 /// Input required to delete a provider-managed agent.
