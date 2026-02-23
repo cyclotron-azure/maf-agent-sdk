@@ -86,9 +86,7 @@ public class Main(
     private async Task<int> RunInvoiceAsync(CancellationToken cancellationToken)
     {
         var pdfDirectory = Configuration["Workflow:InvoicePdfDirectory"] ?? "pdfs";
-        var fullPath = Path.IsPathRooted(pdfDirectory)
-            ? pdfDirectory
-            : Path.Combine(AppContext.BaseDirectory, pdfDirectory);
+        var fullPath = Path.GetFullPath(pdfDirectory, AppContext.BaseDirectory);
 
         if (!Directory.Exists(fullPath))
         {

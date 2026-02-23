@@ -274,7 +274,7 @@ For PDF-related configuration options, see [AgentSdk.Pdf README](../Cyclotron.Ma
 | `IVectorStoreManager` | Manages vector store lifecycle |
 | `IPromptRenderingService` | Renders Handlebars templates |
 | `IProviderClientFactory` | Creates AI provider clients (Azure, Ollama) |
-| `IAzureFoundryCleanupService` | Cleans up Azure AI Foundry resources |
+| `IAIFoundryCleanupService` | Cleans up Azure AI Foundry resources |
 
 For PDF processing interfaces, see [AgentSdk.Pdf README](../Cyclotron.Maf.AgentSdk.Pdf/README.md).
 
