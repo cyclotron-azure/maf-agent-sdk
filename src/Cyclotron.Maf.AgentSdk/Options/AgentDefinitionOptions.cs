@@ -12,6 +12,33 @@ namespace Cyclotron.Maf.AgentSdk.Options;
 /// - Removed nested AIFrameworkOptions - use direct Provider property
 /// - Added Middleware configuration for centralized middleware management
 /// - Added Extensibility options for advanced customization
+/// 
+/// Migration guidance (pre-1.0 to 1.0):
+/// 
+/// Old configuration (pre-1.0):
+/// <code language="yaml"><![CDATA[
+/// agents:
+///   my_agent:
+///     type: "custom"
+///     framework_config:
+///       provider: "azure_foundry"
+/// ]]></code>
+/// 
+/// New configuration (1.0+):
+/// <code language="yaml"><![CDATA[
+/// agents:
+///   my_agent:
+///     type: "custom"
+///     provider: "azure_foundry"
+///     middleware:
+///       - name: "logging"
+///       - name: "retry"
+/// ]]></code>
+/// 
+/// Move any previous framework-level provider settings into the top-level
+/// <c>provider</c> property and configure cross-cutting concerns under the
+/// centralized <c>middleware:</c> section. For more detailed scenarios, see the
+/// 1.0 migration guide in the repository documentation.
 /// </remarks>
 public class AgentDefinitionOptions
 {

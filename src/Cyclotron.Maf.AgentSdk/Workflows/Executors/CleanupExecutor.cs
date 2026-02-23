@@ -25,7 +25,7 @@ public class CleanupExecutor<TResult>(
     where TResult : ICleanupableWorkflowResult
 {
     private readonly VectorStoreManager? _vectorStoreManager = vectorStoreManager; // Optional - can be null if AgentSdk.Vectors not registered
-    private readonly IAIFoundryCleanupService _cleanupService =cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
+    private readonly IAIFoundryCleanupService _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
     private readonly ILogger<CleanupExecutor<TResult>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ModelProviderOptions _providerOptions = providerOptions?.Value ?? throw new ArgumentNullException(nameof(providerOptions));
 

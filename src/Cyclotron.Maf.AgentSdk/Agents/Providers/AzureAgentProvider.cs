@@ -398,7 +398,8 @@ internal sealed class AzureAgentProvider(
                     "Ensure the Azure.AI.Projects SDK version supports these parameters.",
                     request.AgentKey);
             }
-            else if (temperatureSet || topPSet)
+            else if ((request.Temperature.HasValue && temperatureSet) ||
+                     (request.TopP.HasValue && topPSet))
             {
                 _logger.LogInformation(
                     "Configured thermodynamic parameters for {AgentKey} agent: Temperature={Temperature}, TopP={TopP}",
