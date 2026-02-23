@@ -328,7 +328,7 @@ public class AgentSdkServiceCollectionExtensionsTests
         // Arrange
         var configData = new Dictionary<string, string?>
         {
-            ["providers:azure_foundry:type"] = "azure_foundry",
+            ["providers:azure_foundry:type"] = "Azure_Foundry",
             ["providers:azure_foundry:endpoint"] = "https://test.azure.com",
             ["providers:azure_foundry:deployment_name"] = "gpt-4",
             ["providers:azure_foundry:timeout_seconds"] = "600",

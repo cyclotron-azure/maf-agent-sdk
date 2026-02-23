@@ -15,6 +15,13 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// </summary>
 public static class AgentSdkServiceCollectionExtensions
 {
+    private static string NormalizeProviderType(string? providerType)
+    {
+        return string.IsNullOrWhiteSpace(providerType)
+            ? string.Empty
+            : providerType.Trim().ToLowerInvariant();
+    }
+
     /// <summary>
     /// Registers core AgentSdk services including configuration value substitution,
     /// model provider options, agent options, telemetry, provider resolver, and PDF processing.
@@ -181,7 +188,8 @@ public static class AgentSdkServiceCollectionExtensions
                     {
                         var providerDef = new ModelProviderDefinitionOptions
                         {
-                            Type = substitution.Substitute(providerSection.GetValue<string>("type") ?? string.Empty),
+                            Type = NormalizeProviderType(
+                                substitution.Substitute(providerSection.GetValue<string>("type") ?? string.Empty)),
                             Endpoint = substitution.Substitute(providerSection.GetValue<string>("endpoint") ?? string.Empty),
                             DeploymentName = substitution.Substitute(providerSection.GetValue<string>("deployment_name") ?? string.Empty),
                             Model = substitution.SubstituteNullable(providerSection.GetValue<string>("model")),
