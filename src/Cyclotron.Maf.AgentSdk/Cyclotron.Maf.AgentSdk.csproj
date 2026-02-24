@@ -3,8 +3,8 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>AgentSdk</PackageId>
-    <Description>A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF) and Azure AI Foundry. Provides workflow orchestration, agent factories, vector store management, PDF processing, and OpenTelemetry integration.</Description>
-    <PackageTags>ai;agents;azure;azure-ai;workflow;opentelemetry;maf;document-processing;vector-store</PackageTags>
+    <Description>A .NET SDK for building AI agent workflows using Microsoft Agent Framework (MAF) and Azure AI Foundry. Provides workflow orchestration, agent factories, vector store management, and OpenTelemetry integration.</Description>
+    <PackageTags>ai;agents;azure;azure-ai;workflow;opentelemetry;maf;vector-store</PackageTags>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
@@ -17,13 +17,13 @@
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Azure.Identity" />
-    <PackageReference Include="Azure.AI.Agents.Persistent" />
+    <PackageReference Include="Azure.AI.Projects" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" />
+    <PackageReference Include="OpenAI" />
   </ItemGroup>
 
   <!-- Microsoft Agent Framework Packages -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI.AzureAI.Persistent" />
     <PackageReference Include="Microsoft.Agents.AI.AzureAI" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" />
@@ -51,11 +51,18 @@
 
   <!-- Utility Packages -->
   <ItemGroup>
-    <PackageReference Include="PdfPig" />
     <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="NetEscapades.Configuration.Yaml" />
+    <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Polly.Core" />
+  </ItemGroup>
+
+  <!-- Project References -->
+  <ItemGroup>
+    <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Common/Cyclotron.Maf.AgentSdk.Common.csproj" />
+    <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Pdf/Cyclotron.Maf.AgentSdk.Pdf.csproj" />
+    <ProjectReference Include="../Cyclotron.Maf.AgentSdk.Vectors/Cyclotron.Maf.AgentSdk.Vectors.csproj" />
   </ItemGroup>
 
   <!-- Package Content -->

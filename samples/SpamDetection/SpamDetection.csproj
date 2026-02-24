@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cyclotron.Maf.AgentSdk\Cyclotron.Maf.AgentSdk.csproj" />
+    <ProjectReference Include="..\..\src\Cyclotron.Maf.AgentSdk.Pdf\Cyclotron.Maf.AgentSdk.Pdf.csproj" />
+    <ProjectReference Include="..\..\src\Cyclotron.Maf.AgentSdk.Vectors\Cyclotron.Maf.AgentSdk.Vectors.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,4 +29,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- copy pdfs folder to bin -->
+    <None Update="pdfs\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

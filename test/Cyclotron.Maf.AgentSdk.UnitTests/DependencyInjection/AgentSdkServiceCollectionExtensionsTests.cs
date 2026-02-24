@@ -1,3 +1,4 @@
+using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
@@ -5,7 +6,6 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.DependencyInjection;
 
@@ -49,6 +49,7 @@ public class AgentSdkServiceCollectionExtensionsTests
 
         // Act
         services.AddAgentSdkServices();
+        services.AddDocumentWorkflowServices();
         var serviceProvider = services.BuildServiceProvider();
 
         // Assert
@@ -161,14 +162,14 @@ public class AgentSdkServiceCollectionExtensionsTests
         agentDef.Metadata.Tools.Should().Contain("code_interpreter");
     }
 
-    [Fact(DisplayName = "AddAgentOptions should bind framework_config section")]
-    public void AddAgentOptions_WithFrameworkConfig_BindsAIFrameworkOptions()
+    [Fact(DisplayName = "AddAgentOptions should bind provider property")]
+    public void AddAgentOptions_WithProvider_BindsProvider()
     {
         // Arrange
         var configData = new Dictionary<string, string?>
         {
             ["agents:test_agent:type"] = "test",
-            ["agents:test_agent:framework_config:provider"] = "azure_foundry"
+            ["agents:test_agent:provider"] = "azure_foundry"
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
@@ -185,8 +186,8 @@ public class AgentSdkServiceCollectionExtensionsTests
         var options = serviceProvider.GetRequiredService<IOptions<AgentOptions>>();
         var agentDef = options.Value.Agents["test_agent"];
 
-        agentDef.AIFrameworkOptions.Should().NotBeNull();
-        agentDef.AIFrameworkOptions!.Provider.Should().Be("azure_foundry");
+        agentDef.Provider.Should().NotBeNullOrWhiteSpace();
+        agentDef.Provider.Should().Be("azure_foundry");
     }
 
     [Fact(DisplayName = "AddAgentOptions should use default values when not specified")]
@@ -327,7 +328,7 @@ public class AgentSdkServiceCollectionExtensionsTests
         // Arrange
         var configData = new Dictionary<string, string?>
         {
-            ["providers:azure_foundry:type"] = "azure_foundry",
+            ["providers:azure_foundry:type"] = "Azure_Foundry",
             ["providers:azure_foundry:endpoint"] = "https://test.azure.com",
             ["providers:azure_foundry:deployment_name"] = "gpt-4",
             ["providers:azure_foundry:timeout_seconds"] = "600",

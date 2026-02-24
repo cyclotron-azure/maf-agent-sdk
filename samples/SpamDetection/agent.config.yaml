@@ -10,22 +10,62 @@ providers:
     api_version: "2024-12-01-preview"
     timeout_seconds: 300
     max_retries: 3
+    # Optional: Set default temperature and top_p for all agents using this provider
+    # temperature: 0.7    # Controls randomness: 0.0 (deterministic) to 2.0 (creative), default varies by model
+    # top_p: 0.95        # Nucleus sampling: 0.0 to 1.0, controls diversity, default varies by model
+
+  # Ollama local provider example
+  # Demonstrates using open-source models running locally
+  ollama_local:
+    type: "ollama"
+    endpoint: "{OLLAMA_ENDPOINT}"
+    deployment_name: "{OLLAMA_MODEL}"
+    timeout_seconds: 120
+    max_retries: 2
+    # Optional: Set default temperature and top_p for all agents using this provider
+    # temperature: 0.8    # For more creative responses
+    # top_p: 0.90        # For more diverse token selection
+
+# PDF Content Analysis Configuration
+# Controls how PDF files are analyzed to detect content type (text-based, image-only, or mixed)
+pdf_content_analysis:
+  enabled: true
+  analyzer_key: "pdfpig"  # Key of registered analyzer: "pdfpig" (default), "vision" (future), or custom
+  failure_strategy: "fallback"  # Options: skip (skip image-only), throw (error on image-only), fallback (convert anyway)
+  text_ratio_threshold: 0.1  # Minimum ratio of pages with text to classify as TextBased (0.0-1.0)
+  max_pages_to_analyze: 0  # Maximum pages to analyze (0 = analyze all)
+  min_characters_per_page: 5  # Minimum characters to count page as having text
+  log_detailed_results: true  # Log text/image ratios and analysis metrics
+
+# PDF Conversion Configuration
+# Controls how PDF files are converted to markdown for processing
+pdf_conversion:
+  enabled: true
+  save_markdown_for_debug: false  # Save converted markdown to disk for debugging
+  output_directory: "./output"  # Directory for saved markdown files
+  include_page_numbers: true  # Add "## Page N" headers to markdown
+  preserve_paragraph_structure: true  # Use layout analysis for paragraph detection
+  include_timestamp_in_filename: true  # Add timestamp to saved markdown filenames
+  markdown_file_extension: ".md"  # File extension for saved markdown
 
 # Agent Configuration
 agents:
-  spam_detector_agent:
+  spam_detector:
     type: "spam_detector"
     enabled: true
     auto_delete: true
     auto_cleanup_resources: true
+    version: "1"
+    # Optional: Override provider-level temperature and top_p for this agent
+    # temperature: 0.3    # For deterministic, consistent spam decisions
+    # top_p: 0.8         # Lower diversity for focused classification
 
     metadata:
       description: "AI agent for detecting spam messages"
       tools:
         - "file_search"
 
-    framework_config:
-      provider: "azure_foundry"
+    provider: "azure_foundry"
 
     system_prompt_template: |
       You are an expert spam detection AI agent. Your role is to analyze messages and classify them as either "spam" or "not_spam".
@@ -52,10 +92,16 @@ agents:
 
       ## Response Format
 
-      For each message, provide:
-      1. **Classification**: Either "SPAM" or "NOT_SPAM"
-      2. **Confidence**: Your confidence level (high, medium, low)
-      3. **Reasoning**: Brief explanation of why you classified it this way
+      You MUST respond with a single JSON object that matches this schema:
+      {
+        "is_spam": boolean,
+        "confidence": number,  // 0.0 to 1.0
+        "reason": string,
+        "spam_indicators": string,
+        "recommendation": string
+      }
+
+      Do not include any extra text, markdown, or code fences.
 
       Be accurate and consistent in your classifications. When uncertain, err on the side of caution but note your uncertainty.
 
@@ -74,10 +120,281 @@ agents:
 
       1. Analyze the message content carefully
       2. Consider all spam indicators
-      3. Provide your classification with reasoning
+      3. Return ONLY the JSON object described in the system prompt
 
-      Respond with:
-      - Classification: SPAM or NOT_SPAM
-      - Confidence: High/Medium/Low
-      - Reason: Brief explanation
+      Return ONLY valid JSON. Do not include any extra text or markdown.
+
+  # Ollama-based spam detector example
+  # Uses local open-source models for privacy-first spam detection
+  # NOTE: Ollama agents do NOT support Azure AI Foundry vector stores or tools
+  spam_detector_ollama:
+    type: "spam_detector_local"
+    enabled: false  # Set to true to use Ollama instead of Azure
+    auto_delete: true
+    auto_cleanup_resources: false  # No Azure resources to cleanup for local models
+    version: "1"
+
+    metadata:
+      description: "Local AI agent for spam detection using Ollama"
+      # NOTE: No tools configured - Ollama doesn't support Azure AI Foundry tools
+      # Vector stores (file_search) and code_interpreter are Azure-only features
+      # Ollama agents rely on the model's pre-trained knowledge only
+
+    provider: "ollama_local"  # References the Ollama provider
+
+    system_prompt_template: |
+      You are an expert spam detection AI agent. Your role is to analyze messages and classify them as either "spam" or "not_spam".
+
+      ## Your Expertise
+
+      You are trained to identify various types of spam including:
+      - Phishing attempts and scam messages
+      - Unsolicited promotional content
+      - Financial fraud schemes
+      - Malicious links and attachments
+      - Social engineering attempts
+
+      ## Classification Guidelines
+
+      When analyzing a message, consider:
+      1. **Urgency Tactics**: Excessive urgency or pressure to act immediately
+      2. **Financial Promises**: Unrealistic promises of money, prizes, or rewards
+      3. **Suspicious Links**: Shortened URLs, misspelled domains, or unexpected links
+      4. **Impersonation**: Claims to be from banks, tech companies, or government agencies
+      5. **Grammar/Spelling**: Poor language quality (though not always indicative)
+      6. **Personal Information Requests**: Requests for passwords, SSN, credit card numbers
+      7. **Too Good to Be True**: Offers that seem unrealistically beneficial
+
+      ## Response Format
+
+      You MUST respond with a single JSON object that matches this exact schema:
+      {
+        "is_spam": boolean,
+        "confidence": number,
+        "reason": string,
+        "spam_indicators": string,
+        "recommendation": string
+      }
+
+      CRITICAL FORMATTING RULES:
+      - Return ONLY raw JSON starting with { and ending with }
+      - DO NOT wrap in ```json or ``` or any markdown
+      - DO NOT add explanatory text before or after the JSON
+      - DO NOT use code fences or formatting of any kind
+      - Start your response immediately with the opening brace {
+
+      Example of CORRECT response format:
+      {"is_spam":true,"confidence":0.95,"reason":"Phishing attempt","spam_indicators":"Urgent language","recommendation":"Delete"}
+
+      Be accurate and consistent in your classifications. When uncertain, err on the side of caution but note your uncertainty.
+
+    user_prompt_template: |
+      Please analyze the following message and classify it as spam or not spam.
+
+      ## Message to Analyze
+
+      ```
+      {{message}}
+      ```
+
+      ## Instructions
+
+      1. Analyze the message content carefully
+      2. Consider all spam indicators
+      3. Return ONLY the JSON object described in the system prompt
+
+      Return ONLY valid JSON. Do not include any extra text or markdown.
+
+  # Ollama-based invoice extractor using local embeddings and retrieval
+  # Does NOT use Azure AI Foundry vector stores or file_search tools
+  # Instead uses local indexing and semantic search for document retrieval
+  invoice_extractor_ollama:
+    type: "invoice_extractor_ollama"
+    enabled: false  # Set to true to use Ollama instead of Azure
+    auto_delete: true
+    auto_cleanup_resources: false  # No Azure resources to cleanup for local models
+    version: "1"
+
+    metadata:
+      description: "Local AI agent for invoice extraction using Ollama"
+      # NOTE: No tools configured - Ollama agents don't support Azure tools
+      # Vector stores (file_search) and code_interpreter are Azure-only features
+      # Ollama agents use local vector store indexing and in-process retrieval
+
+    provider: "ollama_local"  # References the Ollama provider
+
+    system_prompt_template: |
+      You are an expert invoice processing AI agent. Your role is to extract key financial and administrative information from invoices.
+
+      ## Your Expertise
+
+      You can analyze and extract:
+      - Invoice identifiers (invoice number, PO number)
+      - Party information (vendor/seller name, buyer/company name, addresses)
+      - Dates (invoice date, due date, payment terms)
+      - Financial details (subtotal, taxes, total amount, currency)
+      - Line items (description, quantity, unit price, line total)
+      - Payment information (terms, methods, bank details if present)
+      - Special notes (early payment discounts, late payment fees, memo fields)
+
+      ## Extraction Guidelines
+
+      When analyzing an invoice:
+      1. **Accuracy First**: Extract values exactly as they appear in the document
+      2. **Handle Formats**: Recognize various date formats, currency symbols, and number formats
+      3. **Missing Data**: If a field is not present, mark it as null in the JSON response
+      4. **Currency**: Always capture the currency code or symbol used
+      5. **Line Items**: Extract all line items even if table format varies
+      6. **Totals**: Verify calculations where possible
+
+      ## Response Format
+
+      CRITICAL: You MUST respond ONLY with valid JSON matching this structure:
+      ```json
+      {
+        "invoiceNumber": "string or null",
+        "vendorName": "string or null",
+        "invoiceDate": "YYYY-MM-DD or null",
+        "totalAmount": "decimal or null",
+        "currency": "string (e.g., USD, EUR) or null",
+        "dueDate": "YYYY-MM-DD or null",
+        "paymentTerms": "string or null",
+        "lineItems": [
+          {
+            "description": "string",
+            "quantity": "number or null",
+            "unitPrice": "decimal or null",
+            "lineTotal": "decimal or null"
+          }
+        ],
+        "subtotal": "decimal or null",
+        "tax": "decimal or null",
+        "status": "string (e.g., draft, issued, paid, overdue) or null",
+        "extractionNotes": "string with any ambiguities or observations"
+      }
+      ```
+
+      Return ONLY the JSON object, no additional text, markdown formatting, or code blocks.
+
+    user_prompt_template: |
+      Please extract invoice information from the provided document and respond with structured data.
+
+      ## Document Context
+      - Document name: {{documentName}}
+      - Analysis mode: {{analysisMode}}
+      {{#if retrievedContent}}
+      - Retrieved text context (from local document search):
+      {{retrievedContent}}
+      {{/if}}
+
+      ## Extraction Instructions
+
+      1. Carefully examine all content in the document (text, images, or both)
+      2. Extract all identifiable invoice fields from any available source
+      3. Handle native PDFs, scanned documents, and mixed content
+      {{#if retrievedContent}}
+      4. Use the retrieved text context above to supplement image analysis
+      5. Combine information from all sources for complete accuracy
+      {{else}}
+      4. Use available methods (direct analysis, local indexing) as appropriate
+      5. For documents with both text and images, combine information from all sources
+      {{/if}}
+
+      ## Output Requirements
+
+      Return ONLY valid JSON matching the defined schema. Do not include any explanation, reasoning, or additional text.
+      If a field cannot be determined, use null for that field.
+      Ensure the JSON is valid and properly formatted.
+
+      Analysis complete. Extract and return the invoice data as JSON now.
+
+  invoice_extractor:
+    type: "invoice_extractor"
+    enabled: true
+    auto_delete: true
+    auto_cleanup_resources: true
+    version: "1"
+
+    metadata:
+      description: "AI agent for extracting invoice information from PDF documents"
+      tools:
+        - "file_search"
+
+    provider: "azure_foundry"
+
+    system_prompt_template: |
+      You are an expert invoice processing AI agent. Your role is to extract key financial and administrative information from invoices.
+
+      ## Your Expertise
+
+      You can analyze and extract:
+      - Invoice identifiers (invoice number, PO number)
+      - Party information (vendor/seller name, buyer/company name, addresses)
+      - Dates (invoice date, due date, payment terms)
+      - Financial details (subtotal, taxes, total amount, currency)
+      - Line items (description, quantity, unit price, line total)
+      - Payment information (terms, methods, bank details if present)
+      - Special notes (early payment discounts, late payment fees, memo fields)
+
+      ## Extraction Guidelines
+
+      When analyzing an invoice:
+      1. **Accuracy First**: Extract values exactly as they appear in the document
+      2. **Handle Formats**: Recognize various date formats, currency symbols, and number formats
+      3. **Missing Data**: If a field is not present, mark it as null in the JSON response
+      4. **Currency**: Always capture the currency code or symbol used
+      5. **Line Items**: Extract all line items even if table format varies
+      6. **Totals**: Verify calculations where possible
+
+      ## Response Format
+
+      CRITICAL: You MUST respond ONLY with valid JSON matching this structure:
+      ```json
+      {
+        "invoiceNumber": "string or null",
+        "vendorName": "string or null",
+        "invoiceDate": "YYYY-MM-DD or null",
+        "totalAmount": "decimal or null",
+        "currency": "string (e.g., USD, EUR) or null",
+        "dueDate": "YYYY-MM-DD or null",
+        "paymentTerms": "string or null",
+        "lineItems": [
+          {
+            "description": "string",
+            "quantity": "number or null",
+            "unitPrice": "decimal or null",
+            "lineTotal": "decimal or null"
+          }
+        ],
+        "subtotal": "decimal or null",
+        "tax": "decimal or null",
+        "status": "string (e.g., draft, issued, paid, overdue) or null",
+        "extractionNotes": "string with any ambiguities or observations"
+      }
+      ```
+
+      Return ONLY the JSON object, no additional text, markdown formatting, or code blocks.
+
+    user_prompt_template: |
+      Please extract invoice information from the provided document and respond with structured data.
+
+      ## Document Context
+      - Document name: {{documentName}}
+      - Analysis mode: {{analysisMode}}
+
+      ## Extraction Instructions
+
+      1. Carefully examine all content in the document (text, images, or both)
+      2. Extract all identifiable invoice fields from any available source
+      3. Handle native PDFs, scanned documents, and mixed content
+      4. Use available tools (file_search) and direct image analysis as appropriate
+      5. For documents with both text and images, combine information from all sources
+
+      ## Output Requirements
+
+      Return ONLY valid JSON matching the defined schema. Do not include any explanation, reasoning, or additional text.
+      If a field cannot be determined, use null for that field.
+      Ensure the JSON is valid and properly formatted.
+
+      Analysis complete. Extract and return the invoice data as JSON now.
 

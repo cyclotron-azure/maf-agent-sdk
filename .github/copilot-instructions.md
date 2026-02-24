@@ -13,7 +13,7 @@ This is a .NET 8.0 SDK for building AI agent workflows using Microsoft Agent Fra
 | `IAgentFactory` | `src/.../Agents/` | Creates ephemeral Azure AI Foundry agents with keyed DI |
 | `IVectorStoreManager` | `src/.../Services/` | Manages vector store lifecycle with indexing wait |
 | `IPromptRenderingService` | `src/.../Services/` | Handlebars template rendering for prompts |
-| `IPersistentAgentsClientFactory` | `src/.../Services/` | Creates Azure AI Foundry clients per provider |
+| `IProviderClientFactory` | `src/.../Services/` | Creates AI provider clients (Azure, Ollama) per provider |
 
 ### Data Flow
 
@@ -47,8 +47,7 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: false
-    framework_config:
-      provider: "azure_foundry"  # References providers: section
+    provider: "azure_foundry"  # References providers: section (flattened in 1.0.0)
     system_prompt_template: |
       Your instructions here with {{variables}}
     user_prompt_template: |
@@ -127,11 +126,39 @@ public void RenderSystemPrompt_WithValidAgentKey_ReturnsRenderedTemplate()
 |---------|---------|
 | `Microsoft.Agents.AI.Workflows` | MAF workflow orchestration |
 | `Azure.AI.Agents.Persistent` | Azure AI Foundry agent APIs |
+| `OllamaSharp` | Ollama provider integration for agents and embeddings |
 | `Handlebars.Net` | Template rendering |
 | `Polly.Core` | Retry policies with exponential backoff |
 | `OpenTelemetry` | Distributed tracing and metrics |
 
 ## Important Patterns
+
+### Dependency Injection Lifetime Strategy
+
+**Provider Scope Safety**:
+- `IAgentProvider` implementations (Azure, Ollama) are registered as **Scoped**
+- `IAgentProviderResolver` is registered as **Scoped**
+- `IProviderClientFactory` (their dependency) is registered as **Scoped**
+
+**Why Scoped?**
+Providers store and use `IProviderClientFactory` throughout their lifetime (e.g., in `CreateAgentAsync()`, `DeleteAgentAsync()`).
+Making them scoped ensures they live in the same scope as their factory dependency, preventing scope lifetime violations.
+
+**How It Works**:
+```
+AgentFactory (Scoped)
+  → IAgentProviderResolver.Resolve() (Scoped)
+    → Creates nested scope to instantiate scoped providers
+    → Provider maintains reference to its scoped factory
+    → Provider is immediately used and remains valid
+    → Scope disposed after provider creation, but factory reference lives on
+```
+
+**Key Point**: The nested scope in `AgentProviderResolver.Resolve()` is intentional. It's required to resolve scoped services
+from the root provider, but safe because the returned provider instance keeps its scoped factory alive for its entire usage lifetime.
+
+**For Consumers**: No action needed—`AgentFactory` is already scoped via keyed DI (`AddKeyedScoped<IAgentFactory>`),
+so scope hierarchy is automatically correct.
 
 ### Environment Variable Substitution
 
@@ -139,7 +166,7 @@ Values in `agent.config.yaml` support `${VAR_NAME}` syntax for environment varia
 
 ### Exponential Backoff for Indexing
 
-`VectorStoreManager.WaitForFileProcessingAsync` uses configurable polling with exponential backoff controlled by `VectorStoreIndexingOptions`.
+`AzureVectorStoreManager.WaitForFileProcessingAsync` uses configurable polling with exponential backoff controlled by `VectorStoreIndexingOptions`.
 
 ### OpenTelemetry Integration
 

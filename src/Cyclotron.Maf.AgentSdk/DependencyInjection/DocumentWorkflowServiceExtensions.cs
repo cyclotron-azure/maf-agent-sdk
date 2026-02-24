@@ -1,9 +1,13 @@
 using Cyclotron.Maf.AgentSdk.Agents;
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
+using Cyclotron.Maf.AgentSdk.Common.Options;
+using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -15,24 +19,41 @@ public static class DocumentWorkflowServiceExtensions
 {
     /// <summary>
     /// Registers generic workflow-based document services with Azure AI Foundry.
-    /// This includes core services like vector store management, cleanup, and prompt rendering.
+    /// This includes core services like vector store management, cleanup, prompt rendering, and PDF content analysis.
     /// Domain-specific services should be registered via separate extension methods.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddDocumentWorkflowServices(this IServiceCollection services)
     {
-        // Register PersistentAgentsClient factory as scoped service
-        services.AddScoped<IPersistentAgentsClientFactory, PersistentAgentsClientFactory>();
+        // Register HttpClient factory for Ollama and other HTTP-based providers
+        services.AddHttpClient("ollama", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(300); // Default 5 minutes
+        });
 
-        // Register vector store manager (now depends on IPersistentAgentsClientFactory)
-        services.AddScoped<IVectorStoreManager, VectorStoreManager>();
+        // Register provider client factory as scoped service (supports Azure and Ollama)
+        services.AddScoped<IProviderClientFactory, ProviderClientFactory>();
+
+        // Register provider-specific agent factories and resolver
+        // Note: Providers are Transient (not Singleton) to allow safe dependency on scoped IProviderClientFactory
+        services.AddTransient<IAgentProvider, AzureAgentProvider>();
+        services.AddTransient<IAgentProvider, OllamaAgentProvider>();
+        services.AddSingleton<IAgentProviderResolver, AgentProviderResolver>();
+
+        // Note: Vector store services have been moved to the AgentSdk.Vectors package.
+        // To enable vector store functionality, add a reference to AgentSdk.Vectors
+        // and call services.AddVectorStoreServices() in your startup configuration.
+        // See: https://github.com/cyclotron-azure/maf-agent-sdk/tree/main/src/Cyclotron.Maf.AgentSdk.Vectors
 
         // Register Azure Foundry cleanup service
-        services.AddScoped<IAzureFoundryCleanupService, AzureFoundryCleanupService>();
+        services.AddScoped<IAIFoundryCleanupService, AIFoundryCleanupService>();
 
         // Register unified prompt rendering service
         services.AddSingleton<IPromptRenderingService, PromptRenderingService>();
+
+        // Note: PDF services are registered via AddPdfServices() from AgentSdk.Pdf package
+        // PDF services include: IPdfContentAnalyzer, IPdfImageExtractor, IPdfToMarkdownConverter
 
         // Note: Domain-specific executors (FileRead, VectorStore, etc.) should be registered
         // by domain-specific packages (e.g., AgentSdk.HOA)
@@ -64,8 +85,8 @@ public static class DocumentWorkflowServiceExtensions
                     sp.GetRequiredService<IPromptRenderingService>(),
                     sp.GetRequiredService<IOptions<ModelProviderOptions>>(),
                     sp.GetRequiredService<IOptions<AgentOptions>>(),
-                    sp.GetRequiredService<IPersistentAgentsClientFactory>(),
-                    sp.GetRequiredService<IVectorStoreManager>(),
+                    sp.GetRequiredService<IAgentProviderResolver>(),
+                    sp.GetService<VectorStoreManager>(), // Optional - returns null if AgentSdk.Vectors not registered
                     sp.GetRequiredService<IOptions<TelemetryOptions>>()));
         }
 

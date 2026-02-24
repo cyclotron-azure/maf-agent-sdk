@@ -1,6 +1,7 @@
+using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Options;
 using AwesomeAssertions;
-using Xunit;
+using VectorStoreIndexingOptions = Cyclotron.Maf.AgentSdk.VectorStore.Options.VectorStoreIndexingOptions;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Options;
 
@@ -175,6 +176,197 @@ public class ModelProviderDefinitionOptionsTests
         // Assert
         result.Should().BeTrue();
     }
+
+    [Fact(DisplayName = "IsLocalProvider should return true for Ollama provider")]
+    public void IsLocalProvider_OllamaProvider_ReturnsTrue()
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Type = "ollama",
+            Endpoint = "http://localhost:11434",
+            DeploymentName = "llama3"
+        };
+
+        // Act
+        var result = options.IsLocalProvider();
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "IsLocalProvider should return false for Azure providers")]
+    public void IsLocalProvider_AzureProviders_ReturnsFalse()
+    {
+        // Arrange & Act
+        var azureFoundry = new ModelProviderDefinitionOptions { Type = "azure_foundry" };
+        var azureOpenAI = new ModelProviderDefinitionOptions { Type = "azure_openai" };
+
+        // Assert
+        azureFoundry.IsLocalProvider().Should().BeFalse();
+        azureOpenAI.IsLocalProvider().Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "IsLocalProvider should be case insensitive")]
+    public void IsLocalProvider_CaseInsensitive_ReturnsTrue()
+    {
+        // Arrange
+        var ollamaUpper = new ModelProviderDefinitionOptions { Type = "OLLAMA" };
+        var ollamaMixed = new ModelProviderDefinitionOptions { Type = "Ollama" };
+
+        // Act & Assert
+        ollamaUpper.IsLocalProvider().Should().BeTrue();
+        ollamaMixed.IsLocalProvider().Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "ValidateThermodynamicParameters should not throw when both are null")]
+    public void ValidateThermodynamicParameters_BothNull_DoesNotThrow()
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = null,
+            TopP = null
+        };
+
+        // Act
+        var act = () => options.ValidateThermodynamicParameters();
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory(DisplayName = "ValidateThermodynamicParameters should accept valid temperature values")]
+    [InlineData(0.0f)]
+    [InlineData(0.5f)]
+    [InlineData(1.0f)]
+    [InlineData(1.5f)]
+    [InlineData(2.0f)]
+    public void ValidateThermodynamicParameters_ValidTemperature_DoesNotThrow(float temperature)
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = temperature,
+            TopP = null
+        };
+
+        // Act
+        var act = () => options.ValidateThermodynamicParameters();
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory(DisplayName = "ValidateThermodynamicParameters should reject invalid temperature values")]
+    [InlineData(-0.1f)]
+    [InlineData(-1.0f)]
+    [InlineData(2.1f)]
+    [InlineData(3.0f)]
+    public void ValidateThermodynamicParameters_InvalidTemperature_ThrowsArgumentException(float temperature)
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = temperature,
+            TopP = null
+        };
+
+        // Act
+        var act = () => options.ValidateThermodynamicParameters();
+
+        // Assert
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Temperature must be between 0.0 and 2.0*");
+    }
+
+    [Theory(DisplayName = "ValidateThermodynamicParameters should accept valid TopP values")]
+    [InlineData(0.0f)]
+    [InlineData(0.5f)]
+    [InlineData(0.9f)]
+    [InlineData(1.0f)]
+    public void ValidateThermodynamicParameters_ValidTopP_DoesNotThrow(float topP)
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = null,
+            TopP = topP
+        };
+
+        // Act
+        var act = () => options.ValidateThermodynamicParameters();
+
+        // Assert
+        act.Should().NotThrow();
+    }
+
+    [Theory(DisplayName = "ValidateThermodynamicParameters should reject invalid TopP values")]
+    [InlineData(-0.1f)]
+    [InlineData(-0.5f)]
+    [InlineData(1.1f)]
+    [InlineData(2.0f)]
+    public void ValidateThermodynamicParameters_InvalidTopP_ThrowsArgumentException(float topP)
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = null,
+            TopP = topP
+        };
+
+        // Act
+        var act = () => options.ValidateThermodynamicParameters();
+
+        // Assert
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*TopP must be between 0.0 and 1.0*");
+    }
+
+    [Fact(DisplayName = "ValidateThermodynamicParameters should validate both parameters")]
+    public void ValidateThermodynamicParameters_BothInvalid_ThrowsArgumentException()
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = 3.0f,
+            TopP = 1.5f
+        };
+
+        // Act
+        var act = () => options.ValidateThermodynamicParameters();
+
+        // Assert
+        // The method validates Temperature first, so it should throw for Temperature
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Temperature must be between 0.0 and 2.0*");
+    }
+
+    [Fact(DisplayName = "Temperature and TopP properties should be settable")]
+    public void ThermodynamicProperties_SetValues_AreStored()
+    {
+        // Arrange
+        var options = new ModelProviderDefinitionOptions
+        {
+            Temperature = 0.7f,
+            TopP = 0.95f
+        };
+
+        // Assert
+        options.Temperature.Should().Be(0.7f);
+        options.TopP.Should().Be(0.95f);
+    }
+
+    [Fact(DisplayName = "Temperature and TopP should default to null")]
+    public void ThermodynamicProperties_DefaultValues_AreNull()
+    {
+        // Arrange & Act
+        var options = new ModelProviderDefinitionOptions();
+
+        // Assert
+        options.Temperature.Should().BeNull();
+        options.TopP.Should().BeNull();
+    }
 }
 
 /// <summary>
@@ -193,7 +385,6 @@ public class ModelProviderOptionsTests
         options.Providers.Should().NotBeNull();
         options.Providers.Should().BeEmpty();
         options.DefaultProviderName.Should().BeNull();
-        options.VectorStoreIndexing.Should().NotBeNull();
     }
 
     [Fact(DisplayName = "GetDefaultProviderName should return configured default when it exists")]
@@ -264,7 +455,7 @@ public class ModelProviderOptionsTests
         // Arrange
         var options = new ModelProviderOptions
         {
-            Providers = new Dictionary<string, ModelProviderDefinitionOptions>()
+            Providers = []
         };
 
         // Act
@@ -397,8 +588,10 @@ public class AgentDefinitionOptionsTests
         options.AutoCleanupResources.Should().BeFalse();
         options.SystemPromptTemplate.Should().BeNull();
         options.UserPromptTemplate.Should().BeNull();
-        options.AIFrameworkOptions.Should().NotBeNull();
+        options.Provider.Should().Be(string.Empty); // Provider is required and must be set via configuration
         options.Metadata.Should().NotBeNull();
+        options.Temperature.Should().BeNull();
+        options.TopP.Should().BeNull();
     }
 
     [Fact(DisplayName = "Properties should be settable")]
@@ -412,7 +605,9 @@ public class AgentDefinitionOptionsTests
             AutoDelete = false,
             AutoCleanupResources = true,
             SystemPromptTemplate = "You are a {{role}} assistant.",
-            UserPromptTemplate = "Classify the following: {{text}}"
+            UserPromptTemplate = "Classify the following: {{text}}",
+            Temperature = 0.3f,
+            TopP = 0.8f
         };
 
         // Assert
@@ -422,6 +617,36 @@ public class AgentDefinitionOptionsTests
         options.AutoCleanupResources.Should().BeTrue();
         options.SystemPromptTemplate.Should().Be("You are a {{role}} assistant.");
         options.UserPromptTemplate.Should().Be("Classify the following: {{text}}");
+        options.Temperature.Should().Be(0.3f);
+        options.TopP.Should().Be(0.8f);
+    }
+
+    [Fact(DisplayName = "Temperature should override provider-level setting")]
+    public void Temperature_AgentLevel_OverridesProviderLevel()
+    {
+        // Arrange
+        var options = new AgentDefinitionOptions
+        {
+            Type = "classification",
+            Temperature = 0.5f
+        };
+
+        // Assert
+        options.Temperature.Should().Be(0.5f);
+    }
+
+    [Fact(DisplayName = "TopP should override provider-level setting")]
+    public void TopP_AgentLevel_OverridesProviderLevel()
+    {
+        // Arrange
+        var options = new AgentDefinitionOptions
+        {
+            Type = "classification",
+            TopP = 0.9f
+        };
+
+        // Assert
+        options.TopP.Should().Be(0.9f);
     }
 }
 

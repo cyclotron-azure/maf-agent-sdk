@@ -13,7 +13,11 @@ A .NET SDK for building AI agent workflows using **Microsoft Agent Framework (MA
 ### Installation
 
 ```bash
-dotnet add package Cyclotron.Maf.AgentSdk
+# Core SDK
+dotnet add package AgentSdk
+
+# PDF processing extensions (optional)
+dotnet add package AgentSdk.Pdf
 ```
 
 ### Minimal Setup
@@ -41,6 +45,8 @@ providers:
     type: "azure_foundry"
     endpoint: "${PROJECT_ENDPOINT}"
     deployment_name: "${PROJECT_DEPLOYMENT_NAME}"
+    temperature: 0.7
+    top_p: 0.95
 
 agents:
   my_agent:
@@ -48,13 +54,14 @@ agents:
     enabled: true
     auto_delete: true
     auto_cleanup_resources: true
+    temperature: 0.3
+    top_p: 0.8
     metadata:
       description: "My AI agent"
       tools:
         - "file_search"        # Enable document search
         - "code_interpreter"   # Enable code execution (optional)
-    framework_config:
-      provider: "azure_foundry"
+    provider: "azure_foundry"
     system_prompt_template: |
       You are a helpful assistant.
     user_prompt_template: |
@@ -72,27 +79,43 @@ PROJECT_DEPLOYMENT_NAME=gpt-4o
 
 ## ✨ Features
 
+### Core SDK (AgentSdk)
+
 | Feature | Description |
 |---------|-------------|
 | **Workflow Orchestration** | Build sequential executor pipelines using MAF's `Executor<TInput, TOutput>` pattern |
 | **Agent Factory** | Create and manage ephemeral Azure AI Foundry agents with keyed DI support |
 | **Vector Store Management** | Lifecycle management with automatic indexing wait and exponential backoff |
-| **PDF Processing** | Convert PDF documents to markdown using PdfPig for better text extraction |
 | **Prompt Rendering** | Handlebars-based template rendering for dynamic agent prompts |
 | **OpenTelemetry** | Built-in tracing, metrics, and logging with OTLP exporter support |
 | **Configurable Tools** | Enable `file_search` and/or `code_interpreter` via YAML configuration |
+| **Multi-Provider Support** | Azure AI Foundry and Ollama (with reasoning mode, multimodal, and vector store integration) |
+
+### PDF Extensions (AgentSdk.Pdf)
+
+| Feature | Description |
+|---------|-------------|
+| **Content Analysis** | Automatic detection of PDF content type (TextBased, ImageOnly, Mixed) |
+| **Image Extraction** | Extract embedded images and render pages for vision model processing |
+| **Markdown Conversion** | Convert text-based PDFs to markdown using PdfPig with layout detection |
+| **Vision Model Ready** | Base64-encoded images compatible with Azure OpenAI GPT-4 Vision |
+
+See [AgentSdk.Pdf README](src/Cyclotron.Maf.AgentSdk.Pdf/README.md) for PDF processing documentation.
 
 ## 📁 Project Structure
 
 ```text
 maf-agent-sdk/
 ├── src/
-│   └── Cyclotron.Maf.AgentSdk/     # Main SDK library
+│   ├── Cyclotron.Maf.AgentSdk/     # Core SDK library
+│   └── Cyclotron.Maf.AgentSdk.Pdf/ # PDF processing extensions
 ├── samples/
-│   └── SpamDetection/              # Complete working example
+│   └── SpamDetection/              # Complete working example with PDF workflows
 ├── test/
-│   └── Cyclotron.Maf.AgentSdk.UnitTests/
+│   ├── Cyclotron.Maf.AgentSdk.UnitTests/
+│   └── Cyclotron.Maf.AgentSdk.Pdf.UnitTests/
 └── docs/
+    ├── CHANGELOG.md                # Version history and migration guides
     ├── CICD.md                     # CI/CD and versioning
     └── TELEMETRY.md                # Observability setup
 ```
@@ -101,8 +124,17 @@ maf-agent-sdk/
 
 - **[SDK Documentation](src/Cyclotron.Maf.AgentSdk/README.md)** - Detailed API reference and configuration options
 - **[Spam Detection Sample](samples/SpamDetection/README.md)** - Complete working example
+- **[Changelog](docs/CHANGELOG.md)** - Version history and migration guides
 - **[Telemetry Guide](docs/TELEMETRY.md)** - OpenTelemetry setup and configuration
 - **[CI/CD Guide](docs/CICD.md)** - Build pipeline and versioning
+
+### Microsoft Learn Resources
+
+- **[Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/)** - Build AI agents using MAF
+- **[Agent Framework: Get Started](https://learn.microsoft.com/en-us/agent-framework/get-started/)** - Getting started guide
+- **[Agent Framework: Conversations & Sessions](https://learn.microsoft.com/en-us/agent-framework/agents/conversations/)** - Managing agent conversations with sessions
+- **[Azure AI Foundry: Agents](https://learn.microsoft.com/en-us/azure/ai-foundry/agents/)** - Azure AI Foundry agents overview
+- **[Azure AI Foundry: Agent API Reference](https://learn.microsoft.com/en-us/azure/ai-studio/reference/python-sdk/latest/azure.ai.projects.operations.AgentsOperations)** - Agent operations API
 
 ## 📌 Versioning
 
@@ -166,7 +198,7 @@ dotnet run
 │         │    Microsoft Agent Framework (MAF)   │             │
 │         │    ┌─────────────────────────────┐  │             │
 │         │    │  Workflow Executors         │  │             │
-│         │    │  AIAgent / AgentThread      │  │             │
+│         │    │  AIAgent / AgentSession     │  │             │
 │         └────┴─────────────────────────────┴──┘             │
 ├─────────────────────────────────────────────────────────────┤
 │                   Azure AI Foundry                           │

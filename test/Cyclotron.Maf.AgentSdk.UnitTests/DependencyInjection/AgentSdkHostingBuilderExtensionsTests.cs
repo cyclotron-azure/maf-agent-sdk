@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.DependencyInjection;
 

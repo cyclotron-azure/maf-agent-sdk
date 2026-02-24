@@ -1,9 +1,12 @@
 using Cyclotron.Maf.AgentSdk.Models.Workflow;
+using Cyclotron.Maf.AgentSdk.Common.Options;
+using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Options;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Cyclotron.Maf.AgentSdk.Services;
+using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.Workflows.Executors;
 
@@ -15,14 +18,14 @@ namespace Cyclotron.Maf.AgentSdk.Workflows.Executors;
 /// </summary>
 /// <typeparam name="TResult">The workflow result type that implements <see cref="ICleanupableWorkflowResult"/>.</typeparam>
 public class CleanupExecutor<TResult>(
-    IVectorStoreManager vectorStoreManager,
-    IAzureFoundryCleanupService cleanupService,
+    VectorStoreManager? vectorStoreManager,
+    IAIFoundryCleanupService cleanupService,
     ILogger<CleanupExecutor<TResult>> logger,
     IOptions<ModelProviderOptions> providerOptions) : Executor<TResult, TResult>(nameof(CleanupExecutor<TResult>))
     where TResult : ICleanupableWorkflowResult
 {
-    private readonly IVectorStoreManager _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
-    private readonly IAzureFoundryCleanupService _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
+    private readonly VectorStoreManager? _vectorStoreManager = vectorStoreManager; // Optional - can be null if AgentSdk.Vectors not registered
+    private readonly IAIFoundryCleanupService _cleanupService = cleanupService ?? throw new ArgumentNullException(nameof(cleanupService));
     private readonly ILogger<CleanupExecutor<TResult>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ModelProviderOptions _providerOptions = providerOptions?.Value ?? throw new ArgumentNullException(nameof(providerOptions));
 
@@ -34,7 +37,7 @@ public class CleanupExecutor<TResult>(
     {
         _logger.LogInformation(
             "[{ExecutorName}] Starting execution - Input: Action={Action}, FileIds={FileIds}, VectorStoreIds={VectorStoreIds}, AgentIds={AgentIds}",
-            nameof(CleanupExecutor<TResult>),
+            nameof(CleanupExecutor<>),
             result.Action,
             string.Join(", ", result.FileIds),
             string.Join(", ", result.VectorStoreIds),
@@ -48,6 +51,17 @@ public class CleanupExecutor<TResult>(
 
         try
         {
+            // Check if vector store manager is available
+            if (_vectorStoreManager == null)
+            {
+                _logger.LogWarning(
+                    "Vector store cleanup requested but IVectorStoreManager is not registered. " +
+                    "Add AgentSdk.Vectors package and call AddVectorStoreServices() to enable vector store cleanup. " +
+                    "Skipping cleanup of {VectorStoreCount} vector stores.",
+                    result.VectorStoreIds.Count);
+                return result;
+            }
+
             // Delete vector stores created during THIS workflow execution
             // Each workflow creates unique vector stores that must be cleaned up
             // Agents are already deleted by individual executors when AutoDelete=true

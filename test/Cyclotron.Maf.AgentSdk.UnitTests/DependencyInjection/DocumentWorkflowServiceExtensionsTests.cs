@@ -1,12 +1,13 @@
 using Cyclotron.Maf.AgentSdk.Agents;
-using Cyclotron.Maf.AgentSdk.Options;
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
+using Cyclotron.Maf.AgentSdk.Common.Services;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
 using AwesomeAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Xunit;
+using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.DependencyInjection;
 
@@ -18,12 +19,12 @@ public class DocumentWorkflowServiceExtensionsTests
 {
     #region AddDocumentWorkflowServices Tests
 
-    [Fact(DisplayName = "AddDocumentWorkflowServices should register IPersistentAgentsClientFactory as scoped")]
-    public void AddDocumentWorkflowServices_RegistersPersistentAgentsClientFactory()
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register IProviderClientFactory as scoped")]
+    public void AddDocumentWorkflowServices_RegistersProviderClientFactory()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -33,17 +34,17 @@ public class DocumentWorkflowServiceExtensionsTests
 
         // Assert
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetService<IPersistentAgentsClientFactory>();
+        var service = scope.ServiceProvider.GetService<IProviderClientFactory>();
         service.Should().NotBeNull();
-        service.Should().BeOfType<PersistentAgentsClientFactory>();
+        service.Should().BeOfType<ProviderClientFactory>();
     }
 
-    [Fact(DisplayName = "AddDocumentWorkflowServices should register IVectorStoreManager as scoped")]
-    public void AddDocumentWorkflowServices_RegistersVectorStoreManager()
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register IAgentProviderResolver as scoped")]
+    public void AddDocumentWorkflowServices_RegistersAgentProviderResolver()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -52,10 +53,52 @@ public class DocumentWorkflowServiceExtensionsTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Assert
+        // Scoped service must be resolved from a scope
+        using var scope = serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetService<IAgentProviderResolver>();
+        service.Should().NotBeNull();
+        service.Should().BeOfType<AgentProviderResolver>();
+    }
+
+    [Fact(DisplayName = "AddDocumentWorkflowServices should register provider implementations")]
+    public void AddDocumentWorkflowServices_RegistersAgentProviders()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton(CreateTestConfiguration());
+        services.AddLogging();
+        services.AddAgentSdkServices();
+
+        // Act
+        services.AddDocumentWorkflowServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        // Scoped service must be resolved from a scope
+        using var scope = serviceProvider.CreateScope();
+        var providers = scope.ServiceProvider.GetServices<IAgentProvider>().ToArray();
+        providers.Should().NotBeEmpty();
+        providers.Should().Contain(provider => provider is AzureAgentProvider);
+        providers.Should().Contain(provider => provider is OllamaAgentProvider);
+    }
+
+    [Fact(DisplayName = "AddDocumentWorkflowServices does not require IVectorStoreManager (optional)")]
+    public void AddDocumentWorkflowServices_VectorStoreManagerIsOptional()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton(CreateTestConfiguration());
+        services.AddLogging();
+        services.AddAgentSdkServices();
+
+        // Act
+        services.AddDocumentWorkflowServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert - VectorStoreManager is NOT registered, it's optional
         using var scope = serviceProvider.CreateScope();
         var service = scope.ServiceProvider.GetService<IVectorStoreManager>();
-        service.Should().NotBeNull();
-        service.Should().BeOfType<VectorStoreManager>();
+        service.Should().BeNull(); // This is by design - it's optional
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices should register IAzureFoundryCleanupService as scoped")]
@@ -63,7 +106,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -73,9 +116,9 @@ public class DocumentWorkflowServiceExtensionsTests
 
         // Assert
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetService<IAzureFoundryCleanupService>();
+        var service = scope.ServiceProvider.GetService<IAIFoundryCleanupService>();
         service.Should().NotBeNull();
-        service.Should().BeOfType<AzureFoundryCleanupService>();
+        service.Should().BeOfType<AIFoundryCleanupService>();
     }
 
     [Fact(DisplayName = "AddDocumentWorkflowServices should register IPromptRenderingService as singleton")]
@@ -83,7 +126,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -105,7 +148,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -123,7 +166,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
 
@@ -143,7 +186,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -164,7 +207,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -187,7 +230,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -207,7 +250,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -232,7 +275,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -249,7 +292,7 @@ public class DocumentWorkflowServiceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(CreateTestConfiguration());
+        services.AddSingleton(CreateTestConfiguration());
         services.AddLogging();
         services.AddAgentSdkServices();
         services.AddDocumentWorkflowServices();
@@ -274,9 +317,9 @@ public class DocumentWorkflowServiceExtensionsTests
             ["providers:azure_foundry:endpoint"] = "https://test.azure.com",
             ["providers:azure_foundry:deployment_name"] = "gpt-4",
             ["agents:classification_agent:type"] = "classification",
-            ["agents:classification_agent:framework_config:provider"] = "azure_foundry",
+            ["agents:classification_agent:provider"] = "azure_foundry",
             ["agents:extraction_agent:type"] = "extraction",
-            ["agents:extraction_agent:framework_config:provider"] = "azure_foundry"
+            ["agents:extraction_agent:provider"] = "azure_foundry"
         };
 
         return new ConfigurationBuilder()

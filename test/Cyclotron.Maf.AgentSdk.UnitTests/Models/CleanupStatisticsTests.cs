@@ -1,6 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Models;
 using AwesomeAssertions;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Models;
 
@@ -20,8 +19,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 0,
             VectorStoresDeleted = 3,
             VectorStoresFailedToDelete = 0,
-            ThreadsDeleted = 10,
-            ThreadsFailedToDelete = 0,
             AgentsDeleted = 2,
             AgentsFailedToDelete = 0
         };
@@ -30,7 +27,7 @@ public class CleanupStatisticsTests
         var result = statistics.TotalDeleted;
 
         // Assert
-        result.Should().Be(20);
+        result.Should().Be(10);
     }
 
     [Fact(DisplayName = "TotalFailed should sum all failed counts when all are positive")]
@@ -43,8 +40,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 0,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 0,
-            ThreadsFailedToDelete = 3,
             AgentsDeleted = 0,
             AgentsFailedToDelete = 4
         };
@@ -53,7 +48,7 @@ public class CleanupStatisticsTests
         var result = statistics.TotalFailed;
 
         // Assert
-        result.Should().Be(10);
+        result.Should().Be(7);
     }
 
     [Fact(DisplayName = "TotalDeleted should return zero when all counts are zero")]
@@ -83,20 +78,19 @@ public class CleanupStatisticsTests
     }
 
     [Theory(DisplayName = "TotalDeleted should correctly sum individual delete counts")]
-    [InlineData(1, 0, 0, 0, 1)]
-    [InlineData(0, 1, 0, 0, 1)]
-    [InlineData(0, 0, 1, 0, 1)]
-    [InlineData(0, 0, 0, 1, 1)]
-    [InlineData(10, 20, 30, 40, 100)]
+    [InlineData(1, 0,  0, 1)]
+    [InlineData(0, 1, 0, 1)]
+    [InlineData(0, 0,  0, 0)]
+    [InlineData(0, 0,  1, 1)]
+    [InlineData(10, 20,  40, 70)]
     public void TotalDeleted_VariousCombinations_ReturnsCorrectSum(
-        int files, int vectorStores, int threads, int agents, int expected)
+        int files, int vectorStores, int agents, int expected)
     {
         // Arrange
         var statistics = new CleanupStatistics
         {
             FilesDeleted = files,
             VectorStoresDeleted = vectorStores,
-            ThreadsDeleted = threads,
             AgentsDeleted = agents
         };
 
@@ -108,20 +102,19 @@ public class CleanupStatisticsTests
     }
 
     [Theory(DisplayName = "TotalFailed should correctly sum individual failed counts")]
-    [InlineData(1, 0, 0, 0, 1)]
-    [InlineData(0, 1, 0, 0, 1)]
-    [InlineData(0, 0, 1, 0, 1)]
-    [InlineData(0, 0, 0, 1, 1)]
-    [InlineData(5, 10, 15, 20, 50)]
+    [InlineData(1, 0, 0, 1)]
+    [InlineData(0, 1, 0, 1)]
+    [InlineData(0, 0, 1, 1)]
+    [InlineData(0, 0, 0, 0)]
+    [InlineData(5, 10, 15, 30)]
     public void TotalFailed_VariousCombinations_ReturnsCorrectSum(
-        int files, int vectorStores, int threads, int agents, int expected)
+        int files, int vectorStores, int agents, int expected)
     {
         // Arrange
         var statistics = new CleanupStatistics
         {
             FilesFailedToDelete = files,
             VectorStoresFailedToDelete = vectorStores,
-            ThreadsFailedToDelete = threads,
             AgentsFailedToDelete = agents
         };
 
@@ -142,8 +135,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 3,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 10,
-            ThreadsFailedToDelete = 4,
             AgentsDeleted = 2,
             AgentsFailedToDelete = 0
         };
@@ -167,8 +158,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 3,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 10,
-            ThreadsFailedToDelete = 4,
             AgentsDeleted = 2,
             AgentsFailedToDelete = 0
         };
@@ -179,8 +168,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 3,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 10,
-            ThreadsFailedToDelete = 4,
             AgentsDeleted = 2,
             AgentsFailedToDelete = 0
         };
@@ -200,8 +187,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 3,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 10,
-            ThreadsFailedToDelete = 4,
             AgentsDeleted = 2,
             AgentsFailedToDelete = 0
         };
@@ -212,8 +197,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 3,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 10,
-            ThreadsFailedToDelete = 4,
             AgentsDeleted = 2,
             AgentsFailedToDelete = 0
         };
@@ -232,8 +215,6 @@ public class CleanupStatisticsTests
             FilesFailedToDelete = 2,
             VectorStoresDeleted = 4,
             VectorStoresFailedToDelete = 1,
-            ThreadsDeleted = 15,
-            ThreadsFailedToDelete = 5,
             AgentsDeleted = 3,
             AgentsFailedToDelete = 2
         };
@@ -243,8 +224,8 @@ public class CleanupStatisticsTests
         var totalFailed = statistics.TotalFailed;
 
         // Assert
-        totalDeleted.Should().Be(30); // 8 + 4 + 15 + 3
-        totalFailed.Should().Be(10);  // 2 + 1 + 5 + 2
+        totalDeleted.Should().Be(15); // 8 + 4 + 3
+        totalFailed.Should().Be(5);  // 2 + 1 + 2
     }
 
     [Fact(DisplayName = "Default record should have all properties as zero")]
@@ -258,8 +239,6 @@ public class CleanupStatisticsTests
         statistics.FilesFailedToDelete.Should().Be(0);
         statistics.VectorStoresDeleted.Should().Be(0);
         statistics.VectorStoresFailedToDelete.Should().Be(0);
-        statistics.ThreadsDeleted.Should().Be(0);
-        statistics.ThreadsFailedToDelete.Should().Be(0);
         statistics.AgentsDeleted.Should().Be(0);
         statistics.AgentsFailedToDelete.Should().Be(0);
     }

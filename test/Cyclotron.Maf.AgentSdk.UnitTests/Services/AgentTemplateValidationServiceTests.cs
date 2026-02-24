@@ -5,7 +5,6 @@ using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
@@ -247,7 +246,7 @@ public class AgentTemplateValidationServiceTests
         // Arrange - Empty agents dictionary
         var service = new AgentTemplateValidationService(
             _mockPromptService.Object,
-            CreateAgentOptions(new Dictionary<string, AgentDefinitionOptions>()),
+            CreateAgentOptions([]),
             _mockLogger.Object);
 
         // Act

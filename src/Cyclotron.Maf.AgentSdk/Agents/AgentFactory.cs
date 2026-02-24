@@ -1,19 +1,26 @@
+using Cyclotron.Maf.AgentSdk.Agents.Providers;
+using Cyclotron.Maf.AgentSdk.Common.Options;
+using Cyclotron.Maf.AgentSdk.Common.Services;
+using Cyclotron.Maf.AgentSdk.Middleware;
+using Cyclotron.Maf.AgentSdk.Models;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
-using Azure.AI.Agents.Persistent;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Retry;
+using System.Text.Json;
+using VectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.Agents;
 
 /// <summary>
 /// Generic agent factory implementation that creates AI agents using <see cref="IPromptRenderingService"/> for instructions.
 /// Registered as a keyed service with different agent keys.
-/// Resolves model provider configuration from the agent's framework_config.provider reference.
+/// Resolves model provider configuration from the agent's provider reference.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,12 +35,15 @@ public class AgentFactory : IAgentFactory
 {
     private readonly ILogger<AgentFactory> _logger;
     private readonly IPromptRenderingService _promptService;
-    private readonly IPersistentAgentsClientFactory _clientFactory;
-    private readonly IVectorStoreManager _vectorStoreManager;
+    private readonly IAgentProviderResolver _providerResolver;
+    private readonly VectorStoreManager? _vectorStoreManager;
     private readonly ModelProviderOptions _providerOptions;
     private readonly string _agentKey;
     private readonly AgentDefinitionOptions _agentDefinition;
     private readonly TelemetryOptions _telemetryOptions;
+    private string? _createdAgentName;
+    private string? _createdAgentVersion;
+    private IDisposable? _providerClientDisposable;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AgentFactory"/> class.
@@ -43,8 +53,8 @@ public class AgentFactory : IAgentFactory
     /// <param name="promptService">The service for rendering agent prompts.</param>
     /// <param name="providerOptions">The model provider configuration options.</param>
     /// <param name="agentOptions">The agent configuration options.</param>
-    /// <param name="clientFactory">The factory for creating Azure AI Foundry clients.</param>
-    /// <param name="vectorStoreManager">The manager for vector store operations.</param>
+    /// <param name="providerResolver">Resolver for provider-specific agent factories.</param>
+    /// <param name="vectorStoreManager">Optional manager for vector store operations. If null, vector store functionality will be disabled.</param>
     /// <param name="telemetryOptions">The telemetry configuration options.</param>
     /// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
     public AgentFactory(
@@ -53,15 +63,15 @@ public class AgentFactory : IAgentFactory
         IPromptRenderingService promptService,
         IOptions<ModelProviderOptions> providerOptions,
         IOptions<AgentOptions> agentOptions,
-        IPersistentAgentsClientFactory clientFactory,
-        IVectorStoreManager vectorStoreManager,
+        IAgentProviderResolver providerResolver,
+        VectorStoreManager? vectorStoreManager,
         IOptions<TelemetryOptions> telemetryOptions)
     {
         _agentKey = agentKey ?? throw new ArgumentNullException(nameof(agentKey));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
-        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
-        _vectorStoreManager = vectorStoreManager ?? throw new ArgumentNullException(nameof(vectorStoreManager));
+        _providerResolver = providerResolver ?? throw new ArgumentNullException(nameof(providerResolver));
+        _vectorStoreManager = vectorStoreManager; // Optional - can be null
 
         ArgumentNullException.ThrowIfNull(providerOptions, nameof(providerOptions));
         ArgumentNullException.ThrowIfNull(agentOptions, nameof(agentOptions));
@@ -99,7 +109,7 @@ public class AgentFactory : IAgentFactory
     public AIAgent? Agent { get; private set; }
 
     /// <inheritdoc/>
-    public AgentThread? Thread { get; private set; }
+    public AgentSession? Session { get; private set; }
 
     /// <inheritdoc/>
     public string? VectorStoreId { get; private set; }
@@ -112,7 +122,7 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <inheritdoc/>
-    public async Task<AgentRunResponse> RunAgentWithPollingAsync(
+    public async Task<AgentResponse> RunAgentWithPollingAsync(
         IList<ChatMessage> messages,
         int pollingIntervalSeconds = 2,
         int maxRetries = 10,
@@ -124,9 +134,9 @@ public class AgentFactory : IAgentFactory
             throw new InvalidOperationException("Agent must be created before running. Call CreateAgentAsync first.");
         }
 
-        if (Thread == null)
+        if (Session == null)
         {
-            throw new InvalidOperationException("Thread must be created before running. Call CreateAgentAsync first.");
+            throw new InvalidOperationException("Session must be created before running. Call CreateAgentAsync first.");
         }
 
         _logger.LogDebug(
@@ -137,10 +147,10 @@ public class AgentFactory : IAgentFactory
             maxRetries);
 
         // Configure Polly retry pipeline with exponential backoff
-        var retryPipeline = new ResiliencePipelineBuilder<AgentRunResponse>()
-            .AddRetry(new RetryStrategyOptions<AgentRunResponse>
+        var retryPipeline = new ResiliencePipelineBuilder<AgentResponse>()
+            .AddRetry(new RetryStrategyOptions<AgentResponse>()
             {
-                ShouldHandle = new PredicateBuilder<AgentRunResponse>()
+                ShouldHandle = new PredicateBuilder<AgentResponse>()
                     .HandleResult(response => IsEmptyResponse(response)),
                 MaxRetryAttempts = maxRetries,
                 Delay = TimeSpan.FromSeconds(retryDelaySeconds),
@@ -168,11 +178,12 @@ public class AgentFactory : IAgentFactory
             // Initial agent run
             var agentResponse = await Agent.RunAsync(
                 messages,
-                thread: Thread,
-                options: options,
+                Session,
+                options,
                 cancellationToken: ct);
 
             // Poll until the response is complete
+            #pragma warning disable MEAI001
             while (agentResponse.ContinuationToken is { } token)
             {
                 // Wait before polling again
@@ -185,8 +196,9 @@ public class AgentFactory : IAgentFactory
                     _agentKey,
                     token);
 
-                agentResponse = await Agent.RunAsync(Thread, options, cancellationToken: ct);
+                agentResponse = await Agent.RunAsync(Session, options, cancellationToken: ct);
             }
+            #pragma warning restore MEAI001
 
             return agentResponse;
         }, cancellationToken);
@@ -203,18 +215,147 @@ public class AgentFactory : IAgentFactory
     /// Determines if an agent response is considered empty.
     /// A response is empty if no continuation occurred and all message texts are empty or whitespace.
     /// </summary>
-    private static bool IsEmptyResponse(AgentRunResponse response)
+    private static bool IsEmptyResponse(AgentResponse response)
     {
         // If there's a continuation token, the response is not considered empty (still processing)
+        #pragma warning disable MEAI001
         if (response.ContinuationToken != null)
         {
             return false;
         }
+        #pragma warning restore MEAI001
 
         // Check if response has no messages or all messages have empty text
         return response.Messages != null &&
                response.Messages.Count > 0 &&
                response.Messages.All(m => string.IsNullOrWhiteSpace(m.Text));
+    }
+
+    /// <inheritdoc/>
+    public async Task<IStructuredOutputAgentResponse<T>> RunAgentWithPollingAsync<T>(
+        IList<ChatMessage> messages,
+        int pollingIntervalSeconds = 2,
+        int maxRetries = 10,
+        int retryDelaySeconds = 20,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug(
+            "Running {AgentKey} agent with structured output deserialization to type '{TargetType}'",
+            _agentKey,
+            typeof(T).FullName);
+
+        // Run the agent and get the base response
+        var response = await RunAgentWithPollingAsync(messages, pollingIntervalSeconds, maxRetries, retryDelaySeconds, cancellationToken);
+
+        // Deserialize and return the typed result wrapped with original response
+        return DeserializeStructuredResponse<T>(response);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IStructuredOutputAgentResponse<T>> RunAgentWithPollingAsync<T>(
+        string userPrompt,
+        int pollingIntervalSeconds = 2,
+        int maxRetries = 10,
+        int retryDelaySeconds = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(userPrompt))
+        {
+            throw new ArgumentException("User prompt cannot be null or empty", nameof(userPrompt));
+        }
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, userPrompt) };
+        return await RunAgentWithPollingAsync<T>(messages, pollingIntervalSeconds, maxRetries, retryDelaySeconds, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deserializes the agent response text into a structured output response wrapper.
+    /// Preserves the original response while also providing the deserialized typed result.
+    /// </summary>
+    /// <typeparam name="T">The type to deserialize into.</typeparam>
+    /// <param name="response">The base agent response with JSON text.</param>
+    /// <returns>A structured output response containing both the deserialized result and original response.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if deserialization fails.</exception>
+    private IStructuredOutputAgentResponse<T> DeserializeStructuredResponse<T>(AgentResponse response)
+    {
+        try
+        {
+            var responseText = response.Text;
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                throw new InvalidOperationException(
+                    $"Agent '{_agentKey}' returned an empty response. Cannot deserialize to {typeof(T).Name}.");
+            }
+
+            // Strip markdown code fences if present (e.g., ```json ... ```)
+            responseText = StripMarkdownCodeFences(responseText);
+
+            _logger.LogDebug(
+                "Deserializing structured response for {AgentKey} into type '{TargetType}'",
+                _agentKey,
+                typeof(T).FullName);
+
+            var result = JsonSerializer.Deserialize<T>(responseText, JsonSerializerOptions.Web)
+                ?? throw new InvalidOperationException(
+                    $"Deserialization of response into {typeof(T).Name} resulted in null.");
+
+            _logger.LogInformation(
+                "Successfully deserialized structured response for {AgentKey} into type '{TargetType}'",
+                _agentKey,
+                typeof(T).FullName);
+
+            return new StructuredOutputAgentResponse<T>(result, response);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to deserialize structured response for {AgentKey} into type '{TargetType}'. Response text: {ResponseText}",
+                _agentKey,
+                typeof(T).FullName,
+                response.Text);
+            throw new InvalidOperationException(
+                $"Failed to deserialize agent response into {typeof(T).Name}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Strips markdown code fences from text if present.
+    /// Handles both ```json and ``` fences.
+    /// </summary>
+    /// <param name="text">The text that may contain markdown code fences.</param>
+    /// <returns>The text with code fences removed.</returns>
+    private static string StripMarkdownCodeFences(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        text = text.Trim();
+
+        // Check if text starts with ``` (with optional language identifier like json, xml, etc.)
+        if (text.StartsWith("```"))
+        {
+            // Find the end of the first line (which contains the opening fence and optional language)
+            var firstLineEnd = text.IndexOf('\n');
+            if (firstLineEnd > 0)
+            {
+                // Remove the first line
+                text = text.Substring(firstLineEnd + 1);
+            }
+
+            // Remove trailing ``` if present
+            if (text.TrimEnd().EndsWith("```"))
+            {
+                var lastFenceIndex = text.LastIndexOf("```");
+                text = text.Substring(0, lastFenceIndex);
+            }
+
+            text = text.Trim();
+        }
+
+        return text;
     }
 
     /// <inheritdoc/>
@@ -227,13 +368,21 @@ public class AgentFactory : IAgentFactory
             throw new ArgumentException("Vector store ID cannot be null or empty", nameof(vectorStoreId));
         }
 
-        // Get provider configuration from agent's framework_config
-        var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
+        if (_vectorStoreManager == null)
         {
             throw new InvalidOperationException(
-                $"Provider '{providerName}' referenced by agent '{_agentKey}' not found in configuration. " +
-                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
+                "IVectorStoreManager is not registered. Vector store functionality requires the AgentSdk.Vectors package. " +
+                "Add a package reference to AgentSdk.Vectors and call AddVectorStoreServices() in your startup configuration.");
+        }
+
+        var providerName = _agentDefinition.Provider;
+        var provider = GetProviderDefinition(providerName);
+        var providerImplementation = _providerResolver.Resolve(provider);
+        if (!providerImplementation.Capabilities.SupportsVectorStore)
+        {
+            throw new InvalidOperationException(
+                $"Provider '{providerName}' does not support vector store agents. " +
+                "Use CreateAgentAsync without a vector store for local providers.");
         }
 
         _logger.LogInformation(
@@ -246,77 +395,99 @@ public class AgentFactory : IAgentFactory
         // Get system prompt (instructions) from prompt rendering service
         var instructions = _promptService.RenderSystemPrompt(_agentKey);
 
-        // Configure tool resources and definitions based on agent metadata configuration
-        var (toolResources, toolDefinitions) = BuildToolConfiguration(vectorStoreId);
+        // Configure tools based on agent metadata configuration
+        var tools = BuildToolConfiguration(vectorStoreId);
 
-        // Create ephemeral agent with unique name
-        var namePrefix = _promptService.GetAgentNamePrefix(_agentKey);
-        var agentName = $"{namePrefix}-{Guid.NewGuid().ToString("N")[..8]}";
+        // Resolve structured output configuration if specified
+        var structuredOutput = ResolveStructuredOutput();
 
-        try
-        {
-            _logger.LogDebug(
-                "Creating {AgentKey} agent with name: {AgentName}, provider: {ProviderName}, model: {Model}, tools: [{Tools}]",
-                _agentKey,
-                agentName,
-                providerName,
-                provider.GetEffectiveModel(),
-                string.Join(", ", _agentDefinition.Metadata.Tools));
+        // Resolve temperature and top_p parameters (agent-level overrides provider-level)
+        var (temperature, topP) = ResolveThermodynamicParameters();
 
-            // Get provider-specific client
-            var client = _clientFactory.GetClient(providerName);
+        var creationRequest = new AgentProviderCreationRequest(
+            _agentKey,
+            providerName,
+            provider,
+            vectorStoreId,
+            tools,
+            instructions,
+            _promptService.GetAgentNamePrefix(_agentKey),
+            _agentDefinition.Version,
+            structuredOutput,
+            temperature,
+            topP);
 
-            var agentResponse = await client.Administration.CreateAgentAsync(
-                model: provider.GetEffectiveModel(),
-                name: agentName,
-                instructions: instructions,
-                tools: toolDefinitions,
-                toolResources: toolResources,
-                cancellationToken: cancellationToken);
+        var providerResult = await providerImplementation
+            .CreateAgentAsync(creationRequest, cancellationToken)
+            .ConfigureAwait(false);
 
-            var agentId = agentResponse.Value.Id;
+        _providerClientDisposable = providerResult.ProviderClientDisposable;
+        _createdAgentName = providerResult.CreatedAgentName;
+        _createdAgentVersion = providerResult.CreatedAgentVersion;
 
-            _logger.LogInformation(
-                "Created {AgentKey} agent: {AgentId} (Name: {AgentName}, Provider: {ProviderName})",
-                _agentKey,
-                agentId,
-                agentName,
-                providerName);
+        var agent = ApplyMiddleware(providerResult.Agent);
+        Agent = agent;
+        Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        VectorStoreId = vectorStoreId;
+        _logger.LogDebug("Created session for {AgentKey} agent: {AgentId}", _agentKey, agent.Id);
 
+        return agent;
+    }
 
-            // Convert to MAF AIAgent for workflow compatibility
-            AIAgent agent = await client.GetAIAgentAsync(agentId, cancellationToken: cancellationToken);
+    /// <inheritdoc/>
+    public async Task<AIAgent> CreateAgentAsync(CancellationToken cancellationToken = default)
+    {
+        var providerName = _agentDefinition.Provider;
+        var provider = GetProviderDefinition(providerName);
+        var providerImplementation = _providerResolver.Resolve(provider);
 
-            if (_telemetryOptions.Enabled && !string.IsNullOrWhiteSpace(_telemetryOptions.SourceName))
-            {
-                agent = agent.AsBuilder()
-                    .UseOpenTelemetry(
-                        _telemetryOptions.SourceName,
-                        configure =>
-                        {
-                            configure.EnableSensitiveData = _telemetryOptions.EnableSensitiveData;
-                        })
-                    .Build();
-            }
+        _logger.LogInformation(
+            "Creating {AgentKey} agent WITHOUT vector store with provider '{ProviderName}' (Endpoint: {Endpoint}, Model: {Model})",
+            _agentKey,
+            providerName,
+            provider.Endpoint,
+            provider.GetEffectiveModel());
 
-            // Store agent and create thread automatically
-            Agent = agent;
-            Thread = agent.GetNewThread();
-            VectorStoreId = vectorStoreId;
-            _logger.LogDebug("Created thread for {AgentKey} agent: {AgentId}", _agentKey, agentId);
+        // Get system prompt (instructions) from prompt rendering service
+        var instructions = _promptService.RenderSystemPrompt(_agentKey);
 
-            return agent;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Failed to create {AgentKey} agent with provider '{ProviderName}'",
-                _agentKey,
-                providerName);
+        // No tools configuration for agents without vector stores (e.g., Ollama)
+        // (BuildToolConfiguration returns List<AITool>, but we don't call it here)
 
-            throw;
-        }
+        // Resolve structured output configuration if specified
+        var structuredOutput = ResolveStructuredOutput();
+
+        // Resolve temperature and top_p parameters (agent-level overrides provider-level)
+        var (temperature, topP) = ResolveThermodynamicParameters();
+
+        var creationRequest = new AgentProviderCreationRequest(
+            _agentKey,
+            providerName,
+            provider,
+            null,
+            [],
+            instructions,
+            _promptService.GetAgentNamePrefix(_agentKey),
+            _agentDefinition.Version,
+            structuredOutput,
+            temperature,
+            topP);
+
+        var providerResult = await providerImplementation
+            .CreateAgentAsync(creationRequest, cancellationToken)
+            .ConfigureAwait(false);
+
+        _providerClientDisposable = providerResult.ProviderClientDisposable;
+        _createdAgentName = providerResult.CreatedAgentName;
+        _createdAgentVersion = providerResult.CreatedAgentVersion;
+
+        var agent = ApplyMiddleware(providerResult.Agent);
+        Agent = agent;
+        Session = await agent.CreateSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        VectorStoreId = null; // No vector store for this agent
+        _logger.LogDebug("Created session for {AgentKey} agent: {AgentId} (no vector store)", _agentKey, agent.Id);
+
+        return agent;
     }
 
     /// <inheritdoc/>
@@ -328,69 +499,99 @@ public class AgentFactory : IAgentFactory
             return;
         }
 
-        var agentId = Agent.Id;
-
         try
         {
-            var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-            var client = _clientFactory.GetClient(providerName);
-            await client.Administration.DeleteAgentAsync(agentId, cancellationToken);
-            _logger.LogDebug("Deleted {AgentKey} agent: {AgentId}", _agentKey, agentId);
+            var providerName = _agentDefinition.Provider;
+            var provider = GetProviderDefinition(providerName);
+            var providerImplementation = _providerResolver.Resolve(provider);
+
+            if (!providerImplementation.Capabilities.SupportsAgentDeletion)
+            {
+                _logger.LogDebug("Skipping agent deletion for provider '{ProviderName}'", providerName);
+                return;
+            }
+
+            var deletionRequest = new AgentProviderDeletionRequest(
+                _agentKey,
+                providerName,
+                provider,
+                Agent,
+                _createdAgentName,
+                _createdAgentVersion);
+
+            await providerImplementation
+                .DeleteAgentAsync(deletionRequest, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete {AgentKey} agent: {AgentId}", _agentKey, agentId);
+            _logger.LogWarning(ex, "Failed to delete {AgentKey} agent: {AgentId}", _agentKey, Agent.Id);
         }
         finally
         {
             Agent = null;
+            _createdAgentName = null;
+            _createdAgentVersion = null;
         }
     }
 
     /// <inheritdoc/>
-    public async Task DeleteThreadAsync(CancellationToken cancellationToken = default)
+    public async Task DeleteSessionAsync(CancellationToken cancellationToken = default)
     {
-        if (Thread == null)
+        if (Session == null)
         {
-            _logger.LogDebug("No thread to delete");
+            _logger.LogDebug("No session to delete");
             return;
         }
 
         try
         {
-            // Cast to ChatClientAgentThread to access ConversationId
-            var typedThread = Thread as ChatClientAgentThread;
-            if (typedThread?.ConversationId == null)
+            var providerName = _agentDefinition.Provider;
+            var provider = GetProviderDefinition(providerName);
+            var providerImplementation = _providerResolver.Resolve(provider);
+
+            if (!providerImplementation.Capabilities.SupportsSessionDeletion)
             {
-                _logger.LogWarning("Thread does not have a ConversationId, cannot delete");
+                _logger.LogDebug("Skipping session deletion for provider '{ProviderName}'", providerName);
                 return;
             }
 
-            var providerName = _agentDefinition.AIFrameworkOptions.Provider;
-            var client = _clientFactory.GetClient(providerName);
-            await client.Threads.DeleteThreadAsync(typedThread.ConversationId, cancellationToken);
+            var deletionRequest = new AgentProviderSessionDeletionRequest(
+                _agentKey,
+                providerName,
+                provider,
+                Session);
 
-            _logger.LogDebug("Deleted {AgentKey} thread: {ThreadId}", _agentKey, typedThread.ConversationId);
+            await providerImplementation
+                .DeleteSessionAsync(deletionRequest, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete {AgentKey} thread", _agentKey);
+            _logger.LogWarning(ex, "Failed to delete {AgentKey} session", _agentKey);
         }
         finally
         {
-            Thread = null;
+            Session = null;
         }
     }
 
     /// <inheritdoc/>
     public async Task CleanupAsync(CancellationToken cancellationToken = default)
     {
-        // Cleanup agent and thread if AutoDelete is enabled
+        // Cleanup agent and session if AutoDelete is enabled
         if (_agentDefinition.AutoDelete)
         {
-            await DeleteThreadAsync(cancellationToken);
-            await DeleteAgentAsync(cancellationToken);
-            _logger.LogInformation("Cleaned up {AgentKey} agent and thread", _agentKey);
+            try
+            {
+                await DeleteSessionAsync(cancellationToken);
+                await DeleteAgentAsync(cancellationToken);
+                _logger.LogInformation("Cleaned up {AgentKey} agent and session", _agentKey);
+            }
+            finally
+            {
+                DisposeProviderClient();
+            }
         }
         else
         {
@@ -398,9 +599,9 @@ public class AgentFactory : IAgentFactory
         }
 
         // Cleanup vector store if AutoCleanupResources is enabled
-        if (_agentDefinition.AutoCleanupResources && !string.IsNullOrWhiteSpace(VectorStoreId))
+        if (_agentDefinition.AutoCleanupResources && !string.IsNullOrWhiteSpace(VectorStoreId) && _vectorStoreManager != null)
         {
-            var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+            var providerName = _agentDefinition.Provider;
             _logger.LogInformation(
                 "Cleaning up vector store for {AgentKey}: {VectorStoreId}",
                 _agentKey,
@@ -429,6 +630,11 @@ public class AgentFactory : IAgentFactory
                 VectorStoreId = null;
             }
         }
+        else if (_agentDefinition.AutoCleanupResources && _vectorStoreManager == null)
+        {
+            _logger.LogWarning(
+                "Vector store cleanup requested but IVectorStoreManager is not registered. Add AgentSdk.Vectors package and call AddVectorStoreServices() to enable vector store support.");
+        }
         else if (_agentDefinition.AutoCleanupResources)
         {
             _logger.LogDebug("No vector store to clean up for {AgentKey}", _agentKey);
@@ -441,25 +647,52 @@ public class AgentFactory : IAgentFactory
         }
     }
 
+    private void DisposeProviderClient()
+    {
+        if (_providerClientDisposable == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _providerClientDisposable.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose provider client for {AgentKey}", _agentKey);
+        }
+        finally
+        {
+            _providerClientDisposable = null;
+        }
+    }
+
     /// <summary>
     /// Builds the tool configuration based on the agent's metadata.tools configuration.
-    /// Supports "file_search" and "code_interpreter" tools.
+    /// Supports "file_search" and "code_interpreter" tools using V2 API patterns.
     /// </summary>
     /// <param name="vectorStoreId">The vector store ID to associate with file search tool.</param>
-    /// <returns>A tuple containing the tool resources and tool definitions.</returns>
-    private (ToolResources toolResources, IEnumerable<ToolDefinition> toolDefinitions) BuildToolConfiguration(string vectorStoreId)
+    /// <returns>A list of tools for the agent.</returns>
+    private List<AITool> BuildToolConfiguration(string vectorStoreId)
     {
-        var toolResources = new ToolResources();
-        var toolDefinitions = new List<ToolDefinition>();
+        var tools = new List<AITool>();
         var configuredTools = _agentDefinition.Metadata.Tools;
 
-        // Default to file_search if no tools are configured
-        if (configuredTools.Count == 0)
+        // Default to file_search if no tools are configured and vector store manager is available
+        if (configuredTools.Count == 0 && _vectorStoreManager != null)
         {
             _logger.LogDebug(
                 "No tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
             configuredTools = ["file_search"];
+        }
+        else if (configuredTools.Count == 0)
+        {
+            _logger.LogDebug(
+                "No tools configured for {AgentKey} and vector store manager not available - no tools will be added",
+                _agentKey);
+            return tools;
         }
 
         foreach (var tool in configuredTools)
@@ -467,15 +700,23 @@ public class AgentFactory : IAgentFactory
             switch (tool.ToLowerInvariant())
             {
                 case "file_search":
-                    toolResources.FileSearch = new FileSearchToolResource();
-                    toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
-                    toolDefinitions.Add(new FileSearchToolDefinition());
-                    _logger.LogDebug("Configured file_search tool for {AgentKey}", _agentKey);
+                    if (_vectorStoreManager == null)
+                    {
+                        _logger.LogWarning(
+                            "file_search tool requested for {AgentKey} but IVectorStoreManager is not registered. " +
+                            "Add AgentSdk.Vectors package and call AddVectorStoreServices() to enable vector store support. Skipping file_search tool.",
+                            _agentKey);
+                        continue;
+                    }
+                    var fileSearchTool = new HostedFileSearchTool();
+                    fileSearchTool.Inputs ??= [];
+                    fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+                    tools.Add(fileSearchTool);
+                    _logger.LogDebug("Configured file_search tool for {AgentKey} with vector store {VectorStoreId}", _agentKey, vectorStoreId);
                     break;
 
                 case "code_interpreter":
-                    toolResources.CodeInterpreter = new CodeInterpreterToolResource();
-                    toolDefinitions.Add(new CodeInterpreterToolDefinition());
+                    tools.Add(new HostedCodeInterpreterTool());
                     _logger.LogDebug("Configured code_interpreter tool for {AgentKey}", _agentKey);
                     break;
 
@@ -488,29 +729,86 @@ public class AgentFactory : IAgentFactory
             }
         }
 
-        // Ensure at least one tool is configured
-        if (toolDefinitions.Count == 0)
+        // Only ensure at least one tool if vector store manager is available
+        if (tools.Count == 0 && _vectorStoreManager != null && configuredTools.Any(t => t.Equals("file_search", StringComparison.OrdinalIgnoreCase)))
         {
             _logger.LogWarning(
                 "No valid tools configured for {AgentKey}, defaulting to file_search",
                 _agentKey);
-            toolResources.FileSearch = new FileSearchToolResource();
-            toolResources.FileSearch.VectorStoreIds.Add(vectorStoreId);
-            toolDefinitions.Add(new FileSearchToolDefinition());
+            var fileSearchTool = new HostedFileSearchTool();
+            if (fileSearchTool.Inputs == null)
+            {
+                fileSearchTool.Inputs = [];
+            }
+            fileSearchTool.Inputs.Add(new HostedVectorStoreContent(vectorStoreId));
+            tools.Add(fileSearchTool);
         }
 
-        return (toolResources, toolDefinitions);
+        return tools;
+    }
+
+    private StructuredOutputConfiguration? ResolveStructuredOutput()
+    {
+        if (string.IsNullOrWhiteSpace(_agentDefinition.StructuredOutputType))
+        {
+            return null;
+        }
+
+        try
+        {
+            _logger.LogDebug(
+                "Resolving structured output type '{StructuredOutputType}' for {AgentKey}",
+                _agentDefinition.StructuredOutputType,
+                _agentKey);
+
+            var config = StructuredOutputConfiguration.FromTypeName(_agentDefinition.StructuredOutputType);
+
+            _logger.LogInformation(
+                "Resolved structured output type '{StructuredOutputType}' (CLR Type: {ClrType}) for {AgentKey}",
+                _agentDefinition.StructuredOutputType,
+                config.OutputType.FullName,
+                _agentKey);
+
+            return config;
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to resolve structured output type '{StructuredOutputType}' for {AgentKey}",
+                _agentDefinition.StructuredOutputType,
+                _agentKey);
+            throw;
+        }
+    }
+
+    private (float? Temperature, float? TopP) ResolveThermodynamicParameters()
+    {
+        // Agent-level settings override provider-level settings
+        var temperature = _agentDefinition.Temperature ?? _providerOptions.Providers[_agentDefinition.Provider].Temperature;
+        var topP = _agentDefinition.TopP ?? _providerOptions.Providers[_agentDefinition.Provider].TopP;
+
+        if (temperature.HasValue || topP.HasValue)
+        {
+            _logger.LogDebug(
+                "Resolved thermodynamic parameters for {AgentKey}: Temperature={Temperature}, TopP={TopP}",
+                _agentKey,
+                temperature?.ToString("F2") ?? "null",
+                topP?.ToString("F2") ?? "null");
+        }
+
+        return (temperature, topP);
     }
 
     private void ValidateProviderReference()
     {
-        var providerName = _agentDefinition.AIFrameworkOptions.Provider;
+        var providerName = _agentDefinition.Provider;
 
         if (string.IsNullOrWhiteSpace(providerName))
         {
             throw new InvalidOperationException(
-                $"Agent '{_agentKey}' does not have a provider configured in framework_config.provider. " +
-                $"Please specify a provider reference in agent.config.yaml.");
+                $"Agent '{_agentKey}' does not have a provider configured. " +
+                $"Please specify a provider reference in agent.config.yaml using the 'provider' property.");
         }
 
         if (!_providerOptions.Providers.ContainsKey(providerName))
@@ -520,6 +818,39 @@ public class AgentFactory : IAgentFactory
                 $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}. " +
                 $"Please add '{providerName}' to the providers: section in agent.config.yaml.");
         }
+    }
+
+    private ModelProviderDefinitionOptions GetProviderDefinition(string providerName)
+    {
+        if (!_providerOptions.Providers.TryGetValue(providerName, out var provider))
+        {
+            throw new InvalidOperationException(
+                $"Provider '{providerName}' referenced by agent '{_agentKey}' not found in configuration. " +
+                $"Available providers: {string.Join(", ", _providerOptions.Providers.Keys)}");
+        }
+
+        return provider;
+    }
+
+    /// <summary>
+    /// Applies middleware to the agent using centralized middleware helper.
+    /// Combines legacy TelemetryOptions with new MiddlewareConfiguration.
+    /// </summary>
+    private AIAgent ApplyMiddleware(AIAgent agent)
+    {
+        // Build middleware configuration from agent definition and telemetry options
+        var middlewareConfig = _agentDefinition.Middleware ?? new MiddlewareConfiguration();
+
+        // If TelemetryOptions are enabled, add/override OpenTelemetry configuration
+        if (_telemetryOptions.Enabled && !string.IsNullOrWhiteSpace(_telemetryOptions.SourceName))
+        {
+            middlewareConfig.OpenTelemetryOptions = new AgentOpenTelemetryOptions(
+                _telemetryOptions.SourceName,
+                configure => configure.EnableSensitiveData = _telemetryOptions.EnableSensitiveData);
+        }
+
+        // Apply middleware using centralized helper
+        return AgentMiddlewareHelper.ApplyMiddleware(agent, middlewareConfig, services: null);
     }
 
     private AgentDefinitionOptions GetAgentDefinition(AgentOptions agentOptions, string agentKey)
@@ -548,4 +879,5 @@ public class AgentFactory : IAgentFactory
             AutoDelete = true
         };
     }
+
 }

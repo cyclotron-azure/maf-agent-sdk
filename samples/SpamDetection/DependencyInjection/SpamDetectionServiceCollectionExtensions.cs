@@ -1,9 +1,6 @@
-using Cyclotron.Maf.AgentSdk.Agents;
-using Cyclotron.Maf.AgentSdk.Options;
-using Cyclotron.Maf.AgentSdk.Services;
-using Cyclotron.Maf.AgentSdk.Services.Impl;
-using Microsoft.Extensions.Options;
 using SpamDetection;
+using SpamDetection.Services;
+using SpamDetection.Services.Impl;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -19,41 +16,77 @@ public static class SpamDetectionServiceCollectionExtensions
     /// <param name="services">The service collection to configure.</param>
     public static void ConfigureServices(HostBuilderContext hostBuilder, IServiceCollection services)
     {
-        // Add core AgentSdk services
+        // Add core AgentSdk services (registers ModelProviderOptions)
         services.AddAgentSdkServices();
 
-        // Register prompt rendering service
-        services.AddSingleton<IPromptRenderingService, PromptRenderingService>();
+        // Add vector store services from the Vectors package
+        services.AddVectorStoreServices();
 
-        // Register the persistent agents client factory
-        services.AddSingleton<IPersistentAgentsClientFactory, PersistentAgentsClientFactory>();
+        // Add IVectorStoreManager service (requires ModelProviderOptions to be registered)
+        services.AddVectorStoreManagerService();
 
-        // Register the vector store manager
-        services.AddSingleton<IVectorStoreManager, VectorStoreManager>();
+        // Add document workflow services (includes prompt rendering, PDF services, etc.)
+        services.AddDocumentWorkflowServices();
 
-        // Register the spam detector agent factory as a keyed service
-        services.AddKeyedSingleton<IAgentFactory>("spam_detector", (sp, key) =>
-        {
-            var logger = sp.GetRequiredService<ILogger<AgentFactory>>();
-            var promptService = sp.GetRequiredService<IPromptRenderingService>();
-            var providerOptions = sp.GetRequiredService<IOptions<ModelProviderOptions>>();
-            var agentOptions = sp.GetRequiredService<IOptions<AgentOptions>>();
-            var clientFactory = sp.GetRequiredService<IPersistentAgentsClientFactory>();
-            var vectorStoreManager = sp.GetRequiredService<IVectorStoreManager>();
-            var telemetryOptions = sp.GetRequiredService<IOptions<TelemetryOptions>>();
+        // Register spam detection services
+        services.AddSpamDetectionServices();
 
-            return new AgentFactory(
-                key as string ?? "spam_detector",
-                logger,
-                promptService,
-                providerOptions,
-                agentOptions,
-                clientFactory,
-                vectorStoreManager,
-                telemetryOptions);
-        });
+        // Register invoice extraction services
+        services.AddInvoiceExtractionServices();
 
         // Register the main application entry point
         services.AddScoped<IMain, Main>();
     }
+
+    /// <summary>
+    /// Configures all services required for the spam detection workflow, including both Azure AI Foundry and Ollama implementations.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddSpamDetectionServices(this IServiceCollection services)
+    {
+        // Register keyed agent factories for both Azure and Ollama spam detectors
+        services.AddKeyedAgentFactories("spam_detector");          // Azure AI Foundry
+        services.AddKeyedAgentFactories("spam_detector_ollama");   // Ollama local
+
+        // Register provider strategies (Azure uses vector stores, Ollama does not)
+        services.AddScoped<ISpamProviderStrategy, AzureSpamProviderStrategy>();
+        services.AddScoped<ISpamProviderStrategy, OllamaSpamProviderStrategy>();
+
+        // Register standard workflow that selects the provider strategy via configuration
+        services.AddScoped<ISpamWorkflow, SpamWorkflow>();
+
+        // Register structured output workflow that demonstrates type-safe agent responses
+        // This uses the new RunAgentWithPollingAsync<T>() generic method for type-safe results
+        services.AddScoped<ISpamWorkflowStructuredOutput, SpamWorkflowStructuredOutput>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures all services required for the invoice extraction workflow.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddInvoiceExtractionServices(this IServiceCollection services)
+    {
+        // Register keyed agent factories for both Azure and Ollama invoice extractors
+        services.AddKeyedAgentFactories("invoice_extractor");          // Azure AI Foundry
+        services.AddKeyedAgentFactories("invoice_extractor_ollama");   // Ollama local
+
+        // Register provider strategies (Azure uses vector stores, Ollama uses local retrieval)
+        services.AddScoped<IInvoiceProviderStrategy, AzureInvoiceProviderStrategy>();
+        services.AddScoped<IInvoiceProviderStrategy, OllamaInvoiceProviderStrategy>();
+
+        // Register the three executors as transient services
+        services.AddTransient<TextBasedInvoiceExecutor>();
+        services.AddTransient<ImageOnlyInvoiceExecutor>();
+        services.AddTransient<MixedInvoiceExecutor>();
+
+        // Register the invoice extraction workflow service
+        services.AddScoped<IInvoiceExtractionWorkflow, InvoiceExtractionWorkflow>();
+
+        return services;
+    }
 }
+

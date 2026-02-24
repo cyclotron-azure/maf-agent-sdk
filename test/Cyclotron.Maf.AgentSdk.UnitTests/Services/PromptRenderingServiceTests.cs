@@ -2,9 +2,7 @@ using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Services;
 
@@ -541,7 +539,7 @@ public class PromptRenderingServiceTests
     public void Constructor_EmptyAgentsDictionary_CreatesService()
     {
         // Act
-        var service = CreateService(new Dictionary<string, AgentDefinitionOptions>());
+        var service = CreateService([]);
 
         // Assert
         service.Should().NotBeNull();

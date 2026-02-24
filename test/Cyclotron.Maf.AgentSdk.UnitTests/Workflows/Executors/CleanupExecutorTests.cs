@@ -1,4 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Models.Workflow;
+using Cyclotron.Maf.AgentSdk.Common.Options;
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Workflows.Executors;
@@ -7,8 +8,8 @@ using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
+using IVectorStoreManager = Cyclotron.Maf.AgentSdk.VectorStore.Services.IVectorStoreManager;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Workflows.Executors;
 
@@ -19,7 +20,7 @@ namespace Cyclotron.Maf.AgentSdk.UnitTests.Workflows.Executors;
 public class CleanupExecutorTests
 {
     private readonly Mock<IVectorStoreManager> _mockVectorStoreManager;
-    private readonly Mock<IAzureFoundryCleanupService> _mockCleanupService;
+    private readonly Mock<IAIFoundryCleanupService> _mockCleanupService;
     private readonly Mock<ILogger<CleanupExecutor<TestCleanupableResult>>> _mockLogger;
     private readonly Mock<IWorkflowContext> _mockWorkflowContext;
     private readonly IOptions<ModelProviderOptions> _providerOptions;
@@ -27,7 +28,7 @@ public class CleanupExecutorTests
     public CleanupExecutorTests()
     {
         _mockVectorStoreManager = new Mock<IVectorStoreManager>();
-        _mockCleanupService = new Mock<IAzureFoundryCleanupService>();
+        _mockCleanupService = new Mock<IAIFoundryCleanupService>();
         _mockLogger = new Mock<ILogger<CleanupExecutor<TestCleanupableResult>>>();
         _mockWorkflowContext = new Mock<IWorkflowContext>();
         _providerOptions = MsOptions.Create(new ModelProviderOptions
@@ -55,19 +56,18 @@ public class CleanupExecutorTests
 
     #region Constructor Tests
 
-    [Fact(DisplayName = "Constructor should throw ArgumentNullException when vectorStoreManager is null")]
-    public void Constructor_NullVectorStoreManager_ThrowsArgumentNullException()
+    [Fact(DisplayName = "Constructor should accept null vectorStoreManager (optional)")]
+    public void Constructor_NullVectorStoreManager_IsValid()
     {
         // Act
-        var act = () => new CleanupExecutor<TestCleanupableResult>(
-            null!,
+        var executor = new CleanupExecutor<TestCleanupableResult>(
+            null,
             _mockCleanupService.Object,
             _mockLogger.Object,
             _providerOptions);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("vectorStoreManager");
+        executor.Should().NotBeNull();
     }
 
     [Fact(DisplayName = "Constructor should throw ArgumentNullException when cleanupService is null")]

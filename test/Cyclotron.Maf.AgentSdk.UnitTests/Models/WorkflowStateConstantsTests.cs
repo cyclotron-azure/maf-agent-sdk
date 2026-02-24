@@ -1,6 +1,5 @@
 using Cyclotron.Maf.AgentSdk.Models.Workflow;
 using AwesomeAssertions;
-using Xunit;
 
 namespace Cyclotron.Maf.AgentSdk.UnitTests.Models;
 
