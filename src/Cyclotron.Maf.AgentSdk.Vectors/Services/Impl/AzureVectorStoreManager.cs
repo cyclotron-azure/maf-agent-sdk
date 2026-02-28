@@ -379,7 +379,6 @@ public class AzureVectorStoreManager(
             {
                 var projectClient = GetProjectClient(providerName);
                 var openAIClient = projectClient.GetProjectOpenAIClient();
-                var fileClient = openAIClient.GetOpenAIFileClient();
                 vectorStoreClient = openAIClient.GetVectorStoreClient();
             }
 
