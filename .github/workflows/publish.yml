@@ -129,7 +129,7 @@ jobs:
         run: dotnet pack ${{ env.SOLUTION_PATH }} --no-build --configuration Release /p:Version=${{ steps.gitversion.outputs.nuget_version }} --output ./artifacts
 
       - name: Upload NuGet packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
           path: |
