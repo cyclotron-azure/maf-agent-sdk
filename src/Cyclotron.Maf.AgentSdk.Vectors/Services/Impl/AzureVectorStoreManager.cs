@@ -216,7 +216,7 @@ public class AzureVectorStoreManager(
                 vectorStoreId);
 
             // Wait for Azure to complete chunking and indexing
-            await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, cancellationToken);
+            await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, vectorStoreClient, cancellationToken);
 
             sw.Stop();
 
@@ -326,7 +326,7 @@ public class AzureVectorStoreManager(
             // Wait for all files to be processed by Azure
             foreach (var fileId in allFileIds)
             {
-                await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, cancellationToken);
+                await WaitForFileProcessingAsync(providerName, vectorStoreId, fileId, vectorStoreClient, cancellationToken);
             }
 
             sw.Stop();
@@ -360,6 +360,7 @@ public class AzureVectorStoreManager(
     /// <param name="providerName">Name of the model provider to use.</param>
     /// <param name="vectorStoreId">The unique identifier of the vector store.</param>
     /// <param name="fileId">The file ID to wait for indexing completion.</param>
+    /// <param name="vectorStoreClient">Optional pre-resolved client; if null one is obtained from <see cref="GetProjectClient"/>.</param>
     /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
     /// <returns>A task that completes when the file is indexed.</returns>
     /// <exception cref="VectorStoreIndexingException">Thrown when file indexing fails.</exception>
@@ -369,13 +370,17 @@ public class AzureVectorStoreManager(
         string providerName,
         string vectorStoreId,
         string fileId,
+        OpenAI.VectorStores.VectorStoreClient? vectorStoreClient = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var projectClient = GetProjectClient(providerName);
-            var openAIClient = projectClient.GetProjectOpenAIClient();
-            var vectorStoreClient = openAIClient.GetVectorStoreClient();
+            if (vectorStoreClient == null)
+            {
+                var projectClient = GetProjectClient(providerName);
+                var openAIClient = projectClient.GetProjectOpenAIClient();
+                vectorStoreClient = openAIClient.GetVectorStoreClient();
+            }
 
             var maxAttempts = _indexingOptions.MaxWaitAttempts;
             var initialDelayMs = _indexingOptions.InitialWaitDelayMs;
@@ -414,23 +419,36 @@ public class AzureVectorStoreManager(
                         "Azure file {FileId} indexing completed successfully after {Attempts} attempts",
                         fileId,
                         attempt + 1);
+
                     return;
                 }
 
                 if (status == OpenAIVectorStoreStatus.Failed)
                 {
-                    var errorMessage = $"Azure file indexing failed for {fileId} in vector store {vectorStoreId}";
-                    _logger.LogError(errorMessage);
+                    // This occurs when Azure fails to process the file (e.g. image-based pdf index failure, unsupported format, etc.)
+                    var lastError = vectorStoreFile.Value.LastError;
+                    var errorMessage = $"Azure file indexing failed for {fileId} in vector store {vectorStoreId}. Error code: {lastError?.Code.ToString() ?? "unknown"}, message: {lastError?.Message ?? "unknown"}";
+                    _logger.LogError(
+                        "Azure file indexing failed for {FileId} in vector store {VectorStoreId}. Error code: {ErrorCode}, message: {ErrorMessage}",
+                        fileId,
+                        vectorStoreId,
+                        lastError?.Code.ToString() ?? "unknown",
+                        lastError?.Message ?? "unknown");
                     _telemetry.RecordError(providerName, "IndexingFailed");
                     throw new VectorStoreIndexingException(errorMessage, providerName);
                 }
 
                 if (status == OpenAIVectorStoreStatus.Cancelled)
                 {
-                    var errorMessage = $"Azure file indexing was cancelled for {fileId} in vector store {vectorStoreId}";
-                    _logger.LogWarning(errorMessage);
+                    // This is Azure's server-side job cancellation (e.g. batch cancelled, vector store deleted mid-process)
+                    // It is NOT a .NET CancellationToken cancellation — callers should handle this as an indexing failure
+                    var errorMessage = $"Azure file indexing was cancelled by Azure (server-side) for {fileId} in vector store {vectorStoreId}";
+                    _logger.LogError(
+                        "Azure file indexing was cancelled by Azure (server-side) for {FileId} in vector store {VectorStoreId}",
+                        fileId,
+                        vectorStoreId);
                     _telemetry.RecordError(providerName, "IndexingCancelled");
-                    throw new OperationCanceledException(errorMessage);
+                    throw new VectorStoreIndexingException(errorMessage, providerName);
                 }
 
                 // Wait before next check

@@ -365,7 +365,7 @@ public class PdfPigMarkdownConverter(
             }
         }
 
-        var result = sb.ToString();
+        var result = sb.ToString().Replace("\r\n", "\n").Replace("\r", "\n");
         _logger.LogDebug("Extracted {CharCount} characters from PDF", result.Length);
 
         return result;
