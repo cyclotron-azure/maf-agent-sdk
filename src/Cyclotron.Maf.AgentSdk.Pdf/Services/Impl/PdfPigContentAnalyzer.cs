@@ -260,9 +260,16 @@ public class PdfPigContentAnalyzer(
                            Math.Abs(imageBox.Width - page.Width) <= marginOfError &&
                            Math.Abs(imageBox.Height - page.Height) <= marginOfError);
         }
-        catch
+        catch (OutOfMemoryException)
         {
             // If any error occurs during image detection, assume no full-page image
+            // Do not swallow critical system exceptions
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // If any non-critical error occurs during image detection, assume no full-page image
+            logger.LogWarning(ex, "Failed to detect full-page images on page {PageNumber}. Treating as no full-page image.", page.Number);
         }
 
         return false; // No full-page image detected
