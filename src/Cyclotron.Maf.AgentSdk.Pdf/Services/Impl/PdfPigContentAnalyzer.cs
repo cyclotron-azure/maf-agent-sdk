@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using System.Linq;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 
@@ -251,18 +252,13 @@ public class PdfPigContentAnalyzer(
     {
         try
         {
-            foreach (var image in page.GetImages())
-            {
-                var imageBox = image.Bounds;
+            const double marginOfError = 5.0;
 
-                // Check if the image size matches the page size within a small margin of error
-                const double marginOfError = 5.0;
-                if (Math.Abs(imageBox.Width - page.Width) <= marginOfError &&
-                    Math.Abs(imageBox.Height - page.Height) <= marginOfError)
-                {
-                    return true; // Full-page image detected
-                }
-            }
+            return page.GetImages()
+                       .Select(image => image.Bounds)
+                       .Any(imageBox =>
+                           Math.Abs(imageBox.Width - page.Width) <= marginOfError &&
+                           Math.Abs(imageBox.Height - page.Height) <= marginOfError);
         }
         catch
         {
