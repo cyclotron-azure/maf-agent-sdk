@@ -151,7 +151,6 @@ public class PdfPigMarkdownConverter(
         try
         {
             var analysisResult = await _contentAnalyzer.AnalyzeAsync(pdfFilePath, cancellationToken);
-
             if (analysisResult.ContentType == PdfContentType.ImageOnly)
             {
                 return HandleImageOnlyPdf(fileName, analysisResult);

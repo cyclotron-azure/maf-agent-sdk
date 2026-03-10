@@ -2,6 +2,7 @@ using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -32,12 +33,11 @@ public static class PdfServiceCollectionExtensions
         // Register PDF image extractor as keyed service
         services.AddKeyedSingleton<IPdfImageExtractor, PdfPigImageExtractor>("pdfpig");
 
+        // Register DefaultPdfContentClassifier as the implementation for IPdfContentClassifier
+        services.TryAddSingleton<IPdfContentClassifier, DefaultPdfContentClassifier>();
+
         // Register PDF content analyzer as keyed service
-        services.AddKeyedSingleton<IPdfContentAnalyzer>(
-            "pdfpig",
-            (sp, _) => new PdfPigContentAnalyzer(
-                sp.GetRequiredService<ILogger<PdfPigContentAnalyzer>>(),
-                sp.GetRequiredService<IOptions<PdfContentAnalysisOptions>>()));
+        services.AddKeyedSingleton<IPdfContentAnalyzer, PdfPigContentAnalyzer>("pdfpig");
 
         return services;
     }

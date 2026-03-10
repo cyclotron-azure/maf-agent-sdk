@@ -74,4 +74,14 @@ public class PdfContentAnalysisResult
     /// Gets or sets an optional diagnostic message from the analyzer.
     /// </summary>
     public string? DiagnosticMessage { get; set; }
+
+    /// <summary>
+    /// Gets or sets the total number of pages that contain a full-page image (e.g., scanned pages).
+    /// </summary>
+    /// <remarks>
+    /// This is a heuristic count of pages that likely contain a single image covering
+    /// most of the page, which often indicates scanned documents. The exact detection
+    /// logic may vary by analyzer implementation.
+    /// </remarks>
+    public int PagesWithFullPageImages { get; internal set; }
 }

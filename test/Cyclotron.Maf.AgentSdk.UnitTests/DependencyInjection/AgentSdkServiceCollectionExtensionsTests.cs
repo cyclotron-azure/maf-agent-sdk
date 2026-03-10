@@ -72,6 +72,34 @@ public class AgentSdkServiceCollectionExtensionsTests
         result.Should().BeSameAs(services);
     }
 
+    [Fact(DisplayName = "AddAgentSdkServices should register PdfContentAnalysisOptions")]
+        public void AddAgentSdkServices_RegistersPdfContentAnalysisOptions()
+        {
+            // Arrange
+            var configData = new Dictionary<string, string?>
+            {
+                { "PdfContentAnalysis:TextRatioThreshold", "0.8" },
+                { "PdfContentAnalysis:Enabled", "true" },
+                { "PdfContentAnalysis:AnalyzerKey", "pdfpig" }
+            };
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(configData).Build();
+
+            var services = new ServiceCollection();
+            services.AddSingleton<IConfiguration>(configuration);
+            services.AddLogging();
+
+            // Act
+            services.AddAgentSdkServices();
+            var serviceProvider = services.BuildServiceProvider();
+
+            // Assert
+            var options = serviceProvider.GetService<IOptions<PdfContentAnalysisOptions>>();
+            options.Should().NotBeNull();
+            options!.Value.TextRatioThreshold.Should().Be(0.8);
+            options.Value.Enabled.Should().BeTrue();
+            options.Value.AnalyzerKey.Should().Be("pdfpig");
+        }
+
     #endregion
 
     #region AddAgentOptions Tests
