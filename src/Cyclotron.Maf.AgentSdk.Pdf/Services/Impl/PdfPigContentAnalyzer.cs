@@ -3,6 +3,7 @@ using Cyclotron.Maf.AgentSdk.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 
@@ -23,21 +24,15 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// <item><description>Classify the PDF content type</description></item>
 /// </list>
 /// </para>
-/// <para>
-/// Classification is performed based on configurable thresholds:
-/// <list type="bullet">
-/// <item><description>TextBased: TextRatio &gt;= TextRatioThreshold</description></item>
-/// <item><description>ImageOnly: TextRatio &lt; TextRatioThreshold and ImageRatio &gt; 0.5</description></item>
-/// <item><description>Mixed: TextRatio &lt; TextRatioThreshold but ImageRatio &lt;= 0.5</description></item>
-/// </list>
-/// </para>
 /// </remarks>
 public class PdfPigContentAnalyzer(
     ILogger<PdfPigContentAnalyzer> logger,
-    IOptions<PdfContentAnalysisOptions> options) : IPdfContentAnalyzer
+    IOptions<PdfContentAnalysisOptions> options,
+    IPdfContentClassifier contentClassifier) : IPdfContentAnalyzer
 {
     private readonly ILogger<PdfPigContentAnalyzer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly PdfContentAnalysisOptions _options = options?.Value ?? new PdfContentAnalysisOptions();
+    private readonly IPdfContentClassifier _contentClassifier = contentClassifier ?? throw new ArgumentNullException(nameof(contentClassifier));
 
     /// <inheritdoc/>
     public async Task<PdfContentAnalysisResult> AnalyzeAsync(
@@ -138,6 +133,7 @@ public class PdfPigContentAnalyzer(
             var maxPagesToAnalyze = _options.MaxPagesToAnalyze <= 0 ? totalPages : Math.Min(_options.MaxPagesToAnalyze, totalPages);
             var pagesWithText = 0;
             var pagesWithImages = 0;
+            var pagesWithFullPageImages = 0;
             long totalCharacters = 0;
 
             for (int pageIndex = 0; pageIndex < maxPagesToAnalyze; pageIndex++)
@@ -157,10 +153,17 @@ public class PdfPigContentAnalyzer(
                 // A simple heuristic is to check if page has any images by examining word positions
                 // or by checking content stream. For now, we'll use a simpler approach:
                 // Pages with minimal text but PDF content are likely to be image-heavy
-                var hasImages = CheckPageForImages(page);
+                var hasImages = PageHasImages(page);
                 if (hasImages)
                 {
                     pagesWithImages++;
+                }
+
+                var hasFullPageImage = HasFullPageImage(page);
+                if (hasFullPageImage)
+                {
+                    _logger.LogInformation("Page {PageNumber} contains a full-page image.", pageIndex + 1);
+                    pagesWithFullPageImages++;
                 }
 
                 _logger.LogDebug(
@@ -174,23 +177,11 @@ public class PdfPigContentAnalyzer(
             result.TotalPages = totalPages;
             result.PagesWithText = pagesWithText;
             result.PagesWithImages = pagesWithImages;
+            result.PagesWithFullPageImages = pagesWithFullPageImages;
             result.TotalCharactersExtracted = totalCharacters;
             result.TextRatio = maxPagesToAnalyze > 0 ? (double)pagesWithText / maxPagesToAnalyze : 0;
             result.ImageRatio = maxPagesToAnalyze > 0 ? (double)pagesWithImages / maxPagesToAnalyze : 0;
-
-            // Classify content type based on ratios
-            if (result.TextRatio >= _options.TextRatioThreshold)
-            {
-                result.ContentType = PdfContentType.TextBased;
-            }
-            else if (result.ImageRatio > 0.5)
-            {
-                result.ContentType = PdfContentType.ImageOnly;
-            }
-            else
-            {
-                result.ContentType = PdfContentType.Mixed;
-            }
+            result.ContentType = _contentClassifier.ClassifyContent(result);
 
             if (_options.LogDetailedResults)
             {
@@ -218,7 +209,7 @@ public class PdfPigContentAnalyzer(
     /// Checks if a page contains images by analyzing its structure.
     /// Uses heuristic: pages with very little text but PDF objects likely contain images.
     /// </summary>
-    private bool CheckPageForImages(UglyToad.PdfPig.Content.Page page)
+    private bool PageHasImages(Page page)
     {
         try
         {
@@ -229,5 +220,34 @@ public class PdfPigContentAnalyzer(
             // If any error occurs during image detection, assume no images
             return false;
         }
+    }
+
+    private bool HasFullPageImage(Page page)
+    {
+        try
+        {
+            const double marginOfError = 5.0;
+
+            return page.GetImages()
+                       .Select(image => image.Bounds)
+                       .Any(imageBox =>
+                           Math.Abs(imageBox.Width - page.Width) <= marginOfError &&
+                           Math.Abs(imageBox.Height - page.Height) <= marginOfError);
+        }
+        catch (OutOfMemoryException)
+        {
+            // If any error occurs during image detection, assume no full-page image
+            // Do not swallow critical system exceptions
+            throw;
+        }
+        catch (Exception ex) when (ex is not StackOverflowException
+                                    and not ThreadAbortException
+                                    and not AccessViolationException)
+        {
+            // If any non-critical error occurs during image detection, assume no full-page image
+            logger.LogWarning(ex, "Failed to detect full-page images on page {PageNumber}. Treating as no full-page image.", page.Number);
+        }
+
+        return false; // No full-page image detected
     }
 }
