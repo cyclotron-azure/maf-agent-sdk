@@ -12,6 +12,7 @@ public class DefaultPdfContentClassifier(IOptions<PdfContentAnalysisOptions> opt
 {
     private readonly PdfContentAnalysisOptions _options = options?.Value ?? new PdfContentAnalysisOptions();
 
+    /// <inheritdoc/>
     public PdfContentType ClassifyContent(PdfContentAnalysisResult result)
     {
         if (result.PagesWithFullPageImages == result.TotalPages)
