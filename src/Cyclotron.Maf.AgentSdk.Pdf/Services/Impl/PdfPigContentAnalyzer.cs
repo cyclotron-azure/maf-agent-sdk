@@ -36,10 +36,12 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class PdfPigContentAnalyzer(
     ILogger<PdfPigContentAnalyzer> logger,
-    IOptions<PdfContentAnalysisOptions> options) : IPdfContentAnalyzer
+    IOptions<PdfContentAnalysisOptions> options,
+    IPdfContentClassifier contentClassifier) : IPdfContentAnalyzer
 {
     private readonly ILogger<PdfPigContentAnalyzer> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly PdfContentAnalysisOptions _options = options?.Value ?? new PdfContentAnalysisOptions();
+    private readonly IPdfContentClassifier _contentClassifier = contentClassifier ?? throw new ArgumentNullException(nameof(contentClassifier));
 
     /// <inheritdoc/>
     public async Task<PdfContentAnalysisResult> AnalyzeAsync(
@@ -188,7 +190,7 @@ public class PdfPigContentAnalyzer(
             result.TotalCharactersExtracted = totalCharacters;
             result.TextRatio = maxPagesToAnalyze > 0 ? (double)pagesWithText / maxPagesToAnalyze : 0;
             result.ImageRatio = maxPagesToAnalyze > 0 ? (double)pagesWithImages / maxPagesToAnalyze : 0;
-            result.ContentType = CalculatePdfContentType(result);
+            result.ContentType = _contentClassifier.ClassifyContent(result);
 
             if (_options.LogDetailedResults)
             {
@@ -210,25 +212,6 @@ public class PdfPigContentAnalyzer(
             _logger.LogError(ex, "Error during PDF content analysis for {FileName}", fileName);
             throw;
         }
-    }
-
-    private PdfContentType CalculatePdfContentType(PdfContentAnalysisResult result)
-    {
-        if (result.PagesWithFullPageImages == result.TotalPages)
-        {
-            // Even if there is some text, if every page has a full-page image, we classify
-            // as ImageOnly since the text has a high chance of being poor OCR which fails
-            // to index correctly.
-            return PdfContentType.ImageOnly;
-        }
-
-        // Classify content type based on ratios
-        if (result.PagesWithFullPageImages > 0 && result.TextRatio >= _options.TextRatioThreshold)
-        {
-            return PdfContentType.Mixed;
-        }
-
-        return PdfContentType.TextBased;
     }
 
     /// <summary>
