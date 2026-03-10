@@ -65,7 +65,7 @@ public class PdfPigContentAnalyzerTests : IDisposable
     private PdfPigContentAnalyzer CreateAnalyzer(IOptions<PdfContentAnalysisOptions>? options = null)
     {
         var resolvedOptions = options ?? CreateOptions();
-        var classifier = new DefaultPdfContentClassifier(resolvedOptions.Value);
+        var classifier = new DefaultPdfContentClassifier(resolvedOptions);
         return new PdfPigContentAnalyzer(
             _mockLogger.Object,
             resolvedOptions,

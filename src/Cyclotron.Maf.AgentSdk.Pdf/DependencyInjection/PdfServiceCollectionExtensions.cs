@@ -37,15 +37,7 @@ public static class PdfServiceCollectionExtensions
         services.TryAddSingleton<IPdfContentClassifier, DefaultPdfContentClassifier>();
 
         // Register PDF content analyzer as keyed service
-        services.AddKeyedSingleton<IPdfContentAnalyzer>(
-            "pdfpig",
-            (sp, _) =>
-            {
-                var logger = sp.GetRequiredService<ILogger<PdfPigContentAnalyzer>>();
-                var options = sp.GetRequiredService<IOptions<PdfContentAnalysisOptions>>();
-                var contentClassifier = sp.GetRequiredService<IPdfContentClassifier>();
-                return new PdfPigContentAnalyzer(logger, options, contentClassifier);
-            });
+        services.AddKeyedSingleton<IPdfContentAnalyzer, PdfPigContentAnalyzer>("pdfpig");
 
         return services;
     }
