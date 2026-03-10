@@ -222,17 +222,31 @@ public class PdfPigContentAnalyzer(
         }
     }
 
+    /// <summary>
+    /// Determines if a page contains a full-page image by checking the size
+    /// of images relative to the page dimensions.
+    /// </summary>
+    /// <param name="page"></param>
+    /// <returns></returns>
     private bool HasFullPageImage(Page page)
     {
         try
         {
-            const double marginOfError = 5.0;
-
             return page.GetImages()
-                       .Select(image => image.Bounds)
-                       .Any(imageBox =>
-                           Math.Abs(imageBox.Width - page.Width) <= marginOfError &&
-                           Math.Abs(imageBox.Height - page.Height) <= marginOfError);
+                .Any(img =>
+                {
+                    var b = img.Bounds;
+
+                    double widthCoverage = b.Width / page.Width;
+                    double heightCoverage = b.Height / page.Height;
+                    double areaCoverage = b.Width * b.Height / (page.Width * page.Height);
+
+                    return
+                        areaCoverage >= 0.70 || // dominant image
+                        (widthCoverage >= 0.85 && heightCoverage >= 0.60) ||
+                        (heightCoverage >= 0.85 && widthCoverage >= 0.60);
+                });
+
         }
         catch (OutOfMemoryException)
         {
@@ -245,7 +259,7 @@ public class PdfPigContentAnalyzer(
                                     and not AccessViolationException)
         {
             // If any non-critical error occurs during image detection, assume no full-page image
-            logger.LogWarning(ex, "Failed to detect full-page images on page {PageNumber}. Treating as no full-page image.", page.Number);
+            _logger.LogWarning(ex, "Failed to detect full-page images on page {PageNumber}. Treating as no full-page image.", page.Number);
         }
 
         return false; // No full-page image detected
