@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
-using System.Linq;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates
 
@@ -23,14 +22,6 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// <item><description>Detect image/XObject references</description></item>
 /// <item><description>Calculate text and image ratios</description></item>
 /// <item><description>Classify the PDF content type</description></item>
-/// </list>
-/// </para>
-/// <para>
-/// Classification is performed based on configurable thresholds:
-/// <list type="bullet">
-/// <item><description>TextBased: TextRatio &gt;= TextRatioThreshold</description></item>
-/// <item><description>ImageOnly: TextRatio &lt; TextRatioThreshold and ImageRatio &gt; 0.5</description></item>
-/// <item><description>Mixed: TextRatio &lt; TextRatioThreshold but ImageRatio &lt;= 0.5</description></item>
 /// </list>
 /// </para>
 /// </remarks>
