@@ -249,7 +249,9 @@ public class PdfPigContentAnalyzer(
             // Do not swallow critical system exceptions
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not StackOverflowException
+                                    and not ThreadAbortException
+                                    and not AccessViolationException)
         {
             // If any non-critical error occurs during image detection, assume no full-page image
             logger.LogWarning(ex, "Failed to detect full-page images on page {PageNumber}. Treating as no full-page image.", page.Number);
