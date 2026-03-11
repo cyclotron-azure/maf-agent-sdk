@@ -44,6 +44,7 @@
   <ItemGroup>
     <PackageVersion Include="System.Drawing.Common" Version="10.0.3" />
     <PackageVersion Include="PdfPig" Version="0.1.13" />
+    <PackageVersion Include="PdfPig.Filters.Jpx.OpenJpeg" Version="0.1.12.1" />
     <PackageVersion Include="DotNetEnv" Version="3.1.1" />
     <PackageVersion Include="Handlebars.Net" Version="2.1.6" />
     <PackageVersion Include="NetEscapades.Configuration.Yaml" Version="3.1.0" />
