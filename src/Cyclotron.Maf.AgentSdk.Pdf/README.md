@@ -95,7 +95,10 @@ Configure PDF processing in `appsettings.json` or `agent.config.yaml`:
     "TextRatioThreshold": 0.1,
     "MaxPagesToAnalyze": 0,
     "MinCharactersPerPage": 10,
-    "LogDetailedResults": false
+    "LogDetailedResults": false,
+    "FullPageImageAreaCoverageThreshold": 0.70,
+    "FullPageImagePrimaryDimensionThreshold": 0.85,
+    "FullPageImageSecondaryDimensionThreshold": 0.60
   }
 }
 ```
@@ -108,6 +111,9 @@ Configure PDF processing in `appsettings.json` or `agent.config.yaml`:
 - `MaxPagesToAnalyze` - Limit pages to analyze (0 = all pages)
 - `MinCharactersPerPage` - Minimum characters to consider page as text
 - `LogDetailedResults` - Enable detailed logging
+- `FullPageImageAreaCoverageThreshold` - Minimum area coverage ratio (0.0 - 1.0) for an image to be classified as a dominant full-page image. Default: `0.70`
+- `FullPageImagePrimaryDimensionThreshold` - Minimum coverage ratio for an image's primary axis (width or height) in the aspect-aware full-page check. Default: `0.85`
+- `FullPageImageSecondaryDimensionThreshold` - Minimum coverage ratio for an image's secondary axis in the aspect-aware full-page check. Default: `0.60`
 
 ### PDF Image Extraction
 

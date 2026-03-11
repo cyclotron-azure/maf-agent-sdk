@@ -17,9 +17,6 @@ public class DefaultPdfContentClassifier(IOptions<PdfContentAnalysisOptions> opt
     {
         if (result.PagesWithFullPageImages == result.TotalPages)
         {
-            // Even if there is some text, if every page has a full-page image, we classify
-            // as ImageOnly since the text has a high chance of being poor OCR which fails
-            // to index correctly.
             return result.TextRatio >= _options.TextRatioThreshold
                 ? PdfContentType.Mixed
                 : PdfContentType.ImageOnly;

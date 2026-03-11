@@ -287,6 +287,16 @@ public static class PdfTestFixtures
         return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-img.pdf");
     }
 
+    /// <summary>
+    /// Gets the path to the sample invoice PDF that contains full-page images with an embedded OCR text layer.
+    /// This represents mixed content: image pages with extractable text from the OCR layer.
+    /// </summary>
+    public static string GetSampleMixedContentPdfPath()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-img-with-OCR-layer.pdf");
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
