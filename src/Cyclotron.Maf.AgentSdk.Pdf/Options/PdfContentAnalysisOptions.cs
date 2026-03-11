@@ -82,4 +82,27 @@ public class PdfContentAnalysisOptions
     /// Default: true.
     /// </summary>
     public bool LogDetailedResults { get; set; } = true;
+
+    /// <summary>
+    /// Minimum area coverage ratio (0.0 to 1.0) for an image to be considered a dominant full-page image.
+    /// An image whose area is at least this fraction of the total page area is classified as full-page.
+    /// Default: 0.70 (image must cover at least 70% of the page area).
+    /// </summary>
+    public double FullPageImageAreaCoverageThreshold { get; set; } = 0.70;
+
+    /// <summary>
+    /// Primary dimension coverage ratio (0.0 to 1.0) used in the aspect-aware full-page image check.
+    /// An image is considered full-page when its primary axis (width or height) spans at least this
+    /// fraction of the page in that direction, combined with <see cref="FullPageImageSecondaryDimensionThreshold"/>.
+    /// Default: 0.85 (primary dimension must cover at least 85% of the page).
+    /// </summary>
+    public double FullPageImagePrimaryDimensionThreshold { get; set; } = 0.85;
+
+    /// <summary>
+    /// Secondary dimension coverage ratio (0.0 to 1.0) used in the aspect-aware full-page image check.
+    /// An image is considered full-page when its secondary axis spans at least this fraction of the page,
+    /// combined with <see cref="FullPageImagePrimaryDimensionThreshold"/>.
+    /// Default: 0.60 (secondary dimension must cover at least 60% of the page).
+    /// </summary>
+    public double FullPageImageSecondaryDimensionThreshold { get; set; } = 0.60;
 }

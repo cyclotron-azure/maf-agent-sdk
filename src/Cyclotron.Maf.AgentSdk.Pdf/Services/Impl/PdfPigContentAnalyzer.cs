@@ -242,9 +242,9 @@ public class PdfPigContentAnalyzer(
                     double areaCoverage = b.Width * b.Height / (page.Width * page.Height);
 
                     return
-                        areaCoverage >= 0.70 || // dominant image
-                        (widthCoverage >= 0.85 && heightCoverage >= 0.60) ||
-                        (heightCoverage >= 0.85 && widthCoverage >= 0.60);
+                        areaCoverage >= _options.FullPageImageAreaCoverageThreshold || // dominant image
+                        (widthCoverage >= _options.FullPageImagePrimaryDimensionThreshold && heightCoverage >= _options.FullPageImageSecondaryDimensionThreshold) ||
+                        (heightCoverage >= _options.FullPageImagePrimaryDimensionThreshold && widthCoverage >= _options.FullPageImageSecondaryDimensionThreshold);
                 });
 
         }
