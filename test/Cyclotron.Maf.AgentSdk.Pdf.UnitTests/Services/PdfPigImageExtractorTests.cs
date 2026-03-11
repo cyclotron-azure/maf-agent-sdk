@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using MsOptions = Microsoft.Extensions.Options.Options;
+using UglyToad.PdfPig.Filters;
 
 namespace Cyclotron.Maf.AgentSdk.Pdf.UnitTests.Services;
 
@@ -74,9 +75,11 @@ public class PdfPigImageExtractorTests : IDisposable
 
     private PdfPigImageExtractor CreateExtractor(IOptions<PdfImageExtractionOptions>? options = null)
     {
+        var filterProvider = new JpxFilterProvider();
         return new PdfPigImageExtractor(
             _mockLogger.Object,
-            options ?? CreateOptions());
+            options ?? CreateOptions(),
+            filterProvider);
     }
 
     private string CreateTempPdf(byte[] pdfBytes)
@@ -92,15 +95,20 @@ public class PdfPigImageExtractorTests : IDisposable
     public async Task ExtractImagesAsync_WithValidPdfPath_ReturnsExtractedImages()
     {
         // Arrange
-        var extractor = CreateExtractor();
-        var pdfPath = CreateTempPdf(PdfTestFixtures.CreateMinimalPdf());
+        var options = CreateOptions(preferredFormat: "png", minImageWidth: 1, minImageHeight: 1);
+        var extractor = CreateExtractor(options);
+        var pdfPath = PdfTestFixtures.GetSampleMixedContentPdfPath();
+
+        File.Exists(pdfPath).Should().BeTrue();
 
         // Act
         var result = await extractor.ExtractImagesAsync(pdfPath);
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().BeAssignableTo<ExtractedPdfImage[]>();
+        result.Length.Should().BeGreaterThan(0);
+        result[0].ImageBytes.Length.Should().BeGreaterThan(0);
+        result[0].MimeType.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -578,4 +586,35 @@ public class PdfPigImageExtractorTests : IDisposable
     }
 
     #endregion
+
+    [Fact]
+    public void Constructor_WithNullFilterProvider_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var options = CreateOptions();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => new PdfPigImageExtractor(
+            _mockLogger.Object,
+            options,
+            null!));
+    }
+
+    [Fact]
+    public async Task ExtractImages_UsesInjectedFilterProvider()
+    {
+        // Arrange
+        var mockFilterProvider = new Mock<IFilterProvider>();
+        var options = CreateOptions();
+        var extractor = new PdfPigImageExtractor(
+            _mockLogger.Object,
+            options,
+            mockFilterProvider.Object);
+
+        // Act
+        await extractor.ExtractImagesAsync(CreateTempPdf(PdfTestFixtures.CreateMinimalPdf()));
+
+        // Assert
+        mockFilterProvider.VerifyNoOtherCalls();
+    }
 }

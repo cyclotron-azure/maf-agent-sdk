@@ -1,10 +1,9 @@
 using Cyclotron.Maf.AgentSdk.Options;
 using Cyclotron.Maf.AgentSdk.Services;
 using Cyclotron.Maf.AgentSdk.Services.Impl;
+using UglyToad.PdfPig.Filters;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -29,6 +28,9 @@ public static class PdfServiceCollectionExtensions
 
         // Register PDF to Markdown converter
         services.AddSingleton<IPdfToMarkdownConverter, PdfPigMarkdownConverter>();
+
+        // Register the JPX-capable filter provider for PDF image extraction, which uses OpenJpeg for JPEG 2000 decoding
+        services.AddSingleton<IFilterProvider, JpxFilterProvider>();
 
         // Register PDF image extractor as keyed service
         services.AddKeyedSingleton<IPdfImageExtractor, PdfPigImageExtractor>("pdfpig");
