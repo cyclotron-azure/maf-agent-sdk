@@ -284,7 +284,7 @@ public static class PdfTestFixtures
     public static string GetSampleImageOnlyPdfPath()
     {
         var repositoryRoot = FindRepositoryRoot();
-        return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-img.pdf");
+        return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-jpg-img.pdf");
     }
 
     /// <summary>
@@ -294,7 +294,7 @@ public static class PdfTestFixtures
     public static string GetSampleMixedContentPdfPath()
     {
         var repositoryRoot = FindRepositoryRoot();
-        return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-img-with-OCR-layer.pdf");
+        return Path.Combine(repositoryRoot, "samples", "SpamDetection", "pdfs", "invoice-jpx-img-with-OCR-layer.pdf");
     }
 
     private static string FindRepositoryRoot()

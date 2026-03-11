@@ -24,6 +24,7 @@
   <ItemGroup>
     <PackageReference Include="System.Drawing.Common" />
     <PackageReference Include="PdfPig" />
+    <PackageReference Include="PdfPig.Filters.Jpx.OpenJpeg" />
   </ItemGroup>
 
   <!-- Package Content -->

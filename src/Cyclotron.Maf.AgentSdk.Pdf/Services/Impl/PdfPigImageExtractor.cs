@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Filters;
 using UglyToad.PdfPig.Images;
 using UglyToad.PdfPig.XObjects;
 
@@ -38,10 +39,12 @@ namespace Cyclotron.Maf.AgentSdk.Services.Impl;
 /// </remarks>
 public class PdfPigImageExtractor(
     ILogger<PdfPigImageExtractor> logger,
-    IOptions<PdfImageExtractionOptions> options) : IPdfImageExtractor
+    IOptions<PdfImageExtractionOptions> options,
+    IFilterProvider filterProvider) : IPdfImageExtractor
 {
     private readonly ILogger<PdfPigImageExtractor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly PdfImageExtractionOptions _options = options?.Value ?? new PdfImageExtractionOptions();
+    private readonly IFilterProvider _filterProvider = filterProvider ?? throw new ArgumentNullException(nameof(filterProvider));
 
     /// <inheritdoc/>
     public async Task<ExtractedPdfImage[]> ExtractImagesAsync(
@@ -226,7 +229,7 @@ public class PdfPigImageExtractor(
 
         try
         {
-            using var document = PdfDocument.Open(pdfFilePath);
+            using var document = PdfDocument.Open(pdfFilePath, new ParsingOptions { FilterProvider = _filterProvider });
             var totalPages = document.NumberOfPages;
             var maxPagesToProcess = _options.MaxPagesToProcess <= 0 ? totalPages : Math.Min(_options.MaxPagesToProcess, totalPages);
 
@@ -286,7 +289,7 @@ public class PdfPigImageExtractor(
 
         try
         {
-            using var document = PdfDocument.Open(pdfFilePath);
+            using var document = PdfDocument.Open(pdfFilePath, new ParsingOptions { FilterProvider = _filterProvider });
             var totalPages = document.NumberOfPages;
             var maxPagesToProcess = _options.MaxPagesToProcess <= 0 ? totalPages : Math.Min(_options.MaxPagesToProcess, totalPages);
 
