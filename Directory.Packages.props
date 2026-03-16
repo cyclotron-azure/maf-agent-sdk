@@ -66,6 +66,6 @@
   </ItemGroup>
   <!-- Build/Source Link Packages -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.103" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.201" />
   </ItemGroup>
 </Project>
